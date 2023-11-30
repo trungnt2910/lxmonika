@@ -1,0 +1,77 @@
+;
+; lxmonika.inf
+;
+
+[Version]
+Signature="$WINDOWS NT$"
+Class=System ; TODO: specify appropriate Class
+ClassGuid={4d36e97d-e325-11ce-bfc1-08002be10318} ; TODO: specify appropriate ClassGuid
+Provider=%ManufacturerName%
+CatalogFile=lxmonika.cat
+DriverVer= ; TODO: set DriverVer in stampinf property pages
+PnpLockdown=1
+
+[DestinationDirs]
+DefaultDestDir = 12
+lxmonika_Device_CoInstaller_CopyFiles = 11
+
+[SourceDisksNames]
+1 = %DiskName%,,,""
+
+[SourceDisksFiles]
+lxmonika.sys  = 1,,
+WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll=1 ; make sure the number matches with SourceDisksNames
+
+;*****************************************
+; Install Section
+;*****************************************
+
+[Manufacturer]
+%ManufacturerName%=Standard,NT$ARCH$
+
+[Standard.NT$ARCH$]
+%lxmonika.DeviceDesc%=lxmonika_Device, Root\lxmonika ; TODO: edit hw-id
+
+[lxmonika_Device.NT]
+CopyFiles=Drivers_Dir
+
+[Drivers_Dir]
+lxmonika.sys
+
+;-------------- Service installation
+[lxmonika_Device.NT.Services]
+AddService = lxmonika,%SPSVCINST_ASSOCSERVICE%, lxmonika_Service_Inst
+
+; -------------- lxmonika driver install sections
+[lxmonika_Service_Inst]
+DisplayName    = %lxmonika.SVCDESC%
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 0               ; SERVICE_BOOT_START
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %12%\lxmonika.sys
+
+;
+;--- lxmonika_Device Coinstaller installation ------
+;
+
+[lxmonika_Device.NT.CoInstallers]
+AddReg=lxmonika_Device_CoInstaller_AddReg
+CopyFiles=lxmonika_Device_CoInstaller_CopyFiles
+
+[lxmonika_Device_CoInstaller_AddReg]
+HKR,,CoInstallers32,0x00010000, "WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll,WdfCoInstaller"
+
+[lxmonika_Device_CoInstaller_CopyFiles]
+WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll
+
+[lxmonika_Device.NT.Wdf]
+KmdfService =  lxmonika, lxmonika_wdfsect
+[lxmonika_wdfsect]
+KmdfLibraryVersion = $KMDFVERSION$
+
+[Strings]
+SPSVCINST_ASSOCSERVICE= 0x00000002
+ManufacturerName="Just Monika" ;TODO: Replace with your manufacturer name
+DiskName = "Just Monika"
+lxmonika.DeviceDesc = "Just Monika"
+lxmonika.SVCDESC = "Just Monika"
