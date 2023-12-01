@@ -92,11 +92,20 @@ MapSystemCallDispatch(
         pUtsName = (old_utsname*)SystemCall->TrapFrame->Rdi;
         Logger::LogTrace("uname(", (PVOID)SystemCall->TrapFrame->Rdi, ")");
     }
+#else
+#error Detect the syscall arguments for this architecture!
 #endif
-
+    
     MaOriginalRoutines.DispatchSystemCall(SystemCall);
 
-    if (bIsUname)
+    if (bIsUname
+        // Also check for a success return value.
+        // Otherwise, pUtsName may be an invalid pointer.
+#ifdef AMD64
+        && SystemCall->TrapFrame->Rax == 0)
+#else
+#error Detect the syscall return value for this architecture!
+#endif
     {
         // We should be in the context of the calling process.
         // Therefore, it is safe to access the raw pointers.
