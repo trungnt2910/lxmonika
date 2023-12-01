@@ -54,12 +54,56 @@ then give control to `launchd`.
 
 <!-- HyClone on Windows when? -->
 
-## Build requirements
+## Build instructions
+
+### Prerequisites
 
 - Visual Studio 2022
 - The latest WDK. Download it
 [here](https://learn.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk).
 - A Windows NT 10.0 machine with Test Signing enabled.
+
+### Instructions
+
+Use whatever workflow you normally use for your kernel drivers. The steps below are my preferred
+procedure and friendly for KMDF newbies.
+
+#### For the first time you deploy a driver on a new computer
+
+On an elevated Command Prompt window on the test computer:
+
+- Enable test signing.
+```bat
+bcdedit /set testsigning on
+```
+- Copy the
+[`devcon.exe`](https://learn.microsoft.com/en-us/windows-hardware/drivers/devtest/devcon)
+tool to the test computer. It is normally located at
+`%PROGRAMFILES(x86)%\Windows Kits\10\Tools\$(WINDOWS_SDK_VERSION)\$(ARCHITECTURE)\devcon.exe`.
+- Reboot the device.
+```bat
+shutdown /r /t 00
+```
+
+#### Every time you want to test
+
+- Build this driver on Visual Studio 2022 (Right-click the project -> Build).
+- Copy the output folder, located at
+`$(SolutionDir)\lxmonika\bin\$(Configuration)\$(Platform)\lxmonika`, to the test device.
+
+On an elevated Command Prompt window on the test computer:
+
+- Run the command below. Replace the `path\to` part with the relevant paths. `Root\lxmonika` is the
+driver's virtual device path and should stay the same for all command invocations.
+```bat
+path\to\devcon.exe install path\to\lxmonika\lxmonika.inf Root\lxmonika
+```
+- Reboot the device.
+```bat
+shutdown /r /t 00
+```
+
+### Notes
 
 For the latest Windows builds, WinDbg and Debug mode may not be required, since PatchGuard might
 have removed `PspPicoProviderRoutines` from its	`PsKernelRangeList`. Therefore, modifying the
