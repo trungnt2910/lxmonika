@@ -112,7 +112,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup>
     <ClCompile>
-      <PreprocessorDefinitions>MONIKA_KERNEL_TIMESTAMP="$([System.DateTime]::Now.ToString(ddd MMM dd HH:mm:ss UTC yyyy))";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MONIKA_KERNEL_TIMESTAMP="$([System.DateTime]::UtcNow.ToString(ddd MMM dd HH:mm:ss UTC yyyy))";%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
