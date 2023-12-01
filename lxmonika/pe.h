@@ -6,9 +6,9 @@
 #pragma warning(disable: 4201)
 
 // pe.h
-// 
+//
 // Support definitions for handling PE images.
-// 
+//
 // Based on winnt.h
 
 //
@@ -1367,7 +1367,7 @@ typedef struct _IMAGE_IMPORT_BY_NAME {
 //@[comment("MVI_tracked")]
 typedef struct _IMAGE_THUNK_DATA64 {
     union {
-        ULONGLONG ForwarderString;  // PBYTE 
+        ULONGLONG ForwarderString;  // PBYTE
         ULONGLONG Function;         // PDWORD
         ULONGLONG Ordinal;
         ULONGLONG AddressOfData;    // PIMAGE_IMPORT_BY_NAME
@@ -1380,7 +1380,7 @@ typedef IMAGE_THUNK_DATA64* PIMAGE_THUNK_DATA64;
 //@[comment("MVI_tracked")]
 typedef struct _IMAGE_THUNK_DATA32 {
     union {
-        DWORD ForwarderString;      // PBYTE 
+        DWORD ForwarderString;      // PBYTE
         DWORD Function;             // PDWORD
         DWORD Ordinal;
         DWORD AddressOfData;        // PIMAGE_IMPORT_BY_NAME
@@ -1758,7 +1758,7 @@ typedef struct _IMAGE_FUNCTION_OVERRIDE_DYNAMIC_RELOCATION {
     DWORD RvaSize;              // Size in bytes taken by RVAs. Must be multiple of sizeof(DWORD).
     DWORD BaseRelocSize;        // Size in bytes taken by BaseRelocs
 
-    // DWORD RVAs[RvaSize / sizeof(DWORD)];     // Array containing overriding func RVAs. 
+    // DWORD RVAs[RvaSize / sizeof(DWORD)];     // Array containing overriding func RVAs.
 
     // IMAGE_BASE_RELOCATION  BaseRelocs[ANYSIZE_ARRAY]; // Base relocations (RVA + Size + TO)
                                                          //  Padded with extra TOs for 4B alignment

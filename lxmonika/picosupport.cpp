@@ -177,17 +177,17 @@ PicoSppLocateProviderRoutines(
         {
             continue;
         }
-        
+
         // TODO: Check OpenProcess and OpenThread.
         // TODO: The last unknown member of the struct is always 1. Check for that?
-        
+
         // The current routines match the criteria. Store it.
         PspPicoProviderRoutines = pTestRoutines;
 
         Logger::LogTrace("PspPicoProviderRoutines found at ", pTestRoutines);
 
         *pPpr = pTestRoutines;
-        
+
         return STATUS_SUCCESS;
     }
 

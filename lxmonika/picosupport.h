@@ -5,7 +5,7 @@
 #include "pico.h"
 
 // picosupport.h
-// 
+//
 // Support functions for Pico processes
 
 #ifdef __cplusplus

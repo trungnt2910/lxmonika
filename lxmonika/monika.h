@@ -1,7 +1,7 @@
 #pragma once
 
 // monika.h
-// 
+//
 // Just Monika.
 
 #include <ntddk.h>

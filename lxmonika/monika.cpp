@@ -120,7 +120,7 @@ MapSystemCallDispatch(
 #else
 #error Detect the syscall arguments for this architecture!
 #endif
-    
+
     MaOriginalProviderRoutines.DispatchSystemCall(SystemCall);
 
     if (bIsUname

@@ -47,7 +47,7 @@ MdlpFindModuleByName(
             SIZE_T uPathLength = strnlen(pPath, sizeof(pModules->Modules[i].FullPathName));
 
             SSIZE_T sLastComponent = (SSIZE_T)uPathLength;
-            
+
             while (sLastComponent >= 0 && pPath[sLastComponent] != '\\')
             {
                 --sLastComponent;
