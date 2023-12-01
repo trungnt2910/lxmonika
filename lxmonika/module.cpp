@@ -8,9 +8,9 @@
 extern "C"
 NTSTATUS
 MdlpFindModuleByName(
-    IN PCSTR pModuleName,
-    OUT PHANDLE pHandle,
-    OUT PSIZE_T puSize OPTIONAL
+    _In_ PCSTR pModuleName,
+    _Out_ PHANDLE pHandle,
+    _Out_opt_ PSIZE_T puSize
 )
 {
     NTSTATUS status;
@@ -73,10 +73,10 @@ MdlpFindModuleByName(
 extern "C"
 NTSTATUS
 MdlpFindModuleSectionByName(
-    IN HANDLE hdl,
-    IN PCSTR pSectionName,
-    OUT PVOID pSection,
-    PSIZE_T puSize OPTIONAL
+    _In_ HANDLE hdl,
+    _In_ PCSTR pSectionName,
+    _Out_ PVOID* pSection,
+    _Inout_opt_ PSIZE_T puSize
 )
 {
     if (hdl == NULL || pSectionName == NULL || pSection == NULL)
@@ -137,6 +137,44 @@ MdlpFindModuleSectionByName(
         *puSize = pInterestedSectionHeader->Misc.VirtualSize;
     }
 
-    *(PVOID*)pSection = pStart + pInterestedSectionHeader->VirtualAddress;
+    *pSection = pStart + pInterestedSectionHeader->VirtualAddress;
     return STATUS_SUCCESS;
+}
+
+extern "C"
+NTSTATUS
+MdlpGetProcAddress(
+    _In_ HANDLE hModule,
+    _In_ PCSTR  lpProcName,
+    _Out_ PVOID* pProc
+)
+{
+    if (hModule == NULL || lpProcName == NULL || pProc == NULL)
+    {
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    PCHAR pStart = (PCHAR)hModule;
+
+    PIMAGE_DOS_HEADER pDosHeader = (PIMAGE_DOS_HEADER)pStart;
+    PIMAGE_NT_HEADERS pPeHeader = (PIMAGE_NT_HEADERS)(pStart + pDosHeader->e_lfanew);
+
+    PIMAGE_EXPORT_DIRECTORY pExportDirectory = (PIMAGE_EXPORT_DIRECTORY)(pStart +
+        pPeHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress);
+
+    SIZE_T uNameCount = pExportDirectory->NumberOfNames;
+    PDWORD32 pNameList = (PDWORD32)(pStart + pExportDirectory->AddressOfNames);
+    PDWORD32 pFuncList = (PDWORD32)(pStart + pExportDirectory->AddressOfFunctions);
+    WORD* pOrdinalList = (WORD*)(pStart + pExportDirectory->AddressOfNameOrdinals);
+
+    for (SIZE_T i = 0; i < uNameCount; ++i)
+    {
+        if (strcmp(lpProcName, (PCSTR)(pStart + pNameList[i])) == 0)
+        {
+            *pProc = (PVOID)(pStart + pFuncList[pOrdinalList[i]]);
+            return STATUS_SUCCESS;
+        }
+    }
+
+    return STATUS_NOT_FOUND;
 }

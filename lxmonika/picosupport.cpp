@@ -12,7 +12,7 @@ static PPS_PICO_PROVIDER_ROUTINES PspPicoProviderRoutines = NULL;
 extern "C"
 NTSTATUS
 PicoSppLocateProviderRoutines(
-    OUT PPS_PICO_PROVIDER_ROUTINES* pPpr
+    _Out_ PPS_PICO_PROVIDER_ROUTINES* pPpr
 )
 {
     NTSTATUS status = STATUS_SUCCESS;
@@ -195,4 +195,46 @@ PicoSppLocateProviderRoutines(
     Logger::LogError("Make sure WSL is enabled and LXCORE.SYS is loaded.");
 
     return STATUS_NOT_FOUND;
+}
+
+extern "C"
+NTSTATUS
+PicoSppLocateRoutines(
+    _Out_ PPS_PICO_ROUTINES* pPr
+)
+{
+    if (pPr == NULL)
+    {
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    NTSTATUS status = STATUS_SUCCESS;
+
+    HANDLE hdlLxCore = NULL;
+    SIZE_T uLxCoreSize = 0;
+    status = MdlpFindModuleByName("lxcore.sys", &hdlLxCore, &uLxCoreSize);
+
+    Logger::LogTrace("Find lxcore: status=", (void*)status, " handle=", hdlLxCore,
+        " size=", uLxCoreSize);
+
+    if (!NT_SUCCESS(status))
+    {
+        return status;
+    }
+
+    PVOID pLxpRoutines;
+    status = MdlpGetProcAddress(hdlLxCore, "LxpRoutines", &pLxpRoutines);
+
+    Logger::LogTrace("Find LxpRoutines: status=", (void*)status, " &LxpRoutines=", pLxpRoutines);
+
+    if (!NT_SUCCESS(status))
+    {
+        Logger::LogError("Cannot find Pico routines.");
+        Logger::LogError("Make sure WSL is enabled and LXCORE.SYS is loaded.");
+        return status;
+    }
+
+    *pPr = (PPS_PICO_ROUTINES)pLxpRoutines;
+
+    return STATUS_SUCCESS;
 }

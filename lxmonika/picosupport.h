@@ -15,7 +15,12 @@ extern "C"
 
 NTSTATUS
     PicoSppLocateProviderRoutines(
-        OUT PPS_PICO_PROVIDER_ROUTINES* pPpr
+        _Out_ PPS_PICO_PROVIDER_ROUTINES* pPpr
+    );
+
+NTSTATUS
+    PicoSppLocateRoutines(
+        _Out_ PPS_PICO_ROUTINES* pPr
     );
 
 #ifdef __cplusplus

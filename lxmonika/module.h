@@ -13,9 +13,9 @@ extern "C"
 
 NTSTATUS
     MdlpFindModuleByName(
-        IN PCSTR pModuleName,
-        OUT PHANDLE pHandle,
-        OUT PSIZE_T puSize OPTIONAL
+        _In_ PCSTR pModuleName,
+        _Out_ PHANDLE pHandle,
+        _Out_opt_ PSIZE_T puSize
     );
 
 // MdlpFindModuleSectionByName
@@ -30,10 +30,17 @@ NTSTATUS
 // If puSize is not NULL, the size of the section will be placed in puSize.
 NTSTATUS
     MdlpFindModuleSectionByName(
-        IN HANDLE hdl,
-        IN PCSTR pSectionName,
-        OUT PVOID pSection,
-        PSIZE_T puSize OPTIONAL
+        _In_ HANDLE hdl,
+        _In_ PCSTR pSectionName,
+        _Out_ PVOID* pSection,
+        _Inout_opt_ PSIZE_T puSize
+    );
+
+NTSTATUS
+    MdlpGetProcAddress(
+        _In_ HANDLE hModule,
+        _In_ PCSTR  lpProcName,
+        _Out_ PVOID* pProc
     );
 
 #ifdef __cplusplus

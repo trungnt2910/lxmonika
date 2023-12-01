@@ -24,7 +24,8 @@
 // Monika data
 //
 
-static PS_PICO_PROVIDER_ROUTINES MaOriginalRoutines;
+static PS_PICO_PROVIDER_ROUTINES MaOriginalProviderRoutines;
+static PS_PICO_ROUTINES MaOriginalRoutines;
 
 //
 // Monika lifetime functions
@@ -36,21 +37,45 @@ MapInitialize()
 {
     NTSTATUS status;
 
-    PPS_PICO_PROVIDER_ROUTINES pRoutines = NULL;
-    status = PicoSppLocateProviderRoutines(&pRoutines);
+    PPS_PICO_ROUTINES pRoutines = NULL;
+    status = PicoSppLocateRoutines(&pRoutines);
 
-    Logger::LogTrace("PicoSppLocateProviderRoutines status=", (void*)status);
+    Logger::LogTrace("PicoSppLocateRoutines status=", (void*)status);
+
+    if (!NT_SUCCESS(status))
+    {
+        return status;
+    }
 
     memcpy(&MaOriginalRoutines, pRoutines, sizeof(MaOriginalRoutines));
 
+    if (pRoutines->Size != sizeof(MaOriginalRoutines))
+    {
+        Logger::LogWarning("Expected size ", sizeof(MaOriginalRoutines),
+            " for struct PS_PICO_ROUTINES, but got ", pRoutines->Size);
+        Logger::LogWarning("Please update the pico struct definitions.");
+    }
+
+    PPS_PICO_PROVIDER_ROUTINES pProviderRoutines = NULL;
+    status = PicoSppLocateProviderRoutines(&pProviderRoutines);
+
+    Logger::LogTrace("PicoSppLocateProviderRoutines status=", (void*)status);
+
+    if (!NT_SUCCESS(status))
+    {
+        return status;
+    }
+
+    memcpy(&MaOriginalProviderRoutines, pProviderRoutines, sizeof(MaOriginalProviderRoutines));
+
     // All known versions of the struct contains valid pointers
     // for these members, so this should be safe.
-    pRoutines->DispatchSystemCall = MapSystemCallDispatch;
-    pRoutines->ExitThread = MapThreadExit;
-    pRoutines->ExitProcess = MapProcessExit;
-    pRoutines->DispatchException = MapDispatchException;
-    pRoutines->TerminateProcess = MapTerminateProcess;
-    pRoutines->WalkUserStack = MapWalkUserStack;
+    pProviderRoutines->DispatchSystemCall = MapSystemCallDispatch;
+    pProviderRoutines->ExitThread = MapThreadExit;
+    pProviderRoutines->ExitProcess = MapProcessExit;
+    pProviderRoutines->DispatchException = MapDispatchException;
+    pProviderRoutines->TerminateProcess = MapTerminateProcess;
+    pProviderRoutines->WalkUserStack = MapWalkUserStack;
 
     return STATUS_SUCCESS;
 }
@@ -62,7 +87,7 @@ MapCleanup()
     PPS_PICO_PROVIDER_ROUTINES pRoutines = NULL;
     if (NT_SUCCESS(PicoSppLocateProviderRoutines(&pRoutines)))
     {
-        memcpy(pRoutines, &MaOriginalRoutines, sizeof(MaOriginalRoutines));
+        memcpy(pRoutines, &MaOriginalProviderRoutines, sizeof(MaOriginalProviderRoutines));
     }
 }
 
@@ -96,7 +121,7 @@ MapSystemCallDispatch(
 #error Detect the syscall arguments for this architecture!
 #endif
     
-    MaOriginalRoutines.DispatchSystemCall(SystemCall);
+    MaOriginalProviderRoutines.DispatchSystemCall(SystemCall);
 
     if (bIsUname
         // Also check for a success return value.
@@ -135,7 +160,7 @@ MapThreadExit(
     _In_ PETHREAD Thread
 )
 {
-    MaOriginalRoutines.ExitThread(Thread);
+    MaOriginalProviderRoutines.ExitThread(Thread);
 }
 
 extern "C"
@@ -144,7 +169,7 @@ MapProcessExit(
     _In_ PEPROCESS Process
 )
 {
-    MaOriginalRoutines.ExitProcess(Process);
+    MaOriginalProviderRoutines.ExitProcess(Process);
 }
 
 extern "C"
@@ -157,7 +182,7 @@ MapDispatchException(
     _In_ KPROCESSOR_MODE PreviousMode
 )
 {
-    return MaOriginalRoutines.DispatchException(
+    return MaOriginalProviderRoutines.DispatchException(
         ExceptionRecord,
         ExceptionFrame,
         TrapFrame,
@@ -173,7 +198,7 @@ MapTerminateProcess(
     _In_ NTSTATUS TerminateStatus
 )
 {
-    return MaOriginalRoutines.TerminateProcess(
+    return MaOriginalProviderRoutines.TerminateProcess(
         Process,
         TerminateStatus
     );
@@ -188,7 +213,7 @@ MapWalkUserStack(
     _In_ ULONG FrameCount
 )
 {
-    return MaOriginalRoutines.WalkUserStack(
+    return MaOriginalProviderRoutines.WalkUserStack(
         TrapFrame,
         Callers,
         FrameCount
