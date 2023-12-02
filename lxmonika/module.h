@@ -43,6 +43,12 @@ NTSTATUS
         _Out_ PVOID* pProc
     );
 
+NTSTATUS
+    MdlpGetProductVersion(
+        _In_ HANDLE hModule,
+        _Out_ PCWSTR* pPProductVersion
+    );
+
 #ifdef __cplusplus
 }
 #endif

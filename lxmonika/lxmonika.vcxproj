@@ -123,6 +123,7 @@
     <ClInclude Include="pico.h" />
     <ClInclude Include="picosupport.h" />
     <ClInclude Include="PoolAllocator.h" />
+    <ClInclude Include="winresource.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" />

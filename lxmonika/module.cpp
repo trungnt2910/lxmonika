@@ -2,7 +2,9 @@
 
 #include "pe.h"
 #include "os.h"
+#include "winresource.h"
 
+#include "Logger.h"
 #include "PoolAllocator.h"
 
 extern "C"
@@ -177,4 +179,122 @@ MdlpGetProcAddress(
     }
 
     return STATUS_NOT_FOUND;
+}
+
+NTSTATUS
+MdlpGetProductVersion(
+    _In_ HANDLE hModule,
+    _Out_ PCWSTR* pPProductVersion
+)
+{
+    if (hModule == NULL || pPProductVersion == NULL)
+    {
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    PCHAR pStart = (PCHAR)hModule;
+
+    PIMAGE_DOS_HEADER pDosHeader = (PIMAGE_DOS_HEADER)pStart;
+    PIMAGE_NT_HEADERS pPeHeader = (PIMAGE_NT_HEADERS)(pStart + pDosHeader->e_lfanew);
+
+    PIMAGE_RESOURCE_DIRECTORY pResourceDirectory = (PIMAGE_RESOURCE_DIRECTORY)(pStart +
+        pPeHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_RESOURCE].VirtualAddress);
+
+    // For calculating offsets.
+    PCHAR pRsrcSectionStart = (PCHAR)pResourceDirectory;
+
+    // The entries come right after the directory.
+    PIMAGE_RESOURCE_DIRECTORY_ENTRY pEntryList = (PIMAGE_RESOURCE_DIRECTORY_ENTRY)
+        (pResourceDirectory + 1);
+
+    SIZE_T uTotalEntries = pResourceDirectory->NumberOfIdEntries
+        + pResourceDirectory->NumberOfNamedEntries;
+
+    WORD pResourcePath[] =
+    {
+        (WORD)(ULONG_PTR)RT_VERSION,
+        // This param must be 1
+        // https://learn.microsoft.com/en-us/windows/win32/menurc/versioninfo-resource
+        1
+    };
+
+    const auto GoDownPath = [&](PIMAGE_RESOURCE_DIRECTORY_ENTRY pEntry)
+    {
+        pResourceDirectory = (PIMAGE_RESOURCE_DIRECTORY)
+            (pRsrcSectionStart + pEntry->OffsetToDirectory);
+
+        pEntryList = (PIMAGE_RESOURCE_DIRECTORY_ENTRY)(pResourceDirectory + 1);
+        uTotalEntries = pResourceDirectory->NumberOfIdEntries
+            + pResourceDirectory->NumberOfNamedEntries;
+    };
+
+    for (SIZE_T i = 0; i < ARRAYSIZE(pResourcePath); ++i)
+    {
+        for (SIZE_T j = 0; j < uTotalEntries; ++j)
+        {
+            if (!pEntryList[j].NameIsString
+                && pEntryList[j].Id == pResourcePath[i]
+                && pEntryList[j].DataIsDirectory)
+            {
+                // Go down to the tree on this path.
+                GoDownPath(&pEntryList[j]);
+
+                Logger::LogTrace("Found level ", i + 1, " directory with ", uTotalEntries,
+                    " entries.");
+
+                goto found;
+            }
+        }
+
+        Logger::LogError("Cannot find level ", i + 1, " directory with ID ", pResourcePath[i]);
+        return STATUS_RESOURCE_TYPE_NOT_FOUND;
+
+    found:
+        continue;
+    }
+
+    // Take the first directory type entry. Should be a leaf of the VS_VERSIONINFO data type.
+    // https://learn.microsoft.com/en-us/windows/win32/menurc/vs-versioninfo
+    for (SIZE_T i = 0; i < uTotalEntries; ++i)
+    {
+        if (!pEntryList[i].DataIsDirectory)
+        {
+            PIMAGE_RESOURCE_DATA_ENTRY pDataEntry = (PIMAGE_RESOURCE_DATA_ENTRY)
+                (pRsrcSectionStart + pEntryList[i].OffsetToData);
+
+            SIZE_T uVersionInfoLength = pDataEntry->Size;
+            PCHAR pVersionInfoStart = pStart + pDataEntry->OffsetToData;
+
+            PCHAR pProductVersion = pVersionInfoStart;
+
+            // TODO: Implement actual resource string tree parsing.
+            const WCHAR pPattern[] = L"ProductVersion";
+            while (pProductVersion + sizeof(pPattern)
+                   <= pVersionInfoStart + uVersionInfoLength)
+            {
+                if (wcsncmp((PCWSTR)pProductVersion, pPattern, sizeof(pPattern)) != 0)
+                {
+                    ++pProductVersion;
+                    continue;
+                }
+
+                goto found_product_version;
+            }
+
+            Logger::LogError("Cannot find product version");
+            return STATUS_NOT_FOUND;
+
+        found_product_version:
+            // Align up a 32-bit boundary.
+            PWCHAR pProductVersionValue = (PWCHAR)ALIGN_UP_BY(
+                pProductVersion + sizeof(pPattern), 4);
+
+            *pPProductVersion = pProductVersionValue;
+            return STATUS_SUCCESS;
+        }
+    }
+
+    // No languages available?
+    Logger::LogError("Cannot find leaf");
+    return STATUS_RESOURCE_LANG_NOT_FOUND;
 }

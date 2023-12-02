@@ -43,36 +43,67 @@ PicoSppLocateProviderRoutines(
         return status;
     }
 
-    RTL_OSVERSIONINFOW osVersionInfo;
-    osVersionInfo.dwOSVersionInfoSize = sizeof(osVersionInfo);
-
-    status = RtlGetVersion(&osVersionInfo);
+    PCWSTR pVersionInfoStringUnicode;
+    MdlpGetProductVersion(hdlNtKernel, (PCWSTR*)&pVersionInfoStringUnicode);
 
     if (NT_SUCCESS(status))
     {
-        Logger::LogTrace("Detected Windows NT build ", osVersionInfo.dwBuildNumber);
+        CHAR pVersionInfoStringAnsi[32];
+        for (SIZE_T i = 0; i < ARRAYSIZE(pVersionInfoStringAnsi); ++i)
+        {
+            if (pVersionInfoStringUnicode[i] == L'\0')
+            {
+                pVersionInfoStringAnsi[i] = '\0';
+                break;
+            }
+            pVersionInfoStringAnsi[i] = (CHAR)pVersionInfoStringUnicode[i];
+        }
+
+        Logger::LogTrace("Detected Windows NT version ", pVersionInfoStringAnsi);
 
         PVOID pTarget = NULL;
 
-        switch (osVersionInfo.dwBuildNumber)
-        {
 #ifdef AMD64
-            // Windows 11 23H2
-            case 22621:
-                pTarget = (PCHAR)hdlNtKernel + 0xC37D00;
-            break;
-#endif
-            // TODO: Support more builds.
-            default:
-                Logger::LogWarning("Windows NT build ",
-                    osVersionInfo.dwBuildNumber, " is not supported.");
+        if (strncmp(pVersionInfoStringAnsi, "10.0.22621.2715",
+            sizeof(pVersionInfoStringAnsi)) == 0)
+        {
+            pTarget = (PCHAR)hdlNtKernel + 0xC37CA0;
         }
+#endif
 
         if (pTarget != NULL)
         {
             Logger::LogTrace("PspPicoProviderRoutines found at ", pTarget);
-            *pPpr = PspPicoProviderRoutines = (PPS_PICO_PROVIDER_ROUTINES)pTarget;
-            return STATUS_SUCCESS;
+            PPS_PICO_PROVIDER_ROUTINES pMaybeTheRightRoutines =
+                (PPS_PICO_PROVIDER_ROUTINES)pTarget;
+
+            // Do a size check first. This reduces the chance of wrong version handling code
+            // bootlooping Windows.
+            //
+            // It might be a good idea to check for the pointers in Lxss as well, however, this
+            // would defeat the purpose of using known offsets: To support situations where
+            // other drivers have patched the routines beforehand.
+            //
+            // ExitThread is chosen because it is the member right after DispatchSystemCall.
+            // DispatchSystemCall is absolutely necessary for any Pico provider to function.
+
+            if (pMaybeTheRightRoutines->Size <
+                FIELD_OFFSET(PS_PICO_PROVIDER_ROUTINES, ExitThread)
+                || pMaybeTheRightRoutines->Size > sizeof(PS_PICO_PROVIDER_ROUTINES) * 16)
+            {
+                Logger::LogWarning("Disregarding known offset due to size being suspicious: ",
+                    pMaybeTheRightRoutines->Size);
+            }
+            else
+            {
+                *pPpr = PspPicoProviderRoutines = pMaybeTheRightRoutines;
+                return STATUS_SUCCESS;
+            }
+        }
+        else
+        {
+            Logger::LogWarning("Windows NT version ", pVersionInfoStringAnsi,
+                " is not supported.");
         }
     }
 

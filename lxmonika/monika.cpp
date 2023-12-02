@@ -68,6 +68,8 @@ MapInitialize()
 
     memcpy(&MaOriginalProviderRoutines, pProviderRoutines, sizeof(MaOriginalProviderRoutines));
 
+    Logger::LogTrace("Backed up original provider routines.");
+
     // All known versions of the struct contains valid pointers
     // for these members, so this should be safe.
     pProviderRoutines->DispatchSystemCall = MapSystemCallDispatch;
@@ -76,6 +78,8 @@ MapInitialize()
     pProviderRoutines->DispatchException = MapDispatchException;
     pProviderRoutines->TerminateProcess = MapTerminateProcess;
     pProviderRoutines->WalkUserStack = MapWalkUserStack;
+
+    Logger::LogTrace("Successfully patched provider routines.");
 
     return STATUS_SUCCESS;
 }
@@ -94,6 +98,7 @@ MapCleanup()
 //
 // Pico handlers
 //
+
 extern "C"
 VOID
 MapSystemCallDispatch(
