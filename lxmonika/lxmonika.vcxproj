@@ -68,27 +68,11 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+  <PropertyGroup>
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
     <OutDir>bin\$(ConfigurationName)\$(Platform)\</OutDir>
     <IntDir>obj\$(ConfigurationName)\$(Platform)\</IntDir>
     <Inf2CatUseLocalTime>true</Inf2CatUseLocalTime>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
-    <OutDir>bin\$(ConfigurationName)\$(Platform)\</OutDir>
-    <IntDir>obj\$(ConfigurationName)\$(Platform)\</IntDir>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
-    <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
-    <OutDir>bin\$(ConfigurationName)\$(Platform)\</OutDir>
-    <IntDir>obj\$(ConfigurationName)\$(Platform)\</IntDir>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
-    <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
-    <OutDir>bin\$(ConfigurationName)\$(Platform)\</OutDir>
-    <IntDir>obj\$(ConfigurationName)\$(Platform)\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <DriverSign>
@@ -146,4 +130,41 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+  <UsingTask TaskName="MonikaAppendKernelBuildNumber" TaskFactory="CodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.v4.0.dll">
+    <ParameterGroup>
+      <ItemList ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
+      <OutputItemList ParameterType="Microsoft.Build.Framework.ITaskItem[]" Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Code><![CDATA[
+          const string metadataName = "PreprocessorDefinitions";
+          System.Diagnostics.Process p = new System.Diagnostics.Process();
+          p.StartInfo = new System.Diagnostics.ProcessStartInfo("git", "rev-list --count master");
+          p.StartInfo.RedirectStandardOutput = true;
+          p.StartInfo.UseShellExecute = false;
+          p.Start();
+          p.WaitForExit();
+          string toAppend = "MONIKA_KERNEL_BUILD_NUMBER=\"" + p.StandardOutput.ReadToEnd().Trim() + "\"";
+          foreach (var item in ItemList)
+          {
+            var cur = item.GetMetadata(metadataName);
+            item.SetMetadata(metadataName, toAppend + ";" + cur);
+          }
+          OutputItemList = ItemList;
+          System.Console.WriteLine(toAppend);
+        ]]></Code>
+    </Task>
+  </UsingTask>
+  <Target Name="MonikaAppendKernelBuildNumberToClCompileItems" BeforeTargets="Build;CL;BeforeClCompile">
+    <ItemGroup>
+      <ClCompileCopy Include="@(ClCompile)" />
+      <ClCompile Remove="@(ClCompile)" />
+    </ItemGroup>
+    <MonikaAppendKernelBuildNumber ItemList="@(ClCompileCopy)">
+      <Output ItemName="ClCompile" TaskParameter="OutputItemList" />
+    </MonikaAppendKernelBuildNumber>
+    <ItemGroup>
+      <ClCompileCopy Remove="@(ClCompileCopy)" />
+    </ItemGroup>
+  </Target>
 </Project>
