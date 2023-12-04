@@ -13,6 +13,13 @@ extern "C"
 {
 #endif
 
+__declspec(dllexport)
+NTSTATUS NTAPI
+    MaRegisterPicoProvider(
+        _In_ PPS_PICO_PROVIDER_ROUTINES ProviderRoutines,
+        _Inout_ PPS_PICO_ROUTINES PicoRoutines
+    );
+
 NTSTATUS
     MapInitialize();
 

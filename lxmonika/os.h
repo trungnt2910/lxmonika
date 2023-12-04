@@ -67,20 +67,30 @@ typedef struct _RTL_PROCESS_MODULES {
     RTL_PROCESS_MODULE_INFORMATION  Modules[1];
 } RTL_PROCESS_MODULES, *PRTL_PROCESS_MODULES;
 
+__declspec(dllimport)
 NTSTATUS
-ZwQuerySection(
-    IN HANDLE SectionHandle,
-    IN SECTION_INFORMATION_CLASS InformationClass,
-    OUT PVOID InformationBuffer,
-    IN ULONG InformationBufferSize,
-    OUT PULONG ResultLength OPTIONAL);
+    ZwQuerySection(
+        _In_        HANDLE SectionHandle,
+        _In_        SECTION_INFORMATION_CLASS InformationClass,
+        _Out_       PVOID InformationBuffer,
+        _In_        ULONG InformationBufferSize,
+        _Out_opt_   PULONG ResultLength
+    );
 
+__declspec(dllimport)
 NTSTATUS
-ZwQuerySystemInformation(
-    IN SYSTEM_INFORMATION_CLASS SystemInformationClass,
-    IN PVOID SystemInformation,
-    IN ULONG SystemInformationLength,
-    OUT PULONG ReturnLength);
+    ZwQuerySystemInformation(
+        _In_        SYSTEM_INFORMATION_CLASS SystemInformationClass,
+        _In_        PVOID SystemInformation,
+        _In_        ULONG SystemInformationLength,
+        _Out_       PULONG ReturnLength
+    );
+
+__declspec(dllimport)
+PEPROCESS
+    PsGetThreadProcess(
+        _In_        PETHREAD Thread
+    );
 
 #ifdef __cplusplus
 }

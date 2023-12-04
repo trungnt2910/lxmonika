@@ -1,8 +1,10 @@
 #include "monika.h"
 
+#include "os.h"
 #include "picosupport.h"
 
 #include "Logger.h"
+#include "ProcessMap.h"
 
 //
 // Monika macros
@@ -21,11 +23,44 @@
 #endif
 
 //
+// Monika definitions
+//
+
+enum
+{
+#define MONIKA_PROVIDER(index) MaPicoProvider##index = index,
+#include "monika_providers.cpp"
+#undef MONIKA_PROVIDER
+    MaPicoProviderMaxCount
+};
+
+#define MONIKA_PROVIDER(index)                                                          \
+    static PS_PICO_CREATE_PROCESS               MaPicoCreateProcess##index;             \
+    static PS_PICO_CREATE_THREAD                MaPicoCreateThread##index;              \
+    static PS_PICO_GET_PROCESS_CONTEXT          MaPicoGetProcessContext##index;         \
+    static PS_PICO_GET_THREAD_CONTEXT           MaPicoGetThreadContext##index;          \
+    static PS_PICO_SET_THREAD_DESCRIPTOR_BASE   MaPicoSetThreadDescriptorBase##index;   \
+    static PS_PICO_TERMINATE_PROCESS            MaPicoTerminateProcess##index;          \
+    static PS_SET_CONTEXT_THREAD_INTERNAL       MaPicoSetContextThreadInternal##index;  \
+    static PS_GET_CONTEXT_THREAD_INTERNAL       MaPicoGetContextThreadInternal##index;  \
+    static PS_TERMINATE_THREAD                  MaPicoTerminateThread##index;           \
+    static PS_SUSPEND_THREAD                    MaPicoSuspendThread##index;             \
+    static PS_RESUME_THREAD                     MaPicoResumeThread##index;
+#include "monika_providers.cpp"
+#undef MONIKA_PROVIDER
+
+//
 // Monika data
 //
 
 static PS_PICO_PROVIDER_ROUTINES MaOriginalProviderRoutines;
 static PS_PICO_ROUTINES MaOriginalRoutines;
+
+static SIZE_T MaProvidersCount = 0;
+static PS_PICO_PROVIDER_ROUTINES MaProviderRoutines[MaPicoProviderMaxCount];
+static PS_PICO_ROUTINES MaRoutines[MaPicoProviderMaxCount];
+
+static ProcessMap MaProcessMap;
 
 //
 // Monika lifetime functions
@@ -81,6 +116,29 @@ MapInitialize()
 
     Logger::LogTrace("Successfully patched provider routines.");
 
+    // Initialize pico routines
+#define MONIKA_PROVIDER(index)                                              \
+    MaRoutines[MaPicoProvider##index] =                                     \
+    {                                                                       \
+        .Size = sizeof(PS_PICO_ROUTINES),                                   \
+        .CreateProcess = MaPicoCreateProcess##index,                        \
+        .CreateThread = MaPicoCreateThread##index,                          \
+        .GetProcessContext = MaPicoGetProcessContext##index,                \
+        .GetThreadContext = MaPicoGetThreadContext##index,                  \
+        .GetContextThreadInternal = MaPicoGetContextThreadInternal##index,  \
+        .SetContextThreadInternal = MaPicoSetContextThreadInternal##index,  \
+        .TerminateThread = MaPicoTerminateThread##index,                    \
+        .ResumeThread = MaPicoResumeThread##index,                          \
+        .SetThreadDescriptorBase = MaPicoSetThreadDescriptorBase##index,    \
+        .SuspendThread = MaPicoSuspendThread##index,                        \
+        .TerminateProcess = MaPicoTerminateProcess##index                   \
+    };
+#include "monika_providers.cpp"
+#undef MONIKA_PROVIDER
+
+    // Initialize process map
+    MaProcessMap.Initialize();
+
     return STATUS_SUCCESS;
 }
 
@@ -93,11 +151,80 @@ MapCleanup()
     {
         memcpy(pRoutines, &MaOriginalProviderRoutines, sizeof(MaOriginalProviderRoutines));
     }
+    MaProcessMap.Clear();
+}
+
+
+//
+// Pico provider registration
+//
+
+extern "C"
+__declspec(dllexport)
+NTSTATUS NTAPI
+MaRegisterPicoProvider(
+    _In_ PPS_PICO_PROVIDER_ROUTINES ProviderRoutines,
+    _Inout_ PPS_PICO_ROUTINES PicoRoutines
+)
+{
+    if (ProviderRoutines->Size != sizeof(PS_PICO_PROVIDER_ROUTINES)
+        || PicoRoutines->Size != sizeof(PS_PICO_ROUTINES))
+    {
+        return STATUS_INFO_LENGTH_MISMATCH;
+    }
+
+    const ACCESS_MASK uPicoMaximumRights = STANDARD_RIGHTS_ALL | SPECIFIC_RIGHTS_ALL;
+    if ((ProviderRoutines->OpenProcess & ~uPicoMaximumRights) != 0
+        || (ProviderRoutines->OpenThread & ~uPicoMaximumRights) != 0)
+    {
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    // Acquire an index for the provider.
+    // Once a provider has been registered, it cannot be unregistered.
+    // This is the same as the NT kernel as PsUnregisterPicoProvider does not exist.
+    SIZE_T uProviderIndex = InterlockedIncrementSizeT(&MaProvidersCount) - 1;
+    if (uProviderIndex >= MaPicoProviderMaxCount)
+    {
+        // Prevent SIZE_T overflow (quite hard on 64-bit systems).
+        InterlockedDecrementSizeT(&MaProvidersCount);
+
+        // PsRegisterPicoProvider would return STATUS_TOO_LATE here.
+        return STATUS_INSUFFICIENT_RESOURCES;
+    }
+
+    MaProviderRoutines[uProviderIndex] = *ProviderRoutines;
+    MaRoutines[uProviderIndex] = *PicoRoutines;
+
+    return STATUS_SUCCESS;
 }
 
 //
-// Pico handlers
+// Pico provider dispatchers
 //
+
+#define MA_LOCK_PROCESS_MAP auto _ = Locker(&MaProcessMap)
+
+#define MA_TRY_DISPATCH_TO_HANDLER(process, function, ...)                                      \
+    do                                                                                          \
+    {                                                                                           \
+                                                                                                \
+        BOOLEAN bHasHandler = FALSE;                                                            \
+        DWORD dwHandler;                                                                        \
+                                                                                                \
+        {                                                                                       \
+            MA_LOCK_PROCESS_MAP;                                                                \
+            if (NT_SUCCESS(MaProcessMap.GetProcessHandler((process), &dwHandler)))              \
+            {                                                                                   \
+                bHasHandler = TRUE;                                                             \
+            }                                                                                   \
+        }                                                                                       \
+                                                                                                \
+        if (bHasHandler)                                                                        \
+        {                                                                                       \
+            return MaProviderRoutines[dwHandler].function(__VA_ARGS__);                         \
+        }                                                                                       \
+    } while (false)
 
 extern "C"
 VOID
@@ -105,6 +232,8 @@ MapSystemCallDispatch(
     _In_ PPS_PICO_SYSTEM_CALL_INFORMATION SystemCall
 )
 {
+    MA_TRY_DISPATCH_TO_HANDLER(PsGetCurrentProcess(), DispatchSystemCall, SystemCall);
+
     bool bIsUname = false;
     struct old_utsname {
         char sysname[65];
@@ -165,7 +294,9 @@ MapThreadExit(
     _In_ PETHREAD Thread
 )
 {
-    MaOriginalProviderRoutines.ExitThread(Thread);
+    MA_TRY_DISPATCH_TO_HANDLER(PsGetThreadProcess(Thread), ExitThread, Thread);
+
+    return MaOriginalProviderRoutines.ExitThread(Thread);
 }
 
 extern "C"
@@ -174,7 +305,32 @@ MapProcessExit(
     _In_ PEPROCESS Process
 )
 {
-    MaOriginalProviderRoutines.ExitProcess(Process);
+    BOOLEAN bHasHandler = FALSE;
+    PROCESS_HANDLER_INFORMATION info;
+
+    {
+        MA_LOCK_PROCESS_MAP;
+        if (NT_SUCCESS(MaProcessMap.GetProcessHandler(Process, &info)))
+        {
+            bHasHandler = TRUE;
+            MaProcessMap.UnregisterProcess(Process);
+        }
+    }
+
+    if (bHasHandler)
+    {
+        MaProviderRoutines[info.Handler].ExitProcess(Process);
+    }
+
+    if (bHasHandler && info.HasInternalParentHandler)
+    {
+        MaProviderRoutines[info.ParentHandler].ExitProcess(Process);
+    }
+
+    if (!bHasHandler || !info.HasInternalParentHandler)
+    {
+        MaOriginalProviderRoutines.ExitProcess(Process);
+    }
 }
 
 extern "C"
@@ -187,6 +343,14 @@ MapDispatchException(
     _In_ KPROCESSOR_MODE PreviousMode
 )
 {
+    MA_TRY_DISPATCH_TO_HANDLER(PsGetCurrentProcess(), DispatchException,
+        ExceptionRecord,
+        ExceptionFrame,
+        TrapFrame,
+        Chance,
+        PreviousMode
+    );
+
     return MaOriginalProviderRoutines.DispatchException(
         ExceptionRecord,
         ExceptionFrame,
@@ -203,6 +367,8 @@ MapTerminateProcess(
     _In_ NTSTATUS TerminateStatus
 )
 {
+    MA_TRY_DISPATCH_TO_HANDLER(Process, TerminateProcess, Process, TerminateStatus);
+
     return MaOriginalProviderRoutines.TerminateProcess(
         Process,
         TerminateStatus
@@ -218,9 +384,333 @@ MapWalkUserStack(
     _In_ ULONG FrameCount
 )
 {
+    MA_TRY_DISPATCH_TO_HANDLER(PsGetCurrentProcess(), WalkUserStack,
+        TrapFrame,
+        Callers,
+        FrameCount
+    );
+
     return MaOriginalProviderRoutines.WalkUserStack(
         TrapFrame,
         Callers,
         FrameCount
     );
 }
+
+#define MA_PROCESS_BELONGS_TO_HANDLER(process, index)                                           \
+    (([](PEPROCESS p, DWORD i)                                                                  \
+    {                                                                                           \
+        MA_LOCK_PROCESS_MAP;                                                                    \
+        return MaProcessMap.ProcessBelongsToHandler(p, i);                                      \
+    })((process), (index)))
+
+static
+NTSTATUS
+MapCreateProcess(
+    _In_ DWORD HandlerIndex,
+    _In_ PPS_PICO_PROCESS_ATTRIBUTES ProcessAttributes,
+    _Outptr_ PHANDLE ProcessHandle
+)
+{
+    NTSTATUS status = MaOriginalRoutines.CreateProcess(ProcessAttributes, ProcessHandle);
+
+    // TODO: Check if this "HANDLE" is actually the same as a `PEPROCESS` struct?
+    if (NT_SUCCESS(status))
+    {
+        {
+            MA_LOCK_PROCESS_MAP;
+            status = MaProcessMap.RegisterProcessHandler((PEPROCESS)*ProcessHandle, HandlerIndex);
+        }
+
+        if (!NT_SUCCESS(status))
+        {
+            MaOriginalRoutines.TerminateProcess((PEPROCESS)*ProcessHandle, status);
+        }
+    }
+
+    return status;
+}
+
+static
+NTSTATUS
+MapCreateThread(
+    _In_ DWORD HandlerIndex,
+    _In_ PPS_PICO_THREAD_ATTRIBUTES ThreadAttributes,
+    _Outptr_ PHANDLE ThreadHandle
+)
+{
+    if (ThreadAttributes == NULL)
+    {
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    if (!MA_PROCESS_BELONGS_TO_HANDLER((PEPROCESS)ThreadAttributes->Process, HandlerIndex))
+    {
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    return MaOriginalRoutines.CreateThread(ThreadAttributes, ThreadHandle);
+}
+
+static
+PVOID
+MapGetProcessContext(
+    _In_ DWORD HandlerIndex,
+    _In_ PEPROCESS Process
+)
+{
+    if (!MA_PROCESS_BELONGS_TO_HANDLER(Process, HandlerIndex))
+    {
+        // TODO: Return what on error?
+        return NULL;
+    }
+
+    return MaOriginalRoutines.GetProcessContext(Process);
+}
+
+static
+PVOID
+MapGetThreadContext(
+    _In_ DWORD HandlerIndex,
+    _In_ PETHREAD Thread
+)
+{
+    if (!MA_PROCESS_BELONGS_TO_HANDLER(PsGetThreadProcess(Thread), HandlerIndex))
+    {
+        // TODO: Return what on error?
+        return NULL;
+    }
+
+    return MaOriginalRoutines.GetThreadContext(Thread);
+}
+
+static
+VOID
+MapSetThreadDescriptorBase(
+    _In_ DWORD HandlerIndex,
+    _In_ PS_PICO_THREAD_DESCRIPTOR_TYPE Type,
+    _In_ ULONG_PTR Base
+)
+{
+#if !DBG
+    UNREFERENCED_PARAMETER(HandlerIndex);
+#endif
+    ASSERT(MA_PROCESS_BELONGS_TO_HANDLER(PsGetCurrentProcess(), HandlerIndex));
+
+    return MaOriginalRoutines.SetThreadDescriptorBase(Type, Base);
+}
+
+static
+NTSTATUS
+MapTerminateProcess(
+    _In_ DWORD HandlerIndex,
+    _Inout_ PEPROCESS Process,
+    _In_ NTSTATUS ExitStatus
+)
+{
+    if (!MA_PROCESS_BELONGS_TO_HANDLER(Process, HandlerIndex))
+    {
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    // TODO: Why __inout for the Process parameter?
+    return MaOriginalRoutines.TerminateProcess(Process, ExitStatus);
+}
+
+static
+NTSTATUS
+MapSetContextThreadInternal(
+    _In_ DWORD HandlerIndex,
+    _In_ PETHREAD Thread,
+    _In_ PCONTEXT ThreadContext,
+    _In_ KPROCESSOR_MODE ProbeMode,
+    _In_ KPROCESSOR_MODE CtxMode,
+    _In_ BOOLEAN PerformUnwind
+)
+{
+    if (!MA_PROCESS_BELONGS_TO_HANDLER(PsGetThreadProcess(Thread), HandlerIndex))
+    {
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    return MaOriginalRoutines.SetContextThreadInternal(
+        Thread, ThreadContext, ProbeMode, CtxMode, PerformUnwind);
+}
+
+static
+NTSTATUS
+MapGetContextThreadInternal(
+    _In_ DWORD HandlerIndex,
+    _In_ PETHREAD Thread,
+    _Inout_ PCONTEXT ThreadContext,
+    _In_ KPROCESSOR_MODE ProbeMode,
+    _In_ KPROCESSOR_MODE CtxMode,
+    _In_ BOOLEAN PerformUnwind
+)
+{
+    if (!MA_PROCESS_BELONGS_TO_HANDLER(PsGetThreadProcess(Thread), HandlerIndex))
+    {
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    return MaOriginalRoutines.GetContextThreadInternal(
+        Thread, ThreadContext, ProbeMode, CtxMode, PerformUnwind);
+}
+
+static
+NTSTATUS
+MapTerminateThread(
+    _In_ DWORD HandlerIndex,
+    _Inout_ PETHREAD Thread,
+    _In_ NTSTATUS ExitStatus,
+    _In_ BOOLEAN DirectTerminate
+)
+{
+    if (!MA_PROCESS_BELONGS_TO_HANDLER(PsGetThreadProcess(Thread), HandlerIndex))
+    {
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    return MaOriginalRoutines.TerminateThread(Thread, ExitStatus, DirectTerminate);
+}
+
+static
+NTSTATUS
+MapSuspendThread(
+    _In_ DWORD HandlerIndex,
+    _Inout_ PETHREAD Thread,
+    _Out_opt_ PULONG PreviousSuspendCount
+)
+{
+    if (!MA_PROCESS_BELONGS_TO_HANDLER(PsGetThreadProcess(Thread), HandlerIndex))
+    {
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    return MaOriginalRoutines.SuspendThread(Thread, PreviousSuspendCount);
+}
+
+static
+NTSTATUS
+MapResumeThread(
+    _In_ DWORD HandlerIndex,
+    _Inout_ PETHREAD Thread,
+    _Out_opt_ PULONG PreviousSuspendCount
+)
+{
+    if (!MA_PROCESS_BELONGS_TO_HANDLER(PsGetThreadProcess(Thread), HandlerIndex))
+    {
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    return MaOriginalRoutines.ResumeThread(Thread, PreviousSuspendCount);
+}
+
+#define MONIKA_PROVIDER(index)                                                                  \
+    static NTSTATUS                                                                             \
+        MaPicoCreateProcess##index(                                                             \
+            _In_ PPS_PICO_PROCESS_ATTRIBUTES ProcessAttributes,                                 \
+            _Outptr_ PHANDLE ProcessHandle                                                      \
+        )                                                                                       \
+    {                                                                                           \
+        return MapCreateProcess(index, ProcessAttributes, ProcessHandle);                       \
+    }                                                                                           \
+                                                                                                \
+    static NTSTATUS                                                                             \
+        MaPicoCreateThread##index(                                                              \
+            _In_ PPS_PICO_THREAD_ATTRIBUTES ThreadAttributes,                                   \
+            _Outptr_ PHANDLE ThreadHandle                                                       \
+        )                                                                                       \
+    {                                                                                           \
+        return MapCreateThread(index, ThreadAttributes, ThreadHandle);                          \
+    }                                                                                           \
+                                                                                                \
+    static PVOID                                                                                \
+        MaPicoGetProcessContext##index(                                                         \
+            _In_ PEPROCESS Process                                                              \
+        )                                                                                       \
+    {                                                                                           \
+        return MapGetProcessContext(index, Process);                                            \
+    }                                                                                           \
+                                                                                                \
+    static PVOID                                                                                \
+        MaPicoGetThreadContext##index(                                                          \
+            _In_ PETHREAD Thread                                                                \
+        )                                                                                       \
+    {                                                                                           \
+        return MapGetThreadContext(index, Thread);                                              \
+    }                                                                                           \
+                                                                                                \
+    static VOID                                                                                 \
+        MaPicoSetThreadDescriptorBase##index(                                                   \
+            _In_ PS_PICO_THREAD_DESCRIPTOR_TYPE Type,                                           \
+            _In_ ULONG_PTR Base                                                                 \
+        )                                                                                       \
+    {                                                                                           \
+        return MapSetThreadDescriptorBase(index, Type, Base);                                   \
+    }                                                                                           \
+                                                                                                \
+    static NTSTATUS                                                                             \
+        MaPicoTerminateProcess##index(                                                          \
+            __inout PEPROCESS Process,                                                          \
+            __in NTSTATUS ExitStatus                                                            \
+        )                                                                                       \
+    {                                                                                           \
+        return MapTerminateProcess(index, Process, ExitStatus);                                 \
+    }                                                                                           \
+                                                                                                \
+    static NTSTATUS                                                                             \
+        MaPicoSetContextThreadInternal##index(                                                  \
+            __in PETHREAD Thread,                                                               \
+            __in PCONTEXT ThreadContext,                                                        \
+            __in KPROCESSOR_MODE ProbeMode,                                                     \
+            __in KPROCESSOR_MODE CtxMode,                                                       \
+            __in BOOLEAN PerformUnwind                                                          \
+        )                                                                                       \
+    {                                                                                           \
+        return MapSetContextThreadInternal(index,                                               \
+            Thread, ThreadContext, ProbeMode, CtxMode, PerformUnwind);                          \
+    }                                                                                           \
+                                                                                                \
+    static NTSTATUS                                                                             \
+        MaPicoGetContextThreadInternal##index(                                                  \
+            __in PETHREAD Thread,                                                               \
+            __inout PCONTEXT ThreadContext,                                                     \
+            __in KPROCESSOR_MODE ProbeMode,                                                     \
+            __in KPROCESSOR_MODE CtxMode,                                                       \
+            __in BOOLEAN PerformUnwind                                                          \
+        )                                                                                       \
+    {                                                                                           \
+        return MapGetContextThreadInternal(index,                                               \
+            Thread, ThreadContext, ProbeMode, CtxMode, PerformUnwind);                          \
+    }                                                                                           \
+                                                                                                \
+    static NTSTATUS                                                                             \
+        MaPicoTerminateThread##index(                                                           \
+            __inout PETHREAD Thread,                                                            \
+            __in NTSTATUS ExitStatus,                                                           \
+            __in BOOLEAN DirectTerminate                                                        \
+        )                                                                                       \
+    {                                                                                           \
+        return MapTerminateThread(index, Thread, ExitStatus, DirectTerminate);                  \
+    }                                                                                           \
+                                                                                                \
+    static NTSTATUS                                                                             \
+        MaPicoSuspendThread##index(                                                             \
+            _In_ PETHREAD Thread,                                                               \
+            _Out_opt_ PULONG PreviousSuspendCount                                               \
+        )                                                                                       \
+    {                                                                                           \
+        return MapSuspendThread(index, Thread, PreviousSuspendCount);                           \
+    }                                                                                           \
+                                                                                                \
+    static NTSTATUS                                                                             \
+        MaPicoResumeThread##index(                                                              \
+            _In_ PETHREAD Thread,                                                               \
+            _Out_opt_ PULONG PreviousSuspendCount                                               \
+        )                                                                                       \
+    {                                                                                           \
+        return MapResumeThread(index, Thread, PreviousSuspendCount);                            \
+    }
+#include "monika_providers.cpp"
+#undef MONIKA_PROVIDER

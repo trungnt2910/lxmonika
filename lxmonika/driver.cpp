@@ -1,7 +1,6 @@
 #include "driver.h"
 
 #include <ntddk.h>
-#include <wdf.h>
 
 #include "Logger.h"
 

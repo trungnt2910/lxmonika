@@ -42,6 +42,9 @@
     <ClCompile Include="monika.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="monika_providers.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="module.h">
@@ -69,6 +72,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="driver.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="winresource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
