@@ -3,8 +3,6 @@
 #include <ntddk.h>
 #include <intsafe.h>
 
-#include "Locker.h"
-
 #pragma warning(disable: 4201)
 
 typedef union _PROCESS_HANDLER_INFORMATION {

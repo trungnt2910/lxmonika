@@ -96,7 +96,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup>
     <ClCompile>
-      <PreprocessorDefinitions>MONIKA_KERNEL_TIMESTAMP="$([System.DateTime]::UtcNow.ToString(ddd MMM dd HH:mm:ss UTC yyyy))";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MONIKA_IN_DRIVER=1;MONIKA_KERNEL_TIMESTAMP="$([System.DateTime]::UtcNow.ToString(ddd MMM dd HH:mm:ss UTC yyyy))";%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
   </ItemDefinitionGroup>
@@ -111,7 +111,9 @@
     <ClCompile Include="Logger.cpp" />
     <ClCompile Include="module.cpp" />
     <ClCompile Include="monika.cpp" />
+    <ClCompile Include="monika_dispatcher.cpp" />
     <ClCompile Include="monika_providers.cpp" />
+    <ClCompile Include="monika_syscallhook.cpp" />
     <ClCompile Include="picosupport.cpp" />
     <ClCompile Include="PoolAllocator.cpp" />
     <ClCompile Include="ProcessMap.cpp" />

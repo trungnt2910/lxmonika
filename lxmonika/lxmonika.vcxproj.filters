@@ -42,7 +42,13 @@
     <ClCompile Include="monika.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="monika_dispatcher.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="monika_providers.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="monika_syscallhook.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
