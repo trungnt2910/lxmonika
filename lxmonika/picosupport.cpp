@@ -44,7 +44,7 @@ PicoSppLocateProviderRoutines(
     }
 
     PCWSTR pVersionInfoStringUnicode;
-    MdlpGetProductVersion(hdlNtKernel, (PCWSTR*)&pVersionInfoStringUnicode);
+    status = MdlpGetProductVersion(hdlNtKernel, (PCWSTR*)&pVersionInfoStringUnicode);
 
     if (NT_SUCCESS(status))
     {
