@@ -26,6 +26,43 @@ NTSTATUS NTAPI
         _Inout_ PPS_PICO_ROUTINES PicoRoutines
     );
 
+/// <summary>Sets the name of the specified provider.</summary>
+///
+/// <param name="ProviderDetails">
+/// An opaque structure representing the Pico provider. For this version of <c>lxmonika</c>, a
+/// pointer to a structure that is equal to the provider routines passed to
+/// <see cref="MaRegisterPicoProvider" /> should work.
+/// </param>
+///
+/// <param name="Name">
+/// A null-terminated string. If the string exceeds <see cref="MA_NAME_MAX" /> characters (not
+/// including the null terminator), it will be truncated when registered. The name is recommended
+/// (but not required) to have the following format:
+/// <c>"{Kernel Name}-{Kernel Release}-{Other details}"</c>.
+/// </param>
+///
+/// <remarks>
+/// The function must be called when the provider has no active processes. Trying to change/set
+/// the Pico provider name while hosting processes results in undefined behavior.
+/// When a Pico process requests a provider by name, these registered names will be searched.
+/// The first registered provider with the longest common prefix with the queried name will be
+/// selected.
+/// For example, if "Linux-5.15" and "Linux-6.6" are registered in this order, "Linux" would match
+/// "Linux-5.15", while "Linux-6" would match "Linux-6.6".
+/// </remarks>
+MONIKA_EXPORT
+NTSTATUS NTAPI
+    MaSetPicoProviderName(
+        _In_ PVOID ProviderDetails,
+        _In_ PCSTR Name
+    );
+
+#define MA_NAME_MAX 255
+
+#define MA_REALITY_MINOR 0x13EA1
+
+#define MA_IOCTL_SET_PROVIDER ((ULONG)'STPR')
+
 #ifdef MONIKA_IN_DRIVER
 
 //
@@ -48,6 +85,12 @@ VOID
         _In_ PPS_PICO_SYSTEM_CALL_INFORMATION pPreviousSyscallInfo,
         _In_ PPS_PICO_SYSTEM_CALL_INFORMATION pCurrentSyscallInfo
     );
+
+NTSTATUS
+    MapInitializeLxssDevice();
+
+VOID
+    MapCleanupLxssDevice();
 
 VOID
     MapSystemCallDispatch(
@@ -120,8 +163,12 @@ extern PS_PICO_ROUTINES MapOriginalRoutines;
 extern PS_PICO_PROVIDER_ROUTINES MapProviderRoutines[MaPicoProviderMaxCount];
 extern PS_PICO_ROUTINES MapRoutines[MaPicoProviderMaxCount];
 
+extern CHAR MapProviderNames[MaPicoProviderMaxCount][MA_NAME_MAX + 1];
+
 class ProcessMap;
 extern ProcessMap MapProcessMap;
+
+extern SIZE_T MapProvidersCount;
 
 #endif // MONIKA_IN_DRIVER
 

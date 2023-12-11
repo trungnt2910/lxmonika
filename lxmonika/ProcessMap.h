@@ -5,15 +5,18 @@
 
 #pragma warning(disable: 4201)
 
-typedef union _PROCESS_HANDLER_INFORMATION {
+typedef union _PROCESS_PROVIDER_INFORMATION {
     ULONG64 Value;
     struct {
-        DWORD Handler;
-        DWORD HasParentHandler : 1;
-        DWORD HasInternalParentHandler : 1;
-        DWORD ParentHandler : 30;
+        DWORD HasProvider : 1;
+        DWORD ProviderId : 31;
+        DWORD HasParentProvider : 1;
+        DWORD HasInternalParentProvider : 1;
+        DWORD ParentProviderId : 30;
     } DUMMYSTRUCTNAME;
-} PROCESS_HANDLER_INFORMATION, *PPROCESS_HANDLER_INFORMATION;
+} PROCESS_PROVIDER_INFORMATION, *PPROCESS_PROVIDER_INFORMATION;
+
+#define PROCESS_PROVIDER_NULL 0
 
 class ProcessMap
 {
@@ -23,10 +26,10 @@ private:
 
     typedef struct __NODE {
         PEPROCESS Key;
-        PROCESS_HANDLER_INFORMATION Value;
+        PROCESS_PROVIDER_INFORMATION Value;
     } _NODE, *_PNODE;
 
-    PPROCESS_HANDLER_INFORMATION
+    PPROCESS_PROVIDER_INFORMATION
         operator[](
             _In_ PEPROCESS key
             );
@@ -57,29 +60,29 @@ public:
         Clear();
 
     BOOLEAN
-        ProcessBelongsToHandler(
+        ProcessBelongsToProvider(
             _In_ PEPROCESS process,
-            _In_ DWORD handler
+            _In_ DWORD provider
         );
     NTSTATUS
-        GetProcessHandler(
+        GetProcessProvider(
             _In_ PEPROCESS process,
-            _Out_ DWORD* handler
+            _Out_ DWORD* provider
         );
     NTSTATUS
-        GetProcessHandler(
+        GetProcessProvider(
             _In_ PEPROCESS process,
-            _Out_ PPROCESS_HANDLER_INFORMATION handlerInformation
+            _Out_ PPROCESS_PROVIDER_INFORMATION providerInformation
         );
     NTSTATUS
-        RegisterProcessHandler(
+        RegisterProcessProvider(
             _In_ PEPROCESS process,
-            _In_ DWORD handler
+            _In_ DWORD provider
         );
     NTSTATUS
-        SwitchProcessHandler(
+        SwitchProcessProvider(
             _In_ PEPROCESS process,
-            _In_ DWORD newHandler
+            _In_ DWORD newProvider
         );
     NTSTATUS
         UnregisterProcess(

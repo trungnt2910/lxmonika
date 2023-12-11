@@ -35,6 +35,8 @@ private:
     static void _Print(DWORD dw);
     static void _Print(ULONGLONG ull);
 
+    static void _Print(INT i);
+
     static void _Print(PSTR pStr);
     static void _Print(PCSTR pcStr);
     static void _Print(PUCHAR pcuStr);
@@ -49,7 +51,8 @@ public:
     static bool _Log(LogLevel level, const char* file, int line, const char* function);
 
     template <typename... TRest>
-    static bool _Log(LogLevel level, const char* file, int line, const char* function, TRest... args)
+    static bool _Log(LogLevel level, const char* file, int line, const char* function,
+        TRest... args)
     {
         if (!_Log(level, file, line, function))
         {

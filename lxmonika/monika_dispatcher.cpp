@@ -11,24 +11,24 @@
 
 #define MA_LOCK_PROCESS_MAP auto _ = Locker(&MapProcessMap)
 
-#define MA_TRY_DISPATCH_TO_HANDLER(process, function, ...)                                      \
+#define MA_TRY_DISPATCH_TO_PROVIDER(process, function, ...)                                     \
     do                                                                                          \
     {                                                                                           \
                                                                                                 \
-        BOOLEAN bHasHandler = FALSE;                                                            \
-        DWORD dwHandler;                                                                        \
+        BOOLEAN bHasProvider = FALSE;                                                           \
+        DWORD dwProvider;                                                                       \
                                                                                                 \
         {                                                                                       \
             MA_LOCK_PROCESS_MAP;                                                                \
-            if (NT_SUCCESS(MapProcessMap.GetProcessHandler((process), &dwHandler)))             \
+            if (NT_SUCCESS(MapProcessMap.GetProcessProvider((process), &dwProvider)))           \
             {                                                                                   \
-                bHasHandler = TRUE;                                                             \
+                bHasProvider = TRUE;                                                            \
             }                                                                                   \
         }                                                                                       \
                                                                                                 \
-        if (bHasHandler)                                                                        \
+        if (bHasProvider)                                                                       \
         {                                                                                       \
-            return MapProviderRoutines[dwHandler].function(__VA_ARGS__);                        \
+            return MapProviderRoutines[dwProvider].function(__VA_ARGS__);                       \
         }                                                                                       \
     } while (false)
 
@@ -38,7 +38,7 @@ MapSystemCallDispatch(
     _In_ PPS_PICO_SYSTEM_CALL_INFORMATION SystemCall
 )
 {
-    MA_TRY_DISPATCH_TO_HANDLER(PsGetCurrentProcess(), DispatchSystemCall, SystemCall);
+    MA_TRY_DISPATCH_TO_PROVIDER(PsGetCurrentProcess(), DispatchSystemCall, SystemCall);
 
     if (MapPreSyscallHook(SystemCall))
     {
@@ -62,7 +62,7 @@ MapThreadExit(
     _In_ PETHREAD Thread
 )
 {
-    MA_TRY_DISPATCH_TO_HANDLER(PsGetThreadProcess(Thread), ExitThread, Thread);
+    MA_TRY_DISPATCH_TO_PROVIDER(PsGetThreadProcess(Thread), ExitThread, Thread);
 
     return MapOriginalProviderRoutines.ExitThread(Thread);
 }
@@ -73,29 +73,27 @@ MapProcessExit(
     _In_ PEPROCESS Process
 )
 {
-    BOOLEAN bHasHandler = FALSE;
-    PROCESS_HANDLER_INFORMATION info;
+    PROCESS_PROVIDER_INFORMATION info{ .Value = PROCESS_PROVIDER_NULL };
 
     {
         MA_LOCK_PROCESS_MAP;
-        if (NT_SUCCESS(MapProcessMap.GetProcessHandler(Process, &info)))
+        if (NT_SUCCESS(MapProcessMap.GetProcessProvider(Process, &info)))
         {
-            bHasHandler = TRUE;
             MapProcessMap.UnregisterProcess(Process);
         }
     }
 
-    if (bHasHandler)
+    if (info.HasProvider)
     {
-        MapProviderRoutines[info.Handler].ExitProcess(Process);
+        MapProviderRoutines[info.ProviderId].ExitProcess(Process);
     }
 
-    if (bHasHandler && info.HasInternalParentHandler)
+    if (info.HasProvider && info.HasInternalParentProvider)
     {
-        MapProviderRoutines[info.ParentHandler].ExitProcess(Process);
+        MapProviderRoutines[info.ParentProviderId].ExitProcess(Process);
     }
 
-    if (!bHasHandler || !info.HasInternalParentHandler)
+    if (!info.HasProvider || !info.HasInternalParentProvider)
     {
         MapOriginalProviderRoutines.ExitProcess(Process);
     }
@@ -111,7 +109,7 @@ MapDispatchException(
     _In_ KPROCESSOR_MODE PreviousMode
 )
 {
-    MA_TRY_DISPATCH_TO_HANDLER(PsGetCurrentProcess(), DispatchException,
+    MA_TRY_DISPATCH_TO_PROVIDER(PsGetCurrentProcess(), DispatchException,
         ExceptionRecord,
         ExceptionFrame,
         TrapFrame,
@@ -135,7 +133,7 @@ MapTerminateProcess(
     _In_ NTSTATUS TerminateStatus
 )
 {
-    MA_TRY_DISPATCH_TO_HANDLER(Process, TerminateProcess, Process, TerminateStatus);
+    MA_TRY_DISPATCH_TO_PROVIDER(Process, TerminateProcess, Process, TerminateStatus);
 
     return MapOriginalProviderRoutines.TerminateProcess(
         Process,
@@ -152,7 +150,7 @@ MapWalkUserStack(
     _In_ ULONG FrameCount
 )
 {
-    MA_TRY_DISPATCH_TO_HANDLER(PsGetCurrentProcess(), WalkUserStack,
+    MA_TRY_DISPATCH_TO_PROVIDER(PsGetCurrentProcess(), WalkUserStack,
         TrapFrame,
         Callers,
         FrameCount
@@ -169,17 +167,17 @@ MapWalkUserStack(
 // Pico routine dispatchers
 //
 
-#define MA_PROCESS_BELONGS_TO_HANDLER(process, index)                                           \
+#define MA_PROCESS_BELONGS_TO_PROVIDER(process, index)                                          \
     (([](PEPROCESS p, DWORD i)                                                                  \
     {                                                                                           \
         MA_LOCK_PROCESS_MAP;                                                                    \
-        return MapProcessMap.ProcessBelongsToHandler(p, i);                                     \
+        return MapProcessMap.ProcessBelongsToProvider(p, i);                                    \
     })((process), (index)))
 
 static
 NTSTATUS
 MapCreateProcess(
-    _In_ DWORD HandlerIndex,
+    _In_ DWORD ProviderIndex,
     _In_ PPS_PICO_PROCESS_ATTRIBUTES ProcessAttributes,
     _Outptr_ PHANDLE ProcessHandle
 )
@@ -191,7 +189,8 @@ MapCreateProcess(
     {
         {
             MA_LOCK_PROCESS_MAP;
-            status = MapProcessMap.RegisterProcessHandler((PEPROCESS)*ProcessHandle, HandlerIndex);
+            status = MapProcessMap.RegisterProcessProvider((PEPROCESS)*ProcessHandle,
+                ProviderIndex);
         }
 
         if (!NT_SUCCESS(status))
@@ -206,7 +205,7 @@ MapCreateProcess(
 static
 NTSTATUS
 MapCreateThread(
-    _In_ DWORD HandlerIndex,
+    _In_ DWORD ProviderIndex,
     _In_ PPS_PICO_THREAD_ATTRIBUTES ThreadAttributes,
     _Outptr_ PHANDLE ThreadHandle
 )
@@ -216,7 +215,7 @@ MapCreateThread(
         return STATUS_INVALID_PARAMETER;
     }
 
-    if (!MA_PROCESS_BELONGS_TO_HANDLER((PEPROCESS)ThreadAttributes->Process, HandlerIndex))
+    if (!MA_PROCESS_BELONGS_TO_PROVIDER((PEPROCESS)ThreadAttributes->Process, ProviderIndex))
     {
         return STATUS_INVALID_PARAMETER;
     }
@@ -227,11 +226,11 @@ MapCreateThread(
 static
 PVOID
 MapGetProcessContext(
-    _In_ DWORD HandlerIndex,
+    _In_ DWORD ProviderIndex,
     _In_ PEPROCESS Process
 )
 {
-    if (!MA_PROCESS_BELONGS_TO_HANDLER(Process, HandlerIndex))
+    if (!MA_PROCESS_BELONGS_TO_PROVIDER(Process, ProviderIndex))
     {
         // TODO: Return what on error?
         return NULL;
@@ -243,11 +242,11 @@ MapGetProcessContext(
 static
 PVOID
 MapGetThreadContext(
-    _In_ DWORD HandlerIndex,
+    _In_ DWORD ProviderIndex,
     _In_ PETHREAD Thread
 )
 {
-    if (!MA_PROCESS_BELONGS_TO_HANDLER(PsGetThreadProcess(Thread), HandlerIndex))
+    if (!MA_PROCESS_BELONGS_TO_PROVIDER(PsGetThreadProcess(Thread), ProviderIndex))
     {
         // TODO: Return what on error?
         return NULL;
@@ -259,15 +258,15 @@ MapGetThreadContext(
 static
 VOID
 MapSetThreadDescriptorBase(
-    _In_ DWORD HandlerIndex,
+    _In_ DWORD ProviderIndex,
     _In_ PS_PICO_THREAD_DESCRIPTOR_TYPE Type,
     _In_ ULONG_PTR Base
 )
 {
 #if !DBG
-    UNREFERENCED_PARAMETER(HandlerIndex);
+    UNREFERENCED_PARAMETER(ProviderIndex);
 #endif
-    ASSERT(MA_PROCESS_BELONGS_TO_HANDLER(PsGetCurrentProcess(), HandlerIndex));
+    ASSERT(MA_PROCESS_BELONGS_TO_PROVIDER(PsGetCurrentProcess(), ProviderIndex));
 
     return MapOriginalRoutines.SetThreadDescriptorBase(Type, Base);
 }
@@ -275,12 +274,12 @@ MapSetThreadDescriptorBase(
 static
 NTSTATUS
 MapTerminateProcess(
-    _In_ DWORD HandlerIndex,
+    _In_ DWORD ProviderIndex,
     _Inout_ PEPROCESS Process,
     _In_ NTSTATUS ExitStatus
 )
 {
-    if (!MA_PROCESS_BELONGS_TO_HANDLER(Process, HandlerIndex))
+    if (!MA_PROCESS_BELONGS_TO_PROVIDER(Process, ProviderIndex))
     {
         return STATUS_INVALID_PARAMETER;
     }
@@ -292,7 +291,7 @@ MapTerminateProcess(
 static
 NTSTATUS
 MapSetContextThreadInternal(
-    _In_ DWORD HandlerIndex,
+    _In_ DWORD ProviderIndex,
     _In_ PETHREAD Thread,
     _In_ PCONTEXT ThreadContext,
     _In_ KPROCESSOR_MODE ProbeMode,
@@ -300,7 +299,7 @@ MapSetContextThreadInternal(
     _In_ BOOLEAN PerformUnwind
 )
 {
-    if (!MA_PROCESS_BELONGS_TO_HANDLER(PsGetThreadProcess(Thread), HandlerIndex))
+    if (!MA_PROCESS_BELONGS_TO_PROVIDER(PsGetThreadProcess(Thread), ProviderIndex))
     {
         return STATUS_INVALID_PARAMETER;
     }
@@ -312,7 +311,7 @@ MapSetContextThreadInternal(
 static
 NTSTATUS
 MapGetContextThreadInternal(
-    _In_ DWORD HandlerIndex,
+    _In_ DWORD ProviderIndex,
     _In_ PETHREAD Thread,
     _Inout_ PCONTEXT ThreadContext,
     _In_ KPROCESSOR_MODE ProbeMode,
@@ -320,7 +319,7 @@ MapGetContextThreadInternal(
     _In_ BOOLEAN PerformUnwind
 )
 {
-    if (!MA_PROCESS_BELONGS_TO_HANDLER(PsGetThreadProcess(Thread), HandlerIndex))
+    if (!MA_PROCESS_BELONGS_TO_PROVIDER(PsGetThreadProcess(Thread), ProviderIndex))
     {
         return STATUS_INVALID_PARAMETER;
     }
@@ -332,13 +331,13 @@ MapGetContextThreadInternal(
 static
 NTSTATUS
 MapTerminateThread(
-    _In_ DWORD HandlerIndex,
+    _In_ DWORD ProviderIndex,
     _Inout_ PETHREAD Thread,
     _In_ NTSTATUS ExitStatus,
     _In_ BOOLEAN DirectTerminate
 )
 {
-    if (!MA_PROCESS_BELONGS_TO_HANDLER(PsGetThreadProcess(Thread), HandlerIndex))
+    if (!MA_PROCESS_BELONGS_TO_PROVIDER(PsGetThreadProcess(Thread), ProviderIndex))
     {
         return STATUS_INVALID_PARAMETER;
     }
@@ -349,12 +348,12 @@ MapTerminateThread(
 static
 NTSTATUS
 MapSuspendThread(
-    _In_ DWORD HandlerIndex,
+    _In_ DWORD ProviderIndex,
     _Inout_ PETHREAD Thread,
     _Out_opt_ PULONG PreviousSuspendCount
 )
 {
-    if (!MA_PROCESS_BELONGS_TO_HANDLER(PsGetThreadProcess(Thread), HandlerIndex))
+    if (!MA_PROCESS_BELONGS_TO_PROVIDER(PsGetThreadProcess(Thread), ProviderIndex))
     {
         return STATUS_INVALID_PARAMETER;
     }
@@ -365,12 +364,12 @@ MapSuspendThread(
 static
 NTSTATUS
 MapResumeThread(
-    _In_ DWORD HandlerIndex,
+    _In_ DWORD ProviderIndex,
     _Inout_ PETHREAD Thread,
     _Out_opt_ PULONG PreviousSuspendCount
 )
 {
-    if (!MA_PROCESS_BELONGS_TO_HANDLER(PsGetThreadProcess(Thread), HandlerIndex))
+    if (!MA_PROCESS_BELONGS_TO_PROVIDER(PsGetThreadProcess(Thread), ProviderIndex))
     {
         return STATUS_INVALID_PARAMETER;
     }

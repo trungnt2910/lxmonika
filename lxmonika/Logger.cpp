@@ -98,6 +98,12 @@ Logger::_Print(ULONGLONG ull)
 }
 
 void
+Logger::_Print(INT i)
+{
+    WRITE("%i", i);
+}
+
+void
 Logger::_Print(PSTR pStr)
 {
     WRITE("%s", pStr);

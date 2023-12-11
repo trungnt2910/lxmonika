@@ -8,6 +8,8 @@
 #include "monika.h"
 #include "picosupport.h"
 
+PDRIVER_OBJECT DriverGlobalObject;
+
 extern "C"
 NTSTATUS
 DriverEntry(
@@ -20,6 +22,8 @@ DriverEntry(
     NTSTATUS status = STATUS_SUCCESS;
 
     Logger::LogInfo("Hello World from lxmonika!");
+
+    DriverGlobalObject = DriverObject;
 
     // According to Microsoft naming conventions:
     // Ma           => MonikA
@@ -42,4 +46,6 @@ DriverUnload(
     UNREFERENCED_PARAMETER(DriverObject);
 
     MapCleanup();
+
+    DriverGlobalObject = NULL;
 }

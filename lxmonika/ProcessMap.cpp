@@ -19,78 +19,79 @@ ProcessMap::Clear()
 }
 
 BOOLEAN
-ProcessMap::ProcessBelongsToHandler(
+ProcessMap::ProcessBelongsToProvider(
     _In_ PEPROCESS process,
-    _In_ DWORD handler
+    _In_ DWORD provider
 )
 {
-    PPROCESS_HANDLER_INFORMATION pInfo = (*this)[process];
+    PPROCESS_PROVIDER_INFORMATION pInfo = (*this)[process];
 
     if (pInfo == NULL)
     {
         return FALSE;
     }
 
-    return pInfo->Handler == handler;
+    return pInfo->ProviderId == provider;
 }
 
 NTSTATUS
-ProcessMap::GetProcessHandler(
+ProcessMap::GetProcessProvider(
     _In_ PEPROCESS process,
-    _Out_ DWORD* handler
+    _Out_ DWORD* provider
 )
 {
-    if (handler == NULL)
+    if (provider == NULL)
     {
         return STATUS_INVALID_PARAMETER;
     }
 
-    PPROCESS_HANDLER_INFORMATION pInfo = (*this)[process];
+    PPROCESS_PROVIDER_INFORMATION pInfo = (*this)[process];
 
     if (pInfo == NULL)
     {
         return STATUS_NOT_FOUND;
     }
 
-    *handler = pInfo->Handler;
+    *provider = pInfo->ProviderId;
 
     return STATUS_SUCCESS;
 }
 
 NTSTATUS
-ProcessMap::GetProcessHandler(
+ProcessMap::GetProcessProvider(
     _In_ PEPROCESS process,
-    _Out_ PPROCESS_HANDLER_INFORMATION handlerInformation
+    _Out_ PPROCESS_PROVIDER_INFORMATION providerInformation
 )
 {
-    if (handlerInformation == NULL)
+    if (providerInformation == NULL)
     {
         return STATUS_INVALID_PARAMETER;
     }
 
-    PPROCESS_HANDLER_INFORMATION pInfo = (*this)[process];
+    PPROCESS_PROVIDER_INFORMATION pInfo = (*this)[process];
 
     if (pInfo == NULL)
     {
         return STATUS_NOT_FOUND;
     }
 
-    *handlerInformation = *pInfo;
+    *providerInformation = *pInfo;
 
     return STATUS_SUCCESS;
 }
 
 NTSTATUS
-ProcessMap::RegisterProcessHandler(
+ProcessMap::RegisterProcessProvider(
     _In_ PEPROCESS process,
-    _In_ DWORD handler
+    _In_ DWORD provider
 )
 {
     _NODE node;
     memset(&node, 0, sizeof(node));
 
     node.Key = process;
-    node.Value.Handler = handler;
+    node.Value.HasProvider = TRUE;
+    node.Value.ProviderId = provider;
 
     BOOLEAN bNewEntry = FALSE;
 
@@ -107,23 +108,23 @@ ProcessMap::RegisterProcessHandler(
         return STATUS_ALREADY_REGISTERED;
     }
 
-    ASSERT(pInsertedNode->Value.Handler == handler);
+    ASSERT(pInsertedNode->Value.ProviderId == provider);
 
     return STATUS_SUCCESS;
 }
 
 NTSTATUS
-ProcessMap::SwitchProcessHandler(
+ProcessMap::SwitchProcessProvider(
     _In_ PEPROCESS process,
-    _In_ DWORD newHandler
+    _In_ DWORD newProvider
 )
 {
-    PPROCESS_HANDLER_INFORMATION pInfo = (*this)[process];
+    PPROCESS_PROVIDER_INFORMATION pInfo = (*this)[process];
     BOOLEAN bHasInternalProvider = TRUE;
 
     if (pInfo == NULL)
     {
-        NTSTATUS status = RegisterProcessHandler(process, (DWORD)-1);
+        NTSTATUS status = RegisterProcessProvider(process, (DWORD)-1);
         if (!NT_SUCCESS(status))
         {
             return status;
@@ -134,18 +135,25 @@ ProcessMap::SwitchProcessHandler(
 
         ASSERT(pInfo != NULL);
     }
+    else
+    {
+        if (pInfo->ProviderId == newProvider)
+        {
+            return STATUS_SUCCESS;
+        }
+    }
 
     // TODO: This is mainly a Monika restriction, not the data structure's;
     // move this check to monika.cpp instead?
-    if (pInfo->HasParentHandler)
+    if (pInfo->HasParentProvider)
     {
         return STATUS_NOT_IMPLEMENTED;
     }
 
-    pInfo->HasParentHandler = TRUE;
-    pInfo->HasInternalParentHandler = bHasInternalProvider;
-    pInfo->ParentHandler = pInfo->Handler;
-    pInfo->Handler = newHandler;
+    pInfo->HasParentProvider = TRUE;
+    pInfo->HasInternalParentProvider = bHasInternalProvider;
+    pInfo->ParentProviderId = pInfo->ProviderId;
+    pInfo->ProviderId = newProvider;
 
     return STATUS_SUCCESS;
 }
@@ -168,7 +176,7 @@ ProcessMap::UnregisterProcess(
     return STATUS_SUCCESS;
 }
 
-PPROCESS_HANDLER_INFORMATION
+PPROCESS_PROVIDER_INFORMATION
 ProcessMap::operator[](
     _In_ PEPROCESS key
 )

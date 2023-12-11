@@ -18,9 +18,11 @@ NTSTATUS
     );
 
 VOID
-DriverUnload(
-    _In_ PDRIVER_OBJECT DriverObject
-);
+    DriverUnload(
+        _In_ PDRIVER_OBJECT DriverObject
+    );
+
+extern PDRIVER_OBJECT DriverGlobalObject;
 
 #ifdef __cplusplus
 }

@@ -48,6 +48,9 @@
     <ClCompile Include="monika_providers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="monika_reality.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="monika_syscallhook.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -66,6 +69,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Logger.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lxerrno.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lxss.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="pico.h">
