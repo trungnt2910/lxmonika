@@ -100,6 +100,7 @@
       <PreprocessorDefinitions>MONIKA_TIMESTAMP="$([System.DateTime]::UtcNow.ToString(ddd MMM dd HH:mm:ss UTC yyyy))";%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions>MONIKA_BUILD_YEAR="$([System.DateTime]::UtcNow.ToString(yyyy))";%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions>MONIKA_BUILD_AUTHOR="Trung Nguyen";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>include;include_private;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
   </ItemDefinitionGroup>
@@ -110,33 +111,35 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="driver.cpp" />
-    <ClCompile Include="Logger.cpp" />
-    <ClCompile Include="module.cpp" />
-    <ClCompile Include="monika.cpp" />
-    <ClCompile Include="monika_dispatcher.cpp" />
-    <ClCompile Include="monika_providers.cpp" />
-    <ClCompile Include="monika_reality.cpp" />
-    <ClCompile Include="monika_syscallhook.cpp" />
-    <ClCompile Include="picosupport.cpp" />
-    <ClCompile Include="PoolAllocator.cpp" />
-    <ClCompile Include="ProcessMap.cpp" />
+    <ClCompile Include="src\driver.cpp" />
+    <ClCompile Include="src\Logger.cpp" />
+    <ClCompile Include="src\module.cpp" />
+    <ClCompile Include="src\monika.cpp" />
+    <ClCompile Include="src\monika_dispatcher.cpp" />
+    <ClCompile Include="src\monika_providers.cpp" />
+    <ClCompile Include="src\monika_reality.cpp" />
+    <ClCompile Include="src\monika_syscallhook.cpp" />
+    <ClCompile Include="src\picosupport.cpp" />
+    <ClCompile Include="src\PoolAllocator.cpp" />
+    <ClCompile Include="src\ProcessMap.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="driver.h" />
-    <ClInclude Include="Locker.h" />
-    <ClInclude Include="Logger.h" />
-    <ClInclude Include="lxerrno.h" />
-    <ClInclude Include="lxss.h" />
-    <ClInclude Include="module.h" />
-    <ClInclude Include="monika.h" />
-    <ClInclude Include="os.h" />
-    <ClInclude Include="pe.h" />
-    <ClInclude Include="pico.h" />
-    <ClInclude Include="picosupport.h" />
-    <ClInclude Include="PoolAllocator.h" />
-    <ClInclude Include="ProcessMap.h" />
-    <ClInclude Include="winresource.h" />
+    <ClInclude Include="include_private\driver.h" />
+    <ClInclude Include="include_private\Locker.h" />
+    <ClInclude Include="include_private\Logger.h" />
+    <ClInclude Include="include_private\lxerrno.h" />
+    <ClInclude Include="include_private\lxss.h" />
+    <ClInclude Include="include_private\module.h" />
+    <ClInclude Include="include_private\os.h" />
+    <ClInclude Include="include_private\pe.h" />
+    <ClInclude Include="include_private\picosupport.h" />
+    <ClInclude Include="include_private\PoolAllocator.h" />
+    <ClInclude Include="include_private\ProcessMap.h" />
+    <ClInclude Include="include_private\winresource.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="include\monika.h" />
+    <ClInclude Include="include\pico.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" />

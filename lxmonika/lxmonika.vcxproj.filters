@@ -9,6 +9,10 @@
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
     </Filter>
+    <Filter Include="Private Header Files">
+      <UniqueIdentifier>{30BE1376-9973-4187-AB57-4D71AEE32FB2}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
     <Filter Include="Resource Files">
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
@@ -24,72 +28,83 @@
     </Inf>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="driver.cpp">
+    <ClCompile Include="src\driver.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="module.cpp">
+    <ClCompile Include="src\module.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="PoolAllocator.cpp">
+    <ClCompile Include="src\monika_dispatcher.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Logger.cpp">
+    <ClCompile Include="src\monika_providers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="picosupport.cpp">
+    <ClCompile Include="src\monika_reality.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="monika.cpp">
+    <ClCompile Include="src\monika_syscallhook.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="monika_dispatcher.cpp">
+    <ClCompile Include="src\monika.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="monika_providers.cpp">
+    <ClCompile Include="src\picosupport.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="monika_reality.cpp">
+    <ClCompile Include="src\Logger.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="monika_syscallhook.cpp">
+    <ClCompile Include="src\PoolAllocator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ProcessMap.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="module.h">
+    <ClInclude Include="include_private\driver.h">
+      <Filter>Private Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include_private\lxerrno.h">
+      <Filter>Private Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include_private\lxss.h">
+      <Filter>Private Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include_private\module.h">
+      <Filter>Private Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include_private\os.h">
+      <Filter>Private Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include_private\pe.h">
+      <Filter>Private Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include_private\picosupport.h">
+      <Filter>Private Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include_private\winresource.h">
+      <Filter>Private Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include_private\Locker.h">
+      <Filter>Private Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include_private\Logger.h">
+      <Filter>Private Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include_private\PoolAllocator.h">
+      <Filter>Private Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include_private\ProcessMap.h">
+      <Filter>Private Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="include\monika.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="pe.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="os.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="PoolAllocator.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Logger.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="lxerrno.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="lxss.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="pico.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="picosupport.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="monika.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="driver.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="winresource.h">
+    <ClInclude Include="include\pico.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
