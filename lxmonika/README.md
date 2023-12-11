@@ -33,7 +33,7 @@ performing a `syscall`.
 
 While intercepting `uname` to bump up the kernel version without adding any features does not
 seem useful (other than for showing off with `neofetch`), being able to intercept all WSL1
-processes have huge implications.
+processes has huge implications.
 
 Since Microsoft no longer supports WSL1 (The
 ["WSL1"](https://github.com/microsoft/WSL/issues?q=is%3Aopen+is%3Aissue+label%3Awsl1) label on
@@ -58,7 +58,7 @@ then give control to `launchd`.
 
 ### Prerequisites
 
-- Visual Studio 2022
+- Visual Studio 2022.
 - The latest WDK. Download it
 [here](https://learn.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk).
 - A Windows NT 10.0 machine with Test Signing enabled.
@@ -117,13 +117,14 @@ yet, as I do not own an `arm64` Windows device.
 
 ## Future plans
 
-- Fetch `LxpRoutines` from `lxcore.sys`. These are essential routines any pico provider would need
-to manage its processes. Normally, the struct would be returned by `PsRegisterPicoProvider`;
-however this function has already been locked down by Microsoft using a boolean guard
-(`PspPicoRegistrationDisabled`).
-- Create a `MaRegisterPicoProvider` and let `lxmonika` manage these providers instead. Even if we
-override the boolean guard, `PsRegisterPicoProvider` would not correctly handle multiple Pico
-drivers, since `PspPicoProviderRoutines` is not an array or table but just a global variable.
+- [**DONE**] Fetch `LxpRoutines` from `lxcore.sys`. These are essential routines any pico provider
+would need to manage its processes. Normally, the struct would be returned by
+`PsRegisterPicoProvider`; however this function has already been locked down by Microsoft using a
+boolean guard (`PspPicoRegistrationDisabled`).
+- [**DONE**] Create a `MaRegisterPicoProvider` and let `lxmonika` manage these providers instead.
+Even if we override the boolean guard, `PsRegisterPicoProvider` would not correctly handle multiple
+Pico drivers, since `PspPicoProviderRoutines` is not an array or table but just a global variable.
+- Provide a sample Pico provider.
 - (Far, far future) Port a newer version of Linux, Darwin, or even Haiku???
 - (Far, far future) Revive project Astoria???
 
@@ -132,6 +133,11 @@ drivers, since `PspPicoProviderRoutines` is not an array or table but just a glo
 Thanks to Martin Hron ([**@thinkcz**](https://github.com/thinkcz)) for his
 [pico-toolbox](https://github.com/thinkcz/pico-toolbox), which provides the required definitions
 and a proof-of-concept for Pico process hacking.
+
+Thanks to Bill Zissimopoulos ([**@billziss-gh**](https://github.com/billziss-gh)) for his
+[lxdk](https://github.com/billziss-gh/lxdk), which documents the various symbols exposed by
+`lxcore`, enabling the functionality of `/dev/reality`. Unfortunately, due to licensing issues,
+his great project cannot be directly incorporated into `lxmonika`.
 
 ## Suggested readings
 
