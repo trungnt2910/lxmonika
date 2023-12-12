@@ -181,17 +181,16 @@ MdlpGetProcAddress(
     return STATUS_NOT_FOUND;
 }
 
+static
 NTSTATUS
-MdlpGetProductVersion(
+MdlpGetResourceDirectory(
     _In_ HANDLE hModule,
-    _Out_ PCWSTR* pPProductVersion
+    _In_ LPSTR pIntResource,
+    _In_ WORD wId,
+    _Out_ PVOID* pPRsrcSectionStart,
+    _Out_ PIMAGE_RESOURCE_DIRECTORY* pPResourceDirectory
 )
 {
-    if (hModule == NULL || pPProductVersion == NULL)
-    {
-        return STATUS_INVALID_PARAMETER;
-    }
-
     PCHAR pStart = (PCHAR)hModule;
 
     PIMAGE_DOS_HEADER pDosHeader = (PIMAGE_DOS_HEADER)pStart;
@@ -212,10 +211,8 @@ MdlpGetProductVersion(
 
     WORD pResourcePath[] =
     {
-        (WORD)(ULONG_PTR)RT_VERSION,
-        // This param must be 1
-        // https://learn.microsoft.com/en-us/windows/win32/menurc/versioninfo-resource
-        1
+        (WORD)(ULONG_PTR)pIntResource,
+        wId
     };
 
     const auto GoDownPath = [&](PIMAGE_RESOURCE_DIRECTORY_ENTRY pEntry)
@@ -252,6 +249,51 @@ MdlpGetProductVersion(
     found:
         continue;
     }
+
+    *pPRsrcSectionStart = pRsrcSectionStart;
+    *pPResourceDirectory = pResourceDirectory;
+
+    return STATUS_SUCCESS;
+}
+
+extern "C"
+NTSTATUS
+MdlpGetProductVersion(
+    _In_ HANDLE hModule,
+    _Out_ PCWSTR* pPProductVersion
+)
+{
+    if (hModule == NULL || pPProductVersion == NULL)
+    {
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    PCHAR pStart = (PCHAR)hModule;
+
+    PIMAGE_RESOURCE_DIRECTORY pResourceDirectory;
+    PCHAR pRsrcSectionStart;
+
+    NTSTATUS status = MdlpGetResourceDirectory(
+        hModule,
+        RT_VERSION,
+        // This param must be 1
+        // https://learn.microsoft.com/en-us/windows/win32/menurc/versioninfo-resource
+        1,
+        (PVOID*)&pRsrcSectionStart,
+        &pResourceDirectory
+    );
+
+    if (!NT_SUCCESS(status))
+    {
+        return status;
+    }
+
+    // The entries come right after the directory.
+    PIMAGE_RESOURCE_DIRECTORY_ENTRY pEntryList = (PIMAGE_RESOURCE_DIRECTORY_ENTRY)
+        (pResourceDirectory + 1);
+
+    SIZE_T uTotalEntries = pResourceDirectory->NumberOfIdEntries
+        + pResourceDirectory->NumberOfNamedEntries;
 
     // Take the first directory type entry. Should be a leaf of the VS_VERSIONINFO data type.
     // https://learn.microsoft.com/en-us/windows/win32/menurc/vs-versioninfo
@@ -290,6 +332,62 @@ MdlpGetProductVersion(
                 pProductVersion + sizeof(pPattern), 4);
 
             *pPProductVersion = pProductVersionValue;
+            return STATUS_SUCCESS;
+        }
+    }
+
+    // No languages available?
+    Logger::LogError("Cannot find leaf");
+    return STATUS_RESOURCE_LANG_NOT_FOUND;
+}
+
+extern "C"
+NTSTATUS
+MdlpGetMessageTable(
+    _In_ HANDLE hModule,
+    _Out_ PMESSAGE_RESOURCE_DATA* pPMessageTable
+)
+{
+    if (hModule == NULL || pPMessageTable == NULL)
+    {
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    PCHAR pStart = (PCHAR)hModule;
+
+    PIMAGE_RESOURCE_DIRECTORY pResourceDirectory;
+    PCHAR pRsrcSectionStart;
+
+    NTSTATUS status = MdlpGetResourceDirectory(
+        hModule,
+        RT_MESSAGETABLE,
+        1,
+        (PVOID*)&pRsrcSectionStart,
+        &pResourceDirectory
+    );
+
+    if (!NT_SUCCESS(status))
+    {
+        return status;
+    }
+
+    // The entries come right after the directory.
+    PIMAGE_RESOURCE_DIRECTORY_ENTRY pEntryList = (PIMAGE_RESOURCE_DIRECTORY_ENTRY)
+        (pResourceDirectory + 1);
+
+    SIZE_T uTotalEntries = pResourceDirectory->NumberOfIdEntries
+        + pResourceDirectory->NumberOfNamedEntries;
+
+    for (SIZE_T i = 0; i < uTotalEntries; ++i)
+    {
+        if (!pEntryList[i].DataIsDirectory)
+        {
+            PIMAGE_RESOURCE_DATA_ENTRY pDataEntry = (PIMAGE_RESOURCE_DATA_ENTRY)
+                (pRsrcSectionStart + pEntryList[i].OffsetToData);
+
+            PCHAR pResourceDataStart = pStart + pDataEntry->OffsetToData;
+
+            *pPMessageTable = (PMESSAGE_RESOURCE_DATA)pResourceDataStart;
             return STATUS_SUCCESS;
         }
     }

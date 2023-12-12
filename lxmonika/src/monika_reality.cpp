@@ -7,9 +7,11 @@
 #include "lxerrno.h"
 #include "lxss.h"
 #include "module.h"
+#include "os.h"
 
 #include "Locker.h"
 #include "Logger.h"
+#include "PoolAllocator.h"
 #include "ProcessMap.h"
 
 // lxcore.sys imports
@@ -325,6 +327,9 @@ MaUpdateFileInformation(
 // Driver VFS functions
 //
 
+NTSTATUS
+MapRealityEscape();
+
 static
 INT
 MaRealityCreateInitialNamespace(
@@ -537,7 +542,9 @@ MaFileWrite(
             }
             if (equal)
             {
-                // TODO: Trigger a BSOD with ESCAPE_PLAN_FAILED???
+#ifdef DBG
+                MapRealityEscape();
+#endif
                 return -LINUX_EPERM;
             }
         }
@@ -599,7 +606,6 @@ MaFileIoctl(
                     // Nothing actually matches!
                     return -LINUX_EINVAL;
                 }
-
 
                 NTSTATUS status;
 
@@ -695,4 +701,138 @@ MaFileSeek(
     ExReleaseFastMutex(&pMaFile->Lock);
 
     return Error;
+}
+
+NTSTATUS
+MapRealityEscape()
+{
+    // In Windows 10, the .rsrc section is no longer stored after the early boot stages.
+    // Therefore, `MdlpGetMessageTable` would not work.
+
+    NTSTATUS status;
+    PMESSAGE_RESOURCE_DATA pMessageTable = NULL;
+
+    // Initial buffer size. Pure guesswork.
+    // The usual technique of passing a dummy buffer to query the length of the real information
+    // somehow does not work for SystemBigPoolInformation.
+    ULONG uLen = 1 << 18;
+
+    while (TRUE)
+    {
+        PoolAllocator pBigpoolAllocator(uLen, 'eRaM');
+        if (pBigpoolAllocator.Get() == NULL)
+        {
+            return STATUS_NO_MEMORY;
+        }
+
+        PSYSTEM_BIGPOOL_INFORMATION pInfo = pBigpoolAllocator.Get<SYSTEM_BIGPOOL_INFORMATION>();
+
+        Logger::LogTrace("Attempting to get the system pool information using a buffer of ",
+            uLen, " bytes.");
+
+        status = ZwQuerySystemInformation(SystemBigPoolInformation, pInfo, uLen, NULL);
+        if (!NT_SUCCESS(status))
+        {
+            if (status == STATUS_INFO_LENGTH_MISMATCH)
+            {
+                Logger::LogTrace("Query failed. Doubling the size...");
+                uLen <<= 1;
+                continue;
+            }
+            return status;
+        }
+
+        for (SIZE_T i = 0; i < pInfo->Count; ++i)
+        {
+            if (pInfo->AllocatedInfo[i].TagUlong == 'cBiK')
+            {
+                if (pInfo->AllocatedInfo[i].SizeInBytes > MAXULONG)
+                {
+                    continue;
+                }
+
+                // The match is ambiguous!
+                if (pMessageTable != NULL)
+                {
+                    Logger::LogError("Found multiple matches when searching for message table.");
+                    Logger::LogError("First match: ", (PVOID)pMessageTable);
+                    Logger::LogError("Current match: ", pInfo->AllocatedInfo[i].VirtualAddress);
+                    return STATUS_BAD_DATA;
+                }
+
+                pMessageTable = (PMESSAGE_RESOURCE_DATA)
+                    ALIGN_DOWN_POINTER_BY(pInfo->AllocatedInfo[i].VirtualAddress, 2);
+            }
+        }
+
+        if (pMessageTable == NULL)
+        {
+            return STATUS_NOT_FOUND;
+        }
+
+        break;
+    }
+
+    CONST CHAR pMagicBytes[] =
+    {
+        76, 88, 83, 83, 95,
+        69, 83, 67, 65, 80, 69, 95,
+        80, 76, 65, 78, 95,
+        70, 65, 73, 76, 69, 68,
+        13, 10, 00
+    };
+    CONST SIZE_T uMinLength = sizeof(pMagicBytes) + FIELD_OFFSET(MESSAGE_RESOURCE_ENTRY, Text);
+
+    for (SIZE_T i = 0; i < pMessageTable->NumberOfBlocks; ++i)
+    {
+        PMESSAGE_RESOURCE_BLOCK pMessageBlock = &pMessageTable->Blocks[i];
+        PMESSAGE_RESOURCE_ENTRY pMessageEntry = (PMESSAGE_RESOURCE_ENTRY)
+            ((PCHAR)pMessageTable + pMessageBlock->OffsetToEntries);
+
+        const auto GetNextEntry = [](PMESSAGE_RESOURCE_ENTRY pEntry)
+        {
+            return (PMESSAGE_RESOURCE_ENTRY)((PCHAR)pEntry + pEntry->Length);
+        };
+
+        for (SIZE_T j = 0;
+            j < (pMessageBlock->HighId - pMessageBlock->LowId + 1);
+            ++j, pMessageEntry = GetNextEntry(pMessageEntry))
+        {
+            if (pMessageEntry->Flags & MESSAGE_RESOURCE_UNICODE)
+            {
+                continue;
+            }
+
+            if (pMessageEntry->Length < uMinLength)
+            {
+                continue;
+            }
+
+            BOOLEAN bShouldPatch = TRUE;
+
+            for (SIZE_T k = 0; pMessageEntry->Text[k] != '\0'; ++k)
+            {
+                CHAR ch = pMessageEntry->Text[k];
+                if (!isupper(ch)
+                    && !isdigit(ch)
+                    // Accept trailing line terminators, but not whitespaces.
+                    && !(iswspace(ch) && ch != ' ')
+                    && ch != '_')
+                {
+                    Logger::LogTrace("Violating character: ", (DWORD)ch);
+                    bShouldPatch = FALSE;
+                    break;
+                }
+            }
+
+            if (bShouldPatch)
+            {
+                strcpy((PCHAR)pMessageEntry->Text, pMagicBytes);
+                memset(((PCHAR)pMessageEntry) + uMinLength, 0, pMessageEntry->Length - uMinLength);
+            }
+        }
+    }
+
+    // Magic code to escape into your reality
+    RtlFailFast(FAST_FAIL_SET_CONTEXT_DENIED);
 }

@@ -20,9 +20,9 @@ typedef enum _SECTION_INFORMATION_CLASS {
 
 typedef struct _SECTION_IMAGE_INFORMATION
 {
-    PVOID	TransferAddress;
-    ULONG	ZeroBits;
-    SIZE_T	MaximumStackSize;
+    PVOID   TransferAddress;
+    ULONG   ZeroBits;
+    SIZE_T  MaximumStackSize;
     SIZE_T  CommittedStackSize;
     ULONG   SubSystemType;
     union
@@ -46,7 +46,8 @@ typedef struct _SECTION_IMAGE_INFORMATION
 } SECTION_IMAGE_INFORMATION, *PSECTION_IMAGE_INFORMATION;
 
 typedef enum _SYSTEM_INFORMATION_CLASS {
-    SystemModuleInformation = 11
+    SystemModuleInformation = 11,
+    SystemBigPoolInformation = 66
 } SYSTEM_INFORMATION_CLASS;
 
 typedef struct _RTL_PROCESS_MODULE_INFORMATION {
@@ -66,6 +67,27 @@ typedef struct _RTL_PROCESS_MODULES {
     ULONG                           NumberOfModules;
     RTL_PROCESS_MODULE_INFORMATION  Modules[1];
 } RTL_PROCESS_MODULES, *PRTL_PROCESS_MODULES;
+
+typedef struct _SYSTEM_BIGPOOL_ENTRY {
+    union
+    {
+        PVOID       VirtualAddress;
+        ULONG_PTR   NonPaged : 1;
+    };
+
+    ULONG_PTR   SizeInBytes;
+
+    union
+    {
+        UCHAR   Tag[4];
+        ULONG   TagUlong;
+    };
+} SYSTEM_BIGPOOL_ENTRY, *PSYSTEM_BIGPOOL_ENTRY;
+
+typedef struct _SYSTEM_BIGPOOL_INFORMATION {
+    ULONG                   Count;
+    SYSTEM_BIGPOOL_ENTRY    AllocatedInfo[ANYSIZE_ARRAY];
+} SYSTEM_BIGPOOL_INFORMATION, *PSYSTEM_BIGPOOL_INFORMATION;
 
 __declspec(dllimport)
 NTSTATUS

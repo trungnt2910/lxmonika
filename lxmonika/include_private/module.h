@@ -2,6 +2,8 @@
 
 #include <ntddk.h>
 
+#include "winresource.h"
+
 // module.h
 //
 // Module support functions.
@@ -47,6 +49,12 @@ NTSTATUS
     MdlpGetProductVersion(
         _In_ HANDLE hModule,
         _Out_ PCWSTR* pPProductVersion
+    );
+
+NTSTATUS
+    MdlpGetMessageTable(
+        _In_ HANDLE hModule,
+        _Out_ PMESSAGE_RESOURCE_DATA* pPMessageTable
     );
 
 #ifdef __cplusplus
