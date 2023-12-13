@@ -22,8 +22,6 @@ VOID
         _In_ PDRIVER_OBJECT DriverObject
     );
 
-extern PDRIVER_OBJECT DriverGlobalObject;
-
 #ifdef __cplusplus
 }
 #endif

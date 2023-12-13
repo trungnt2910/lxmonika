@@ -100,7 +100,9 @@ static LX_FILE_SEEK                             MaFileSeek;
 
 extern "C"
 NTSTATUS
-MapInitializeLxssDevice()
+MapInitializeLxssDevice(
+    _In_ PDRIVER_OBJECT DriverObject
+)
 {
     NTSTATUS status;
 
@@ -126,7 +128,7 @@ MapInitializeLxssDevice()
     };
 
     // TODO: Potential clash with lxdk-based drivers at this point?
-    status = LxInitialize(DriverGlobalObject, &subsystem);
+    status = LxInitialize(DriverObject, &subsystem);
 
     if (!NT_SUCCESS(status) && status != STATUS_TOO_LATE)
     {

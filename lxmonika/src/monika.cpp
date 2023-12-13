@@ -22,6 +22,8 @@ ProcessMap MapProcessMap;
 
 SIZE_T MapProvidersCount = 0;
 
+static LONG MaInitialized = FALSE;
+
 //
 // Monika lifetime functions
 //
@@ -30,16 +32,30 @@ extern "C"
 NTSTATUS
 MapInitialize()
 {
+    if (InterlockedCompareExchange(&MaInitialized, TRUE, FALSE))
+    {
+        // Already initialized for most of the time.
+        // The only time that Monika may not be initialized yet is during boot where Windows calls
+        // the DriverEntry functions for each registered driver.
+        // During this time, driver initialization should happen sequentially, so this function
+        // cannot be called at the same time by two threads.
+        // If I am mistaken (I might be, since I am a KMDF noob after all), then we might need an
+        // actual lock here.
+        return STATUS_SUCCESS;
+    }
+
     NTSTATUS status;
 
     PPS_PICO_ROUTINES pRoutines = NULL;
+    PPS_PICO_PROVIDER_ROUTINES pProviderRoutines = NULL;
+
     status = PicoSppLocateRoutines(&pRoutines);
 
     Logger::LogTrace("PicoSppLocateRoutines status=", (void*)status);
 
     if (!NT_SUCCESS(status))
     {
-        return status;
+        goto fail;
     }
 
     memcpy(&MapOriginalRoutines, pRoutines, sizeof(MapOriginalRoutines));
@@ -51,14 +67,13 @@ MapInitialize()
         Logger::LogWarning("Please update the pico struct definitions.");
     }
 
-    PPS_PICO_PROVIDER_ROUTINES pProviderRoutines = NULL;
     status = PicoSppLocateProviderRoutines(&pProviderRoutines);
 
     Logger::LogTrace("PicoSppLocateProviderRoutines status=", (void*)status);
 
     if (!NT_SUCCESS(status))
     {
-        return status;
+        goto fail;
     }
 
     memcpy(&MapOriginalProviderRoutines, pProviderRoutines, sizeof(MapOriginalProviderRoutines));
@@ -99,32 +114,26 @@ MapInitialize()
     // Initialize process map
     MapProcessMap.Initialize();
 
-    // /dev/reality
-    status = MapInitializeLxssDevice();
-
-    Logger::LogTrace("MapInitializeLxssDevice status=", (void*)status);
-
-    if (!NT_SUCCESS(status))
-    {
-        Logger::LogWarning("Failed to initialize lxss device. "
-            "WSL integration features will not work.");
-        Logger::LogWarning("Make sure WSL1 is enabled and lxcore.sys is loaded.");
-    }
-
     return STATUS_SUCCESS;
+
+fail:
+    MaInitialized = FALSE;
+    return status;
 }
 
 extern "C"
 VOID
 MapCleanup()
 {
-    PPS_PICO_PROVIDER_ROUTINES pRoutines = NULL;
-    if (NT_SUCCESS(PicoSppLocateProviderRoutines(&pRoutines)))
+    if (InterlockedCompareExchange(&MaInitialized, FALSE, TRUE))
     {
-        memcpy(pRoutines, &MapOriginalProviderRoutines, sizeof(MapOriginalProviderRoutines));
+        PPS_PICO_PROVIDER_ROUTINES pRoutines = NULL;
+        if (NT_SUCCESS(PicoSppLocateProviderRoutines(&pRoutines)))
+        {
+            memcpy(pRoutines, &MapOriginalProviderRoutines, sizeof(MapOriginalProviderRoutines));
+        }
+        MapProcessMap.Clear();
     }
-    MapProcessMap.Clear();
-    MapCleanupLxssDevice();
 }
 
 
@@ -150,6 +159,14 @@ MaRegisterPicoProvider(
         || (ProviderRoutines->OpenThread & (~THREAD_ALL_ACCESS)) != 0)
     {
         return STATUS_INVALID_PARAMETER;
+    }
+
+    // BE CAREFUL! This function might be called by other drivers before lxmonika's own DriverEntry
+    // gets called.
+    NTSTATUS status = MapInitialize();
+    if (!NT_SUCCESS(status))
+    {
+        return status;
     }
 
     // Acquire an index for the provider.

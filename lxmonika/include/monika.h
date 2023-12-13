@@ -87,7 +87,9 @@ VOID
     );
 
 NTSTATUS
-    MapInitializeLxssDevice();
+    MapInitializeLxssDevice(
+        _In_ PDRIVER_OBJECT DriverObject
+    );
 
 VOID
     MapCleanupLxssDevice();

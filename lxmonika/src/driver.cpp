@@ -19,11 +19,9 @@ DriverEntry(
 {
     UNREFERENCED_PARAMETER(RegistryPath);
 
-    NTSTATUS status = STATUS_SUCCESS;
+    NTSTATUS status;
 
     Logger::LogInfo("Hello World from lxmonika!");
-
-    DriverGlobalObject = DriverObject;
 
     // According to Microsoft naming conventions:
     // Ma           => MonikA
@@ -32,9 +30,31 @@ DriverEntry(
     // This function has nothing to do with maps.
     status = MapInitialize();
 
+    if (!NT_SUCCESS(status))
+    {
+        Logger::LogError("Failed to initialize lxmonika, status=", (PVOID)status);
+        return status;
+    }
+
+    // /dev/reality
+    // Initializing the reality device requires knowing our DRIVER_OBJECT.
+    // As MapInitialize may be indirectly called by other drivers through MaRegisterPicoProvider,
+    // we cannot guarantee the availablity of DriverObject when MapInitialize is called.
+    // For this reason, MapInitializeLxssDevice needs to be directly handled by DriverEntry.
+    status = MapInitializeLxssDevice(DriverObject);
+
+    if (!NT_SUCCESS(status))
+    {
+        Logger::LogWarning("Failed to initialize lxss device, status=", (PVOID)status);
+        Logger::LogWarning("WSL integration features will not work.");
+        Logger::LogWarning("Make sure WSL1 is enabled and lxcore.sys is loaded.");
+
+        // Non-fatal.
+    }
+
     DriverObject->DriverUnload = DriverUnload;
 
-    return status;
+    return STATUS_SUCCESS;
 }
 
 extern "C"
@@ -45,7 +65,7 @@ DriverUnload(
 {
     UNREFERENCED_PARAMETER(DriverObject);
 
-    MapCleanup();
+    MapCleanupLxssDevice();
 
-    DriverGlobalObject = NULL;
+    MapCleanup();
 }
