@@ -581,7 +581,7 @@ MaFileIoctl(
                 PCSTR pRequestedProvider = (PCSTR)pBuffer;
                 Logger::LogTrace("MA_IOCTL_SET_PROVIDER ", pRequestedProvider);
 
-                SIZE_T uProviderLength = strlen(pRequestedProvider);
+                SIZE_T uProviderLength = strnlen(pRequestedProvider, MA_NAME_MAX);
 
                 // Prevent reading newer providers.
                 SIZE_T uCurrentRegisteredCount = min(MapProvidersCount, MaPicoProviderMaxCount);
@@ -621,6 +621,9 @@ MaFileIoctl(
                 {
                     return LxpUtilTranslateStatus(status);
                 }
+
+                Logger::LogTrace("Successfully switched process to provider ID ", uBestMatchIndex);
+                Logger::LogTrace("New provider name: ", MapProviderNames[uBestMatchIndex]);
 
                 return 0;
             }
