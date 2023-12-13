@@ -146,9 +146,8 @@ MaRegisterPicoProvider(
         return STATUS_INFO_LENGTH_MISMATCH;
     }
 
-    const ACCESS_MASK uPicoMaximumRights = STANDARD_RIGHTS_ALL | SPECIFIC_RIGHTS_ALL;
-    if ((ProviderRoutines->OpenProcess & ~uPicoMaximumRights) != 0
-        || (ProviderRoutines->OpenThread & ~uPicoMaximumRights) != 0)
+    if ((ProviderRoutines->OpenProcess & (~PROCESS_ALL_ACCESS)) != 0
+        || (ProviderRoutines->OpenThread & (~THREAD_ALL_ACCESS)) != 0)
     {
         return STATUS_INVALID_PARAMETER;
     }

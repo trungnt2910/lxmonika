@@ -25,11 +25,11 @@ extern "C"
 #define PS_PICO_CREATE_PROCESS_BREAKAWAY                0x8
 #define PS_PICO_CREATE_PROCESS_PACKAGED_PROCESS         0x10
 
-#define PS_PICO_CREATE_PROCESS_FLAGS_MASK (			\
-    PS_PICO_CREATE_PROCESS_CLONE_PARENT			|	\
-    PS_PICO_CREATE_PROCESS_INHERIT_HANDLES		|	\
-    PS_PICO_CREATE_PROCESS_CLONE_REDUCED_COMMIT |	\
-    PS_PICO_CREATE_PROCESS_BREAKAWAY			|	\
+#define PS_PICO_CREATE_PROCESS_FLAGS_MASK (         \
+    PS_PICO_CREATE_PROCESS_CLONE_PARENT         |   \
+    PS_PICO_CREATE_PROCESS_INHERIT_HANDLES      |   \
+    PS_PICO_CREATE_PROCESS_CLONE_REDUCED_COMMIT |   \
+    PS_PICO_CREATE_PROCESS_BREAKAWAY            |   \
     PS_PICO_CREATE_PROCESS_PACKAGED_PROCESS)
 
 typedef struct _PS_PICO_PROCESS_ATTRIBUTES {
@@ -117,13 +117,13 @@ typedef NTSTATUS PS_PICO_CREATE_PROCESS(
 
 typedef PS_PICO_CREATE_PROCESS* PPS_PICO_CREATE_PROCESS;
 
-typedef	NTSTATUS PS_PICO_CREATE_THREAD(
+typedef NTSTATUS PS_PICO_CREATE_THREAD(
     _In_ PPS_PICO_THREAD_ATTRIBUTES ThreadAttributes,
     _Outptr_ PHANDLE ThreadHandle
 );
 typedef PS_PICO_CREATE_THREAD* PPS_PICO_CREATE_THREAD;
 
-typedef	PVOID PS_PICO_GET_PROCESS_CONTEXT(
+typedef PVOID PS_PICO_GET_PROCESS_CONTEXT(
     _In_ PEPROCESS Process
 );
 typedef PS_PICO_GET_PROCESS_CONTEXT* PPS_PICO_GET_PROCESS_CONTEXT;
@@ -151,19 +151,19 @@ typedef enum _PS_PICO_THREAD_DESCRIPTOR_TYPE {
     PicoThreadDescriptorTypeMax
 } PS_PICO_THREAD_DESCRIPTOR_TYPE, *PPS_PICO_THREAD_DESCRIPTOR_TYPE;
 
-typedef	VOID PS_PICO_SET_THREAD_DESCRIPTOR_BASE(
+typedef VOID PS_PICO_SET_THREAD_DESCRIPTOR_BASE(
     _In_ PS_PICO_THREAD_DESCRIPTOR_TYPE Type,
     _In_ ULONG_PTR Base
 );
 typedef PS_PICO_SET_THREAD_DESCRIPTOR_BASE* PPS_PICO_SET_THREAD_DESCRIPTOR_BASE;
 
-typedef	NTSTATUS PS_PICO_TERMINATE_PROCESS(
+typedef NTSTATUS PS_PICO_TERMINATE_PROCESS(
     __inout PEPROCESS Process,
     __in NTSTATUS ExitStatus
 );
 typedef PS_PICO_TERMINATE_PROCESS* PPS_PICO_TERMINATE_PROCESS;
 
-typedef	NTSTATUS PS_SET_CONTEXT_THREAD_INTERNAL(
+typedef NTSTATUS PS_SET_CONTEXT_THREAD_INTERNAL(
     __in PETHREAD Thread,
     __in PCONTEXT ThreadContext,
     __in KPROCESSOR_MODE ProbeMode,
@@ -172,7 +172,7 @@ typedef	NTSTATUS PS_SET_CONTEXT_THREAD_INTERNAL(
 );
 typedef PS_SET_CONTEXT_THREAD_INTERNAL* PPS_SET_CONTEXT_THREAD_INTERNAL;
 
-typedef	NTSTATUS PS_GET_CONTEXT_THREAD_INTERNAL(
+typedef NTSTATUS PS_GET_CONTEXT_THREAD_INTERNAL(
     __in PETHREAD Thread,
     __inout PCONTEXT ThreadContext,
     __in KPROCESSOR_MODE ProbeMode,
@@ -182,7 +182,7 @@ typedef	NTSTATUS PS_GET_CONTEXT_THREAD_INTERNAL(
 typedef PS_GET_CONTEXT_THREAD_INTERNAL* PPS_GET_CONTEXT_THREAD_INTERNAL;
 
 
-typedef	NTSTATUS PS_TERMINATE_THREAD(
+typedef NTSTATUS PS_TERMINATE_THREAD(
     __inout PETHREAD Thread,
     __in NTSTATUS ExitStatus,
     __in BOOLEAN DirectTerminate
@@ -190,7 +190,7 @@ typedef	NTSTATUS PS_TERMINATE_THREAD(
 typedef PS_TERMINATE_THREAD* PPS_TERMINATE_THREAD;
 
 
-typedef	NTSTATUS PS_SUSPEND_THREAD(
+typedef NTSTATUS PS_SUSPEND_THREAD(
     _In_ PETHREAD Thread,
     _Out_opt_ PULONG PreviousSuspendCount
 );
@@ -331,6 +331,60 @@ typedef struct _PS_PICO_PROVIDER_ROUTINES {
     SIZE_T Unknown;
 } PS_PICO_PROVIDER_ROUTINES, *PPS_PICO_PROVIDER_ROUTINES;
 
+//
+// Process and Thread Security and Access Rights
+//
+// Based on winnt.h
+// See also
+// https://learn.microsoft.com/en-us/windows/win32/procthread/process-security-and-access-rights
+// and https://learn.microsoft.com/en-us/windows/win32/procthread/thread-security-and-access-rights
+//
+
+#define PROCESS_TERMINATE                  (0x0001)
+#define PROCESS_CREATE_THREAD              (0x0002)
+#define PROCESS_SET_SESSIONID              (0x0004)
+#define PROCESS_VM_OPERATION               (0x0008)
+#define PROCESS_VM_READ                    (0x0010)
+#define PROCESS_VM_WRITE                   (0x0020)
+#define PROCESS_DUP_HANDLE                 (0x0040)
+#define PROCESS_CREATE_PROCESS             (0x0080)
+#define PROCESS_SET_QUOTA                  (0x0100)
+#define PROCESS_SET_INFORMATION            (0x0200)
+#define PROCESS_QUERY_INFORMATION          (0x0400)
+#define PROCESS_SUSPEND_RESUME             (0x0800)
+#define PROCESS_QUERY_LIMITED_INFORMATION  (0x1000)
+#define PROCESS_SET_LIMITED_INFORMATION    (0x2000)
+//
+
+#if (NTDDI_VERSION >= NTDDI_VISTA)
+#define PROCESS_ALL_ACCESS        (STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | \
+                                   0xFFFF)
+#else
+#define PROCESS_ALL_ACCESS        (STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | \
+                                   0xFFF)
+#endif
+
+//
+#define THREAD_TERMINATE                 (0x0001)
+#define THREAD_SUSPEND_RESUME            (0x0002)
+#define THREAD_GET_CONTEXT               (0x0008)
+#define THREAD_SET_CONTEXT               (0x0010)
+#define THREAD_QUERY_INFORMATION         (0x0040)
+#define THREAD_SET_INFORMATION           (0x0020)
+#define THREAD_SET_THREAD_TOKEN          (0x0080)
+#define THREAD_IMPERSONATE               (0x0100)
+#define THREAD_DIRECT_IMPERSONATION      (0x0200)
+#define THREAD_SET_LIMITED_INFORMATION   (0x0400)  // winnt
+#define THREAD_QUERY_LIMITED_INFORMATION (0x0800)  // winnt
+#define THREAD_RESUME                    (0x1000)  // winnt
+
+#if (NTDDI_VERSION >= NTDDI_VISTA)
+#define THREAD_ALL_ACCESS         (STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | \
+                                   0xFFFF)
+#else
+#define THREAD_ALL_ACCESS         (STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | \
+                                   0x3FF)
+#endif
 
 #ifdef __cplusplus
 }
