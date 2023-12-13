@@ -183,7 +183,7 @@ MaRegisterPicoProvider(
     }
 
     MapProviderRoutines[uProviderIndex] = *ProviderRoutines;
-    MapRoutines[uProviderIndex] = *PicoRoutines;
+    *PicoRoutines = MapRoutines[uProviderIndex];
 
     return STATUS_SUCCESS;
 }
