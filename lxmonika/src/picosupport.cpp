@@ -69,6 +69,16 @@ PicoSppLocateProviderRoutines(
         {
             pTarget = (PCHAR)hdlNtKernel + 0xC37CA0;
         }
+        else if (strncmp(pVersionInfoStringAnsi, "10.0.22621.2792",
+            sizeof(pVersionInfoStringAnsi)) == 0)
+        {
+            pTarget = (PCHAR)hdlNtKernel + 0xC37D40;
+        }
+        else if (strncmp(pVersionInfoStringAnsi, "10.0.22621.2861",
+            sizeof(pVersionInfoStringAnsi)) == 0)
+        {
+            pTarget = (PCHAR)hdlNtKernel + 0xC37D40;
+        }
 #endif
 
         if (pTarget != NULL)
