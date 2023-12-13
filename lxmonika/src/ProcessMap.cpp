@@ -98,7 +98,7 @@ ProcessMap::RegisterProcessProvider(
     _PNODE pInsertedNode = (_PNODE)
         RtlInsertElementGenericTableAvl(&m_table, &node, sizeof(node), &bNewEntry);
 
-    if (pInsertedNode == FALSE)
+    if (pInsertedNode == NULL)
     {
         return STATUS_INSUFFICIENT_RESOURCES;
     }
@@ -124,7 +124,7 @@ ProcessMap::SwitchProcessProvider(
 
     if (pInfo == NULL)
     {
-        NTSTATUS status = RegisterProcessProvider(process, (DWORD)-1);
+        NTSTATUS status = RegisterProcessProvider(process, newProvider);
         if (!NT_SUCCESS(status))
         {
             return status;
@@ -152,7 +152,7 @@ ProcessMap::SwitchProcessProvider(
 
     pInfo->HasParentProvider = TRUE;
     pInfo->HasInternalParentProvider = bHasInternalProvider;
-    pInfo->ParentProviderId = pInfo->ProviderId;
+    pInfo->ParentProviderId = bHasInternalProvider ? pInfo->ProviderId : 0;
     pInfo->ProviderId = newProvider;
 
     return STATUS_SUCCESS;
