@@ -114,6 +114,13 @@ PEPROCESS
         _In_        PETHREAD Thread
     );
 
+__declspec(dllimport)
+NTSTATUS
+    PsLookupProcessByProcessId(
+        _In_        HANDLE ProcessId,
+        _Out_       PEPROCESS* Process
+    );
+
 #ifdef __cplusplus
 }
 #endif

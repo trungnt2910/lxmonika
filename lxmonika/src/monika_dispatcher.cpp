@@ -184,19 +184,26 @@ MapCreateProcess(
 {
     NTSTATUS status = MapOriginalRoutines.CreateProcess(ProcessAttributes, ProcessHandle);
 
-    // TODO: Check if this "HANDLE" is actually the same as a `PEPROCESS` struct?
     if (NT_SUCCESS(status))
     {
+        PEPROCESS pNewProcess = NULL;
+        if (!NT_SUCCESS(PsLookupProcessByProcessId(ProcessHandle, &pNewProcess)))
+        {
+            // Should bugcheck here.
+            DbgBreakPoint();
+        }
+
         {
             MA_LOCK_PROCESS_MAP;
-            status = MapProcessMap.RegisterProcessProvider((PEPROCESS)*ProcessHandle,
-                ProviderIndex);
+            status = MapProcessMap.RegisterProcessProvider(pNewProcess, ProviderIndex);
         }
 
         if (!NT_SUCCESS(status))
         {
-            MapOriginalRoutines.TerminateProcess((PEPROCESS)*ProcessHandle, status);
+            MapOriginalRoutines.TerminateProcess(pNewProcess, status);
         }
+
+        ObDereferenceObject(pNewProcess);
     }
 
     return status;
@@ -215,7 +222,23 @@ MapCreateThread(
         return STATUS_INVALID_PARAMETER;
     }
 
-    if (!MA_PROCESS_BELONGS_TO_PROVIDER((PEPROCESS)ThreadAttributes->Process, ProviderIndex))
+    BOOLEAN bBelongsToProvider = FALSE;
+
+    {
+        PEPROCESS pHostProcess = NULL;
+        NTSTATUS status = PsLookupProcessByProcessId(ThreadAttributes->Process, &pHostProcess);
+
+        if (!NT_SUCCESS(status))
+        {
+            return status;
+        }
+
+        bBelongsToProvider = MA_PROCESS_BELONGS_TO_PROVIDER(pHostProcess, ProviderIndex);
+
+        ObDereferenceObject(pHostProcess);
+    }
+
+    if (!bBelongsToProvider)
     {
         return STATUS_INVALID_PARAMETER;
     }
