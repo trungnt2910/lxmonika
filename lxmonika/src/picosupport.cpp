@@ -219,8 +219,20 @@ PicoSppLocateProviderRoutines(
             continue;
         }
 
-        // TODO: Check OpenProcess and OpenThread.
-        // TODO: The last unknown member of the struct is always 1. Check for that?
+        if ((pTestRoutines->OpenProcess & (~PROCESS_ALL_ACCESS)) != 0)
+        {
+            continue;
+        }
+
+        if ((pTestRoutines->OpenThread & (~THREAD_ALL_ACCESS)) != 0)
+        {
+            continue;
+        }
+
+        if (pTestRoutines->SubsystemInformationType != SubsystemInformationTypeWSL)
+        {
+            continue;
+        }
 
         // The current routines match the criteria. Store it.
         PspPicoProviderRoutines = pTestRoutines;

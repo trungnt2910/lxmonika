@@ -328,7 +328,7 @@ typedef struct _PS_PICO_PROVIDER_ROUTINES {
     PPS_PICO_GET_ALLOCATED_PROCESS_IMAGE_NAME GetAllocatedProcessImageName;
     ACCESS_MASK OpenProcess;
     ACCESS_MASK OpenThread;
-    SIZE_T Unknown;
+    SUBSYSTEM_INFORMATION_TYPE SubsystemInformationType;
 } PS_PICO_PROVIDER_ROUTINES, *PPS_PICO_PROVIDER_ROUTINES;
 
 //
