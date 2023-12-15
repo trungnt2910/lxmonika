@@ -261,3 +261,54 @@ struct _LX_IOVECTOR
     INT Count;
     LX_IOVECTOR_BUFFER Vector[];
 };
+
+//
+// Additional structs
+//
+// These structs are NOT part of LxDK. Licensed under the the MIT License.
+// There have been no real-world tests for the validity of these structures,
+// USE THEM AT YOUR OWN RISK.
+
+typedef struct _LX_INSTANCE {
+    UINT64 Reserved[309];
+} LX_INSTANCE, *PLX_INSTANCE;
+
+typedef struct _LX_PROCESS {
+    PLX_INSTANCE Instance;
+    PEPROCESS Process;
+    ULONG_PTR ReferenceCount;
+    HANDLE Handle;
+    UINT64 Reserved1[2];
+    EX_PUSH_LOCK Lock;
+    UINT64 Reserved2[3];
+    PUNICODE_STRING ExecutablePath;
+    PVOID SomethingThatNeedsToBeFreedWithTheProcess;
+    UINT64 Reserved3[39];
+} LX_PROCESS, *PLX_PROCESS;
+
+typedef struct _LX_THREAD_GROUP {
+    UINT64 Reserved1;
+    EX_PUSH_LOCK Lock;
+    UINT64 Reserved2[15];
+    PLX_PROCESS Process;
+    UINT64 Reserved3[738];
+} LX_THREAD_GROUP, *PLX_THREAD_GROUP;
+
+typedef struct _LX_THREAD {
+    UINT64 Reserved[16];
+    PLX_THREAD_GROUP ThreadGroup;
+    UINT64 Reserved1[502];
+} LX_THREAD, *PLX_THREAD;
+
+typedef struct _LX_CALL_CONTEXT {
+    PLX_INSTANCE Instance;
+    UINT64 Reserved[8];
+    PLX_THREAD Thread;
+    UINT64 Reserved1[4];
+} LX_CALL_CONTEXT, *PLX_CALL_CONTEXT;
+
+typedef struct _LX_STRING {
+    SIZE_T Length;
+    SIZE_T MaximumLength;
+    PCHAR Buffer;
+} LX_STRING, *PLX_STRING;
