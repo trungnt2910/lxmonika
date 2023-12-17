@@ -269,9 +269,54 @@ struct _LX_IOVECTOR
 // There have been no real-world tests for the validity of these structures,
 // USE THEM AT YOUR OWN RISK.
 
+typedef struct _LX_WAIT_OBJECT *PLX_WAIT_OBJECT;
+
+typedef VOID LX_WAIT_OBJECT_LAST_DEREFERENCE(
+    _In_ PLX_CALL_CONTEXT CallContext,
+    _In_ PLX_WAIT_OBJECT WaitObject
+);
+typedef LX_WAIT_OBJECT_LAST_DEREFERENCE* PLX_WAIT_OBJECT_LAST_DEREFERENCE;
+
+typedef struct _LX_WAIT_OBJECT_TYPE {
+    PLX_WAIT_OBJECT_LAST_DEREFERENCE LastDereference;
+} LX_WAIT_OBJECT_TYPE, *PLX_WAIT_OBJECT_TYPE;
+
+typedef struct _LX_WAIT_OBJECT {
+    PLX_WAIT_OBJECT_TYPE Type;
+    EX_PUSH_LOCK Lock;
+    UINT64 Reserved[1];
+    NTSTATUS Status;
+    UINT32 Reserved2;
+    UINT64 ReferenceCount;
+    LIST_ENTRY Events;
+    LIST_ENTRY ThreadGroups;
+    UINT64 Reserved3[5];
+} LX_WAIT_OBJECT, *PLX_WAIT_OBJECT;
+
 typedef struct _LX_INSTANCE {
-    UINT64 Reserved[309];
+    UINT64 Reserved[3];
+    EX_RUNDOWN_REF RundownProtection;
+    UINT64 Reserved1[33];
+    LIST_ENTRY Sessions;
+    UINT64 Reserved2[5];
+    EX_PUSH_LOCK Lock;
+    UINT64 Reserved3[264];
 } LX_INSTANCE, *PLX_INSTANCE;
+
+typedef struct _LX_SESSION {
+    LX_WAIT_OBJECT WaitObject;
+    LIST_ENTRY ListEntry;
+    UINT64 Reserved[2];
+    LIST_ENTRY ProcessGroups;
+    UINT64 Reserved1;
+} LX_SESSION, *PLX_SESSION;
+
+typedef struct _LX_PROCESS_GROUP {
+    LX_WAIT_OBJECT WaitObject;
+    LIST_ENTRY ListEntry;
+    LIST_ENTRY ThreadGroups;
+    PLX_SESSION Session;
+} LX_PROCESS_GROUP, *PLX_PROCESS_GROUP;
 
 typedef struct _LX_PROCESS {
     PLX_INSTANCE Instance;
@@ -280,31 +325,84 @@ typedef struct _LX_PROCESS {
     HANDLE Handle;
     UINT64 Reserved1[2];
     EX_PUSH_LOCK Lock;
-    UINT64 Reserved2[3];
+    LIST_ENTRY ThreadGroups;
+    UINT64 Reserved2[1];
     PUNICODE_STRING ExecutablePath;
     PVOID SomethingThatNeedsToBeFreedWithTheProcess;
     UINT64 Reserved3[39];
 } LX_PROCESS, *PLX_PROCESS;
 
 typedef struct _LX_THREAD_GROUP {
-    UINT64 Reserved1;
-    EX_PUSH_LOCK Lock;
-    UINT64 Reserved2[15];
+    LX_WAIT_OBJECT WaitObject;
+    UINT64 Reserved1[3];
     PLX_PROCESS Process;
-    UINT64 Reserved3[738];
+    PLX_INSTANCE Instance;
+    UINT64 Reserved2[7];
+    LIST_ENTRY ListEntry;
+    UINT64 Reserved3;
+    EX_RUNDOWN_REF RundownProtection;
+    UINT64 Reserved4[3];
+    LIST_ENTRY Threads;
+    UINT32 ThreadCount;
+    UINT32 Reserved5;
+    UINT64 Reserved6[720];
 } LX_THREAD_GROUP, *PLX_THREAD_GROUP;
 
+typedef struct _LX_FILE_DESCRIPTOR_TABLE {
+    UINT64 ReferenceCount;
+    UINT64 Reserved[9];
+} LX_FILE_DESCRIPTOR_TABLE, *PLX_FILE_DESCRIPTOR_TABLE;
+
+typedef struct _LX_FILE_SYSTEM {
+    UINT64 ReferenceCount;
+    UINT64 Reserved[8];
+} LX_FILE_SYSTEM, *PLX_FILE_SYSTEM;
+
+typedef struct _LX_NT_STATE_THREAD_DATA {
+    UINT64 ReferenceCount;
+    PETHREAD Thread;
+    HANDLE Handle;
+    KAPC KernelApc;
+    KAPC UserApc;
+} LX_NT_STATE_THREAD_DATA, *PLX_NT_STATE_THREAD_DATA;
+
+typedef struct _LX_NT_STATE_THREAD {
+    UINT64 Reserved[4];
+    PLX_NT_STATE_THREAD_DATA Data;
+} LX_NT_STATE_THREAD, *PLX_NT_STATE_THREAD;
+
+typedef enum _LX_THREAD_FLAGS {
+    LxThreadPreparedForTermination = 0x1,
+    LxThreadTerminating = 0x10
+} LX_THREAD_FLAGS;
+
 typedef struct _LX_THREAD {
-    UINT64 Reserved[16];
+    LX_WAIT_OBJECT WaitObject;
+    LIST_ENTRY ListItem;
     PLX_THREAD_GROUP ThreadGroup;
-    UINT64 Reserved1[502];
+    PLX_FILE_DESCRIPTOR_TABLE FileDescriptorTable;
+    PLX_FILE_SYSTEM FileSystem;
+    UINT32 Reserved;
+    LX_THREAD_FLAGS Flags;
+    EX_RUNDOWN_REF RundownProtection;
+    UINT64 Reserved1[498];
 } LX_THREAD, *PLX_THREAD;
+
+typedef struct _LX_VFS_LOOKUP_CONTEXT LX_VFS_LOOKUP_CONTEXT, *PLX_VFS_LOOKUP_CONTEXT;
+
+typedef enum _LX_CALL_CONTEXT_FLAGS {
+    LxCallContextHasThread = 0x2,
+    LxCallContextHasLookupContext = 0x4
+} LX_CALL_CONTEXT_FLAGS;
 
 typedef struct _LX_CALL_CONTEXT {
     PLX_INSTANCE Instance;
     UINT64 Reserved[8];
     PLX_THREAD Thread;
-    UINT64 Reserved1[4];
+    PLX_VFS_LOOKUP_CONTEXT VfsLookupContext;
+    UINT64 Reserved1[2];
+    LX_CALL_CONTEXT_FLAGS Flags;
+    UINT32 Reserved2;
 } LX_CALL_CONTEXT, *PLX_CALL_CONTEXT;
 
 typedef struct _LX_STRING {
