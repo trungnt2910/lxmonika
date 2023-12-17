@@ -8,6 +8,29 @@
 #include "Logger.h"
 
 static PPS_PICO_PROVIDER_ROUTINES PspPicoProviderRoutines = NULL;
+static PS_PICO_ROUTINES PspPicoRoutines
+{
+    .Size = 0
+};
+
+static
+VOID
+PicoSpStringUnicodeToAnsi(
+    _Out_ PSTR pAnsiString,
+    _In_ PCWSTR pUnicodeString,
+    _In_ SIZE_T uMaxLen
+)
+{
+    SIZE_T uLen = wcslen(pUnicodeString);
+
+    uLen = min(uLen, uMaxLen - 1);
+
+    // Copy the null char as well.
+    for (SIZE_T i = 0; i <= uLen; ++i)
+    {
+        pAnsiString[i] = (CHAR)pUnicodeString[i];
+    }
+}
 
 extern "C"
 NTSTATUS
@@ -49,43 +72,21 @@ PicoSppLocateProviderRoutines(
     if (NT_SUCCESS(status))
     {
         CHAR pVersionInfoStringAnsi[32];
-        for (SIZE_T i = 0; i < ARRAYSIZE(pVersionInfoStringAnsi); ++i)
-        {
-            if (pVersionInfoStringUnicode[i] == L'\0')
-            {
-                pVersionInfoStringAnsi[i] = '\0';
-                break;
-            }
-            pVersionInfoStringAnsi[i] = (CHAR)pVersionInfoStringUnicode[i];
-        }
+        PicoSpStringUnicodeToAnsi(pVersionInfoStringAnsi, pVersionInfoStringUnicode,
+            sizeof(pVersionInfoStringAnsi));
 
         Logger::LogTrace("Detected Windows NT version ", pVersionInfoStringAnsi);
 
-        PVOID pTarget = NULL;
+        PMA_PSP_PICO_PROVIDER_ROUTINES_OFFSETS pOffsets = NULL;
+        status = PicoSppGetOffsets(pVersionInfoStringAnsi, NULL, &pOffsets);
 
-#ifdef AMD64
-        if (strncmp(pVersionInfoStringAnsi, "10.0.22621.2715",
-            sizeof(pVersionInfoStringAnsi)) == 0)
+        if (NT_SUCCESS(status) && pOffsets->Offsets.PspPicoProviderRoutines != 0)
         {
-            pTarget = (PCHAR)hdlNtKernel + 0xC37CA0;
-        }
-        else if (strncmp(pVersionInfoStringAnsi, "10.0.22621.2792",
-            sizeof(pVersionInfoStringAnsi)) == 0)
-        {
-            pTarget = (PCHAR)hdlNtKernel + 0xC37D40;
-        }
-        else if (strncmp(pVersionInfoStringAnsi, "10.0.22621.2861",
-            sizeof(pVersionInfoStringAnsi)) == 0)
-        {
-            pTarget = (PCHAR)hdlNtKernel + 0xC37D40;
-        }
-#endif
-
-        if (pTarget != NULL)
-        {
-            Logger::LogTrace("PspPicoProviderRoutines found at ", pTarget);
             PPS_PICO_PROVIDER_ROUTINES pMaybeTheRightRoutines =
-                (PPS_PICO_PROVIDER_ROUTINES)pTarget;
+                (PPS_PICO_PROVIDER_ROUTINES)
+                    ((PCHAR)hdlNtKernel + pOffsets->Offsets.PspPicoProviderRoutines);
+
+            Logger::LogTrace("PspPicoProviderRoutines found at ", pMaybeTheRightRoutines);
 
             // Do a size check first. This reduces the chance of wrong version handling code
             // bootlooping Windows.
@@ -263,6 +264,7 @@ PicoSppLocateRoutines(
 
     NTSTATUS status = STATUS_SUCCESS;
 
+    // Method 1: Resolve symbols from lxcore.sys
     HANDLE hdlLxCore = NULL;
     SIZE_T uLxCoreSize = 0;
     status = MdlpFindModuleByName("lxcore.sys", &hdlLxCore, &uLxCoreSize);
@@ -270,24 +272,139 @@ PicoSppLocateRoutines(
     Logger::LogTrace("Find lxcore: status=", (void*)status, " handle=", hdlLxCore,
         " size=", uLxCoreSize);
 
-    if (!NT_SUCCESS(status))
+    if (NT_SUCCESS(status))
     {
-        return status;
+        PVOID pLxpRoutines;
+        status = MdlpGetProcAddress(hdlLxCore, "LxpRoutines", &pLxpRoutines);
+
+        Logger::LogTrace("Find LxpRoutines: status=", (void*)status, " &LxpRoutines=",
+            pLxpRoutines);
+
+        if (!NT_SUCCESS(status))
+        {
+            goto fail;
+        }
+
+        *pPr = (PPS_PICO_ROUTINES)pLxpRoutines;
+        return STATUS_SUCCESS;
     }
 
-    PVOID pLxpRoutines;
-    status = MdlpGetProcAddress(hdlLxCore, "LxpRoutines", &pLxpRoutines);
+    // Method 2: Known offsets from the NT Kernel base.
 
-    Logger::LogTrace("Find LxpRoutines: status=", (void*)status, " &LxpRoutines=", pLxpRoutines);
-
-    if (!NT_SUCCESS(status))
+    // Cached value
+    if (PspPicoRoutines.Size != 0)
     {
-        Logger::LogError("Cannot find Pico routines.");
-        Logger::LogError("Make sure WSL is enabled and LXCORE.SYS is loaded.");
-        return status;
+        *pPr = &PspPicoRoutines;
+        return STATUS_SUCCESS;
     }
 
-    *pPr = (PPS_PICO_ROUTINES)pLxpRoutines;
+    HANDLE hdlNtKernel;
+    SIZE_T uNtKernelSize;
+    status = MdlpFindModuleByName("ntoskrnl.exe", &hdlNtKernel, &uNtKernelSize);
 
-    return STATUS_SUCCESS;
+    Logger::LogTrace("Find ntoskrnl: status=", (PVOID)status, " handle=", hdlNtKernel,
+        " size=", uNtKernelSize);
+
+    if (NT_SUCCESS(status))
+    {
+        PCWSTR pVersionInfoStringUnicode;
+        CHAR pVersionInfoStringAnsi[32];
+        status = MdlpGetProductVersion(hdlNtKernel, (PCWSTR*)&pVersionInfoStringUnicode);
+
+        if (!NT_SUCCESS(status))
+        {
+            goto fail;
+        }
+
+        PicoSpStringUnicodeToAnsi(pVersionInfoStringAnsi, pVersionInfoStringUnicode,
+            sizeof(pVersionInfoStringAnsi));
+
+        Logger::LogTrace("Detected Windows NT version ", pVersionInfoStringAnsi);
+
+        PMA_PSP_PICO_PROVIDER_ROUTINES_OFFSETS pOffsets = NULL;
+        status = PicoSppGetOffsets(pVersionInfoStringAnsi, NULL, &pOffsets);
+
+        if (!NT_SUCCESS(status))
+        {
+            Logger::LogWarning("Windows NT version ", pVersionInfoStringAnsi,
+                " is not supported.");
+            goto fail;
+        }
+
+#define PICO_SPP_CHECK_AND_ASSIGN(member, symbol)                                               \
+        if (pOffsets->Offsets.symbol == 0)                                                      \
+        {                                                                                       \
+            Logger::LogWarning("The offset to " #symbol " is unknown.");                        \
+            /* Actually happens on 16xxx ARM builds. */                                         \
+            Logger::LogWarning("Maybe Microsoft has blocked Pico processed on this build?");    \
+            goto fail;                                                                          \
+        }                                                                                       \
+        else                                                                                    \
+        {                                                                                       \
+            PspPicoRoutines.member = (decltype(PspPicoRoutines.member))                         \
+                ((PCHAR)hdlNtKernel + pOffsets->Offsets.symbol);                                \
+        }
+
+        PICO_SPP_CHECK_AND_ASSIGN(CreateProcess,            PspCreatePicoProcess);
+        PICO_SPP_CHECK_AND_ASSIGN(CreateThread,             PspCreatePicoThread);
+        PICO_SPP_CHECK_AND_ASSIGN(GetProcessContext,        PspGetPicoProcessContext);
+        PICO_SPP_CHECK_AND_ASSIGN(GetThreadContext,         PspGetPicoThreadContext);
+        PICO_SPP_CHECK_AND_ASSIGN(GetContextThreadInternal, PspPicoGetContextThreadEx);
+        PICO_SPP_CHECK_AND_ASSIGN(SetContextThreadInternal, PspPicoSetContextThreadEx);
+        PICO_SPP_CHECK_AND_ASSIGN(TerminateThread,          PspTerminateThreadByPointer);
+        PICO_SPP_CHECK_AND_ASSIGN(ResumeThread,             PsResumeThread);
+        PICO_SPP_CHECK_AND_ASSIGN(SetThreadDescriptorBase,  PspSetPicoThreadDescriptorBase);
+        PICO_SPP_CHECK_AND_ASSIGN(SuspendThread,            PsSuspendThread);
+        PICO_SPP_CHECK_AND_ASSIGN(TerminateProcess,         PspTerminatePicoProcess);
+
+#undef PICO_SPP_CHECK_AND_ASSIGN
+
+        PspPicoRoutines.Size = sizeof(PS_PICO_ROUTINES);
+        *pPr = &PspPicoRoutines;
+
+        return STATUS_SUCCESS;
+    }
+
+
+fail:
+    Logger::LogError("Cannot find Pico routines.");
+    Logger::LogError("Make sure WSL is enabled and LXCORE.SYS is loaded.");
+    return status;
+}
+
+extern "C"
+NTSTATUS
+PicoSppGetOffsets(
+    _In_ PCSTR pVersion,
+    _In_opt_ PCSTR pArchitecture,
+    _Out_ PMA_PSP_PICO_PROVIDER_ROUTINES_OFFSETS* pPOffsets
+)
+{
+    if (pVersion == NULL)
+    {
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    if (pArchitecture == NULL)
+    {
+#ifdef AMD64
+        pArchitecture = "x64";
+#else
+#error "Define the identifier for this architecture!"
+#endif
+    }
+
+    for (SIZE_T i = 0; i < ARRAYSIZE(MaPspPicoProviderRoutinesOffsets); ++i)
+    {
+        PMA_PSP_PICO_PROVIDER_ROUTINES_OFFSETS pCurrentOffsets =
+            (PMA_PSP_PICO_PROVIDER_ROUTINES_OFFSETS)&MaPspPicoProviderRoutinesOffsets[i];
+        if (strcmp(pVersion, pCurrentOffsets->Version) == 0
+            && strcmp(pArchitecture, pCurrentOffsets->Architecture) == 0)
+        {
+            *pPOffsets = pCurrentOffsets;
+            return STATUS_SUCCESS;
+        }
+    }
+
+    return STATUS_NOT_FOUND;
 }

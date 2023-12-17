@@ -3,6 +3,7 @@
 #include <ntddk.h>
 
 #include "pico.h"
+#include "picooffsets.h"
 
 // picosupport.h
 //
@@ -21,6 +22,13 @@ NTSTATUS
 NTSTATUS
     PicoSppLocateRoutines(
         _Out_ PPS_PICO_ROUTINES* pPr
+    );
+
+NTSTATUS
+    PicoSppGetOffsets(
+        _In_ PCSTR pVersion,
+        _In_opt_ PCSTR pArchitecture,
+        _Out_ PMA_PSP_PICO_PROVIDER_ROUTINES_OFFSETS* pPOffsets
     );
 
 #ifdef __cplusplus

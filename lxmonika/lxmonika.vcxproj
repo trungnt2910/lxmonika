@@ -119,6 +119,7 @@
     <ClCompile Include="src\monika_providers.cpp" />
     <ClCompile Include="src\monika_reality.cpp" />
     <ClCompile Include="src\monika_syscallhook.cpp" />
+    <ClCompile Include="src\picooffsets.cpp" />
     <ClCompile Include="src\picosupport.cpp" />
     <ClCompile Include="src\PoolAllocator.cpp" />
     <ClCompile Include="src\ProcessMap.cpp" />
@@ -132,6 +133,7 @@
     <ClInclude Include="include_private\module.h" />
     <ClInclude Include="include_private\os.h" />
     <ClInclude Include="include_private\pe.h" />
+    <ClInclude Include="include_private\picooffsets.h" />
     <ClInclude Include="include_private\picosupport.h" />
     <ClInclude Include="include_private\PoolAllocator.h" />
     <ClInclude Include="include_private\ProcessMap.h" />

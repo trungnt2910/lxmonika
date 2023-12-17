@@ -49,6 +49,9 @@
     <ClCompile Include="src\monika.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\picooffsets.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="src\picosupport.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -79,6 +82,9 @@
       <Filter>Private Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include_private\pe.h">
+      <Filter>Private Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include_private\picooffsets.h">
       <Filter>Private Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include_private\picosupport.h">
