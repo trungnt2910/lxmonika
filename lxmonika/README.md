@@ -1,5 +1,7 @@
 # lxmonika
 
+[![Discord Invite](https://dcbadge.vercel.app/api/server/bcV3gXGtsJ?style=flat)](https://discord.gg/bcV3gXGtsJ)
+
 A Windows driver to monitor kernel access of Pico processes.
 
 ## Current functionality
@@ -127,6 +129,13 @@ Pico drivers, since `PspPicoProviderRoutines` is not an array or table but just 
 - Provide a sample Pico provider.
 - (Far, far future) Port a newer version of Linux, Darwin, or even Haiku???
 - (Far, far future) Revive project Astoria???
+
+## Community
+
+This repo is a part of [Project Reality](https://discord.gg/bcV3gXGtsJ).
+
+Need help using this project? Join me on [Discord](https://discord.gg/bcV3gXGtsJ), and let's find a
+solution together.
 
 ## Acknowledements
 
