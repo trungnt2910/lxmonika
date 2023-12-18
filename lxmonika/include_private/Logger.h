@@ -20,6 +20,9 @@ enum class LogLevel
 class Logger
 {
 private:
+    static LONG _Initialized;
+    static FAST_MUTEX _Mutex;
+
     template <typename TFirst, typename... TRest>
     static void _Print(TFirst first, TRest... args)
     {
@@ -47,28 +50,42 @@ private:
     template <typename T>
     static void _Print(const T* ptr) { _Print((PVOID)ptr); }
 
+    static void _Lock();
+    static void _Unlock();
 public:
     static bool _Log(LogLevel level, const char* file, int line, const char* function);
 
-    template <typename... TRest>
-    static bool _Log(LogLevel level, const char* file, int line, const char* function,
+    template <LogLevel level, typename... TRest>
+    static bool _Log(const char* file, int line, const char* function,
         TRest... args)
     {
-        if (!_Log(level, file, line, function))
+        if constexpr (level < LOGGER_MINIMUM_LEVEL)
         {
+            UNREFERENCED_PARAMETER(file);
+            UNREFERENCED_PARAMETER(line);
+            UNREFERENCED_PARAMETER(function);
+            PVOID unused[] = {&args...};
+            UNREFERENCED_PARAMETER(unused);
             return false;
         }
+        else
+        {
+            if (!_Log(level, file, line, function))
+            {
+                return false;
+            }
 
-        _Print(args...);
-        _Print("\n");
+            _Print(args...);
+            _Print("\n");
 
-        return true;
+            _Unlock();
+            return true;
+        }
     }
 };
 
 #define LogTrace(...)           \
-    _Log(                       \
-        LogLevel::Trace,        \
+    _Log<LogLevel::Trace>(      \
         __FILE__,               \
         __LINE__,               \
         __func__,               \
@@ -76,8 +93,7 @@ public:
     )
 
 #define LogInfo(...)            \
-    _Log(                       \
-        LogLevel::Info,        \
+    _Log<LogLevel::Info>(       \
         __FILE__,               \
         __LINE__,               \
         __func__,               \
@@ -85,8 +101,7 @@ public:
     )
 
 #define LogWarning(...)         \
-    _Log(                       \
-        LogLevel::Warning,      \
+    _Log<LogLevel::Warning>(    \
         __FILE__,               \
         __LINE__,               \
         __func__,               \
@@ -94,8 +109,7 @@ public:
     )
 
 #define LogError(...)           \
-    _Log(                       \
-        LogLevel::Error,        \
+    _Log<LogLevel::Error>(      \
         __FILE__,               \
         __LINE__,               \
         __func__,               \

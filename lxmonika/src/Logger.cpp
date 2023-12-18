@@ -2,6 +2,9 @@
 
 #include <ntstrsafe.h>
 
+LONG Logger::_Initialized = 0;
+FAST_MUTEX Logger::_Mutex;
+
 #define WRITE(format, ...)								\
     DbgPrintEx(											\
         /* Just do what everyone does. */               \
@@ -21,6 +24,8 @@ Logger::_Log(LogLevel level, const char* file, int line, const char* function)
     }
 
     // TODO: File name check.
+
+    _Lock();
 
     const char* levelStr = "???";
 
@@ -71,6 +76,36 @@ Logger::_Log(LogLevel level, const char* file, int line, const char* function)
     WRITE("%s", buffer);
 
     return true;
+}
+
+void
+Logger::_Lock()
+{
+    if (InterlockedCompareExchange(&_Initialized, 1, 0))
+    {
+        LARGE_INTEGER lInt
+        {
+            .QuadPart = -100000
+        };
+        while (_Initialized == 1)
+        {
+            KeDelayExecutionThread(KernelMode, FALSE, &lInt);
+        }
+    }
+    else
+    {
+        // Won the race.
+        ExInitializeFastMutex(&_Mutex);
+        _Initialized = 2;
+    }
+
+    ExAcquireFastMutex(&_Mutex);
+}
+
+void
+Logger::_Unlock()
+{
+    ExReleaseFastMutex(&_Mutex);
 }
 
 void
