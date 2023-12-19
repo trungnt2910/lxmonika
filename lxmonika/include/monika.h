@@ -61,6 +61,8 @@ NTSTATUS NTAPI
 
 #ifdef MONIKA_IN_DRIVER
 
+#include <intsafe.h>
+
 //
 // Monika private definitions
 //
@@ -128,6 +130,53 @@ ULONG
         _In_ ULONG FrameCount
     );
 
+//
+// Monika-managed context
+//
+
+#define MA_CONTEXT_MAGIC ('moni')
+
+typedef struct _MA_CONTEXT {
+    ULONG                   Magic;
+    DWORD                   Provider;
+    PVOID                   Context;
+    struct _MA_CONTEXT*     Parent;
+} MA_CONTEXT, *PMA_CONTEXT;
+
+PMA_CONTEXT
+    MapAllocateContext(
+        _In_ DWORD Provider,
+        _In_opt_ PVOID OriginalContext
+    );
+
+VOID
+    MapFreeContext(
+        _In_ PMA_CONTEXT Context
+    );
+
+/// <summary>
+/// Sets <paramref name="CurrentContext"/> as the parent of <paramref name="NewContext"/>,
+/// then swaps the contents of the two pointed structs.
+/// </summary>
+NTSTATUS
+    MapPushContext(
+        _Inout_ PMA_CONTEXT CurrentContext,
+        _In_ PMA_CONTEXT NewContext
+    );
+
+/// <summary>
+/// Sets <paramref name="CurrentContext"/> to the contents of its own parent,
+/// then destorys the parent's memory.
+/// </summary>
+NTSTATUS
+    MapPopContext(
+        _Inout_ PMA_CONTEXT CurrentContext
+    );
+
+//
+// Monika provider-specific callbacks
+//
+
 enum
 {
 #define MONIKA_PROVIDER(index) MaPicoProvider##index = index,
@@ -160,13 +209,10 @@ extern PS_PICO_ROUTINES MapOriginalRoutines;
 
 extern PS_PICO_PROVIDER_ROUTINES MapProviderRoutines[MaPicoProviderMaxCount];
 extern PS_PICO_ROUTINES MapRoutines[MaPicoProviderMaxCount];
-
 extern CHAR MapProviderNames[MaPicoProviderMaxCount][MA_NAME_MAX + 1];
-
-class ProcessMap;
-extern ProcessMap MapProcessMap;
-
 extern SIZE_T MapProvidersCount;
+
+extern BOOLEAN MapPatchedLxss;
 
 #endif // MONIKA_IN_DRIVER
 

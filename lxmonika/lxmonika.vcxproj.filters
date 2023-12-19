@@ -34,6 +34,9 @@
     <ClCompile Include="src\module.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\monika_context.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="src\monika_dispatcher.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -59,9 +62,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\PoolAllocator.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\ProcessMap.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -100,9 +100,6 @@
       <Filter>Private Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include_private\PoolAllocator.h">
-      <Filter>Private Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="include_private\ProcessMap.h">
       <Filter>Private Header Files</Filter>
     </ClInclude>
   </ItemGroup>

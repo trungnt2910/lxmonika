@@ -1,10 +1,10 @@
 #include "monika.h"
 
+#include "module.h"
 #include "os.h"
 #include "picosupport.h"
 
 #include "Logger.h"
-#include "ProcessMap.h"
 
 //
 // Monika data
@@ -15,12 +15,10 @@ PS_PICO_ROUTINES MapOriginalRoutines;
 
 PS_PICO_PROVIDER_ROUTINES MapProviderRoutines[MaPicoProviderMaxCount];
 PS_PICO_ROUTINES MapRoutines[MaPicoProviderMaxCount];
-
 CHAR MapProviderNames[MaPicoProviderMaxCount][MA_NAME_MAX + 1];
-
-ProcessMap MapProcessMap;
-
 SIZE_T MapProvidersCount = 0;
+
+BOOLEAN MapPatchedLxss = FALSE;
 
 static LONG MaInitialized = FALSE;
 
@@ -111,8 +109,38 @@ MapInitialize()
 #include "monika_providers.cpp"
 #undef MONIKA_PROVIDER
 
-    // Initialize process map
-    MapProcessMap.Initialize();
+    // Optional step: Register WSL as a lxmonika client to simplify Pico process routines handling.
+    HANDLE hdlLxCore;
+    if (NT_SUCCESS(MdlpFindModuleByName("lxcore.sys", &hdlLxCore, NULL)))
+    {
+        PPS_PICO_ROUTINES pLxpRoutines = NULL;
+        status = MdlpGetProcAddress(hdlLxCore, "LxpRoutines", (PVOID*)&pLxpRoutines);
+
+        if (NT_SUCCESS(status))
+        {
+            // This function should be called before any MaRegisterPicoProvider calls succeeds.
+            ASSERT(MapProvidersCount == 0);
+            ++MapProvidersCount;
+            ASSERT(MapProvidersCount == 1);
+
+            Logger::LogTrace("lxcore.sys detected. Found LxpRoutines at ", pLxpRoutines);
+
+            // Should be safe to patch everything here since lxcore.sys, as a core driver,
+            // should be initialized before third-party ones.
+            MapProviderRoutines[0] = MapOriginalProviderRoutines;
+            *pLxpRoutines = MapRoutines[0];
+
+            // The release string has never been changed since Windows 10,
+            // so it is safe to hard code it here.
+            // We do not really need the Windows NT build number, otherwise a dynamic query to
+            // fetch version string resources would be required.
+            strncpy(MapProviderNames[0], "Linux-4.4.0-Microsoft-WSL1", MA_NAME_MAX);
+
+            MapPatchedLxss = TRUE;
+
+            Logger::LogTrace("lxcore.sys successfully registered as a lxmonika provider.");
+        }
+    }
 
     return STATUS_SUCCESS;
 
@@ -130,9 +158,19 @@ MapCleanup()
         PPS_PICO_PROVIDER_ROUTINES pRoutines = NULL;
         if (NT_SUCCESS(PicoSppLocateProviderRoutines(&pRoutines)))
         {
-            memcpy(pRoutines, &MapOriginalProviderRoutines, sizeof(MapOriginalProviderRoutines));
+            *pRoutines = MapOriginalProviderRoutines;
         }
-        MapProcessMap.Clear();
+        if (MapPatchedLxss)
+        {
+            PPS_PICO_ROUTINES pLxpRoutines = NULL;
+            HANDLE hdlLxCore;
+            if (NT_SUCCESS(MdlpFindModuleByName("lxcore.sys", &hdlLxCore, NULL))
+                && NT_SUCCESS(MdlpGetProcAddress(hdlLxCore, "LxpRoutines", (PVOID*)&pLxpRoutines)))
+            {
+                *pLxpRoutines = MapOriginalRoutines;
+            }
+            MapPatchedLxss = FALSE;
+        }
     }
 }
 

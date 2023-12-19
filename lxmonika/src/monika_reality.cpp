@@ -3,7 +3,6 @@
 #include <ntddk.h>
 #include <ntstrsafe.h>
 
-#include "driver.h"
 #include "lxerrno.h"
 #include "lxss.h"
 #include "module.h"
@@ -12,7 +11,6 @@
 #include "Locker.h"
 #include "Logger.h"
 #include "PoolAllocator.h"
-#include "ProcessMap.h"
 
 // lxcore.sys imports
 //
@@ -153,7 +151,6 @@ typedef struct _MA_FILE : public LX_FILE {
     FAST_MUTEX  Lock;
     SIZE_T      Length;
     SIZE_T      Offset;
-    ULONG64     SavedProviderValue;
     CHAR        Data[2048];
 } MA_FILE, *PMA_FILE;
 
@@ -187,20 +184,8 @@ MaUpdateFileInformation(
     _Inout_ PMA_FILE pFile
 )
 {
-    PEPROCESS pCurrentProcess = PsGetCurrentProcess();
-    PROCESS_PROVIDER_INFORMATION info{ .Value = PROCESS_PROVIDER_NULL };
-
-    {
-        auto _ = Locker(&MapProcessMap);
-        MapProcessMap.GetProcessProvider(pCurrentProcess, &info);
-    }
-
-    // We don't need to update the file if provider infomration has not changed.
-    // We do need to populate the initial Monika details if the file is newly created.
-    if (info.Value == pFile->SavedProviderValue && pFile->Length != 0)
-    {
-        return STATUS_SUCCESS;
-    }
+    PMA_CONTEXT pContext = (PMA_CONTEXT)
+        MapOriginalRoutines.GetThreadContext(PsGetCurrentThread());
 
     ExAcquireFastMutex(&pFile->Lock);
 
@@ -222,7 +207,8 @@ MaUpdateFileInformation(
         }
     };
 
-    if (info.HasProvider)
+    // Check if the context is valid.
+    if (pContext != NULL && pContext->Magic == MA_CONTEXT_MAGIC)
     {
         // Since MapProviderNames is not guarded, this can cause a potential data race when a
         // provider changes its name while a process is running and holding a reference to a
@@ -233,24 +219,26 @@ MaUpdateFileInformation(
         // overrun cannot occur since the last byte (index MA_NAME_MAX) of every entry is
         // guaranteed to be null and untouched.
         Write(_snprintf(pFile->Data + pFile->Length, uSizeLeft + 1,
-            "ProviderName:\t%s", MapProviderNames[info.ProviderId]
+            "ProviderName:\t%s", MapProviderNames[pContext->Provider]
         ));
         Write(_snprintf(pFile->Data + pFile->Length, uSizeLeft + 1,
-            "ProviderId:\t%d", info.ProviderId
+            "ProviderId:\t%d", pContext->Provider
         ));
-
-        if (info.HasParentProvider)
+        
+        // Check if the context has a parent
+        if (pContext->Parent != NULL)
         {
             Write(_snprintf(pFile->Data + pFile->Length, uSizeLeft + 1,
                 "ProviderHasParent:\t1"
             ));
-            if (info.HasInternalParentProvider)
+            // And the parent is also valid.
+            if (pContext->Parent->Magic == MA_CONTEXT_MAGIC)
             {
                 Write(_snprintf(pFile->Data + pFile->Length, uSizeLeft + 1,
-                    "ProviderParentName:\t%s", MapProviderNames[info.ParentProviderId]
+                    "ProviderParentName:\t%s", MapProviderNames[pContext->Parent->Provider]
                 ));
                 Write(_snprintf(pFile->Data + pFile->Length, uSizeLeft + 1,
-                    "ProviderParentId:\t%d", info.ParentProviderId
+                    "ProviderParentId:\t%d", pContext->Parent->Provider
                 ));
             }
         }
@@ -317,8 +305,6 @@ MaUpdateFileInformation(
 
     pFile->Data[pFile->Length] = '\0';
     ++pFile->Length;
-
-    pFile->SavedProviderValue = info.Value;
 
     ExReleaseFastMutex(&pFile->Lock);
 
@@ -391,7 +377,6 @@ MaDeviceOpen(
 
     ExInitializeFastMutex(&pNewFile->Lock);
 
-    pNewFile->SavedProviderValue = PROCESS_PROVIDER_NULL;
     pNewFile->Length = 0;
     pNewFile->Offset = 0;
     pNewFile->Data[0] = '\0';
@@ -609,17 +594,33 @@ MaFileIoctl(
                     return -LINUX_EINVAL;
                 }
 
-                NTSTATUS status;
+                PMA_CONTEXT pMaContext = (PMA_CONTEXT)
+                    MapOriginalRoutines.GetThreadContext(PsGetCurrentThread());
 
+                if (pMaContext != NULL && pMaContext->Magic == MA_CONTEXT_MAGIC)
                 {
-                    auto _ = Locker(&MapProcessMap);
-                    status = MapProcessMap.SwitchProcessProvider(
-                        PsGetCurrentProcess(), uBestMatchIndex);
+                    if (pMaContext->Provider != uBestMatchIndex)
+                    {
+                        PMA_CONTEXT pNewContext = MapAllocateContext(uBestMatchIndex, NULL);
+                        if (pNewContext == NULL)
+                        {
+                            return -LINUX_ENOMEM;
+                        }
+
+                        NTSTATUS status = MapPushContext(pMaContext, pNewContext);
+
+                        if (!NT_SUCCESS(status))
+                        {
+                            return LxpUtilTranslateStatus(status);
+                        }
+                    }
                 }
-
-                if (!NT_SUCCESS(status))
+                else
                 {
-                    return LxpUtilTranslateStatus(status);
+                    // Can't switch a process unless it's managed by Monika.
+                    Logger::LogError("Attempted to switch providers for "
+                        "a process not managed by lxmonika");
+                    return -LINUX_EPERM;
                 }
 
                 Logger::LogTrace("Successfully switched process to provider ID ", uBestMatchIndex);

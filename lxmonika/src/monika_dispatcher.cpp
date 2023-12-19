@@ -2,35 +2,57 @@
 
 #include "os.h"
 
-#include "Locker.h"
-#include "ProcessMap.h"
-
 //
 // Pico provider dispatchers
 //
 
-#define MA_LOCK_PROCESS_MAP auto _ = Locker(&MapProcessMap)
+#define MA_DISPATCH_PROCESS         (0x1)
+#define MA_DISPATCH_THREAD          (0x2)
+#define MA_DISPATCH_FREE            (0x4)
 
-#define MA_TRY_DISPATCH_TO_PROVIDER(process, function, ...)                                     \
+#define MA_GET_OBJECT_CONTEXT(var, type, object)                                                \
     do                                                                                          \
     {                                                                                           \
-                                                                                                \
-        BOOLEAN bHasProvider = FALSE;                                                           \
-        DWORD dwProvider;                                                                       \
-                                                                                                \
+        if constexpr ((type) & MA_DISPATCH_PROCESS)                                             \
         {                                                                                       \
-            MA_LOCK_PROCESS_MAP;                                                                \
-            if (NT_SUCCESS(MapProcessMap.GetProcessProvider((process), &dwProvider)))           \
+            var = (PMA_CONTEXT)MapOriginalRoutines.GetProcessContext((PEPROCESS)object);        \
+        }                                                                                       \
+        else if constexpr ((type) & MA_DISPATCH_THREAD)                                         \
+        {                                                                                       \
+            var = (PMA_CONTEXT)MapOriginalRoutines.GetThreadContext((PETHREAD)object);          \
+        }                                                                                       \
+        if (var != NULL && var->Magic != MA_CONTEXT_MAGIC)                                      \
+        {                                                                                       \
+            var = NULL;                                                                         \
+        }                                                                                       \
+    }                                                                                           \
+    while (FALSE)
+
+
+#define MA_DISPATCH_TO_PROVIDER(type, object, function, ...)                                    \
+    do                                                                                          \
+    {                                                                                           \
+        PMA_CONTEXT pContext = NULL;                                                            \
+        MA_GET_OBJECT_CONTEXT(pContext, type, object);                                          \
+        if (pContext != NULL)                                                                   \
+        {                                                                                       \
+            __try                                                                               \
             {                                                                                   \
-                bHasProvider = TRUE;                                                            \
+                return MapProviderRoutines[pContext->Provider].function(__VA_ARGS__);           \
+            }                                                                                   \
+            __finally                                                                           \
+            {                                                                                   \
+                if constexpr ((type) & MA_DISPATCH_FREE)                                        \
+                {                                                                               \
+                    MapFreeContext(pContext);                                                   \
+                }                                                                               \
             }                                                                                   \
         }                                                                                       \
-                                                                                                \
-        if (bHasProvider)                                                                       \
+        else if (MapOriginalProviderRoutines.function != NULL)                                  \
         {                                                                                       \
-            return MapProviderRoutines[dwProvider].function(__VA_ARGS__);                       \
+            return MapOriginalProviderRoutines.function(__VA_ARGS__);                           \
         }                                                                                       \
-    } while (false)
+    } while (FALSE)
 
 extern "C"
 VOID
@@ -38,22 +60,8 @@ MapSystemCallDispatch(
     _In_ PPS_PICO_SYSTEM_CALL_INFORMATION SystemCall
 )
 {
-    MA_TRY_DISPATCH_TO_PROVIDER(PsGetCurrentProcess(), DispatchSystemCall, SystemCall);
-
-    if (MapPreSyscallHook(SystemCall))
-    {
-        PS_PICO_SYSTEM_CALL_INFORMATION beforeSystemCall;
-        memcpy(&beforeSystemCall, SystemCall, sizeof(beforeSystemCall));
-
-        KTRAP_FRAME beforeTrapFrame;
-        memcpy(&beforeTrapFrame, SystemCall->TrapFrame, sizeof(beforeTrapFrame));
-
-        beforeSystemCall.TrapFrame = &beforeTrapFrame;
-
-        MapOriginalProviderRoutines.DispatchSystemCall(SystemCall);
-
-        MapPostSyscallHook(&beforeSystemCall, SystemCall);
-    }
+    MA_DISPATCH_TO_PROVIDER(MA_DISPATCH_THREAD, PsGetCurrentThread(),
+        DispatchSystemCall, SystemCall);
 }
 
 extern "C"
@@ -62,9 +70,8 @@ MapThreadExit(
     _In_ PETHREAD Thread
 )
 {
-    MA_TRY_DISPATCH_TO_PROVIDER(PsGetThreadProcess(Thread), ExitThread, Thread);
-
-    return MapOriginalProviderRoutines.ExitThread(Thread);
+    MA_DISPATCH_TO_PROVIDER(MA_DISPATCH_THREAD | MA_DISPATCH_FREE, Thread,
+        ExitThread, Thread);
 }
 
 extern "C"
@@ -73,30 +80,8 @@ MapProcessExit(
     _In_ PEPROCESS Process
 )
 {
-    PROCESS_PROVIDER_INFORMATION info{ .Value = PROCESS_PROVIDER_NULL };
-
-    {
-        MA_LOCK_PROCESS_MAP;
-        if (NT_SUCCESS(MapProcessMap.GetProcessProvider(Process, &info)))
-        {
-            MapProcessMap.UnregisterProcess(Process);
-        }
-    }
-
-    if (info.HasProvider)
-    {
-        MapProviderRoutines[info.ProviderId].ExitProcess(Process);
-    }
-
-    if (info.HasProvider && info.HasInternalParentProvider)
-    {
-        MapProviderRoutines[info.ParentProviderId].ExitProcess(Process);
-    }
-
-    if (!info.HasProvider || !info.HasInternalParentProvider)
-    {
-        MapOriginalProviderRoutines.ExitProcess(Process);
-    }
+    MA_DISPATCH_TO_PROVIDER(MA_DISPATCH_PROCESS | MA_DISPATCH_FREE, Process,
+        ExitProcess, Process);
 }
 
 extern "C"
@@ -109,21 +94,16 @@ MapDispatchException(
     _In_ KPROCESSOR_MODE PreviousMode
 )
 {
-    MA_TRY_DISPATCH_TO_PROVIDER(PsGetCurrentProcess(), DispatchException,
-        ExceptionRecord,
-        ExceptionFrame,
-        TrapFrame,
-        Chance,
-        PreviousMode
+    MA_DISPATCH_TO_PROVIDER(MA_DISPATCH_THREAD, PsGetCurrentThread(),
+        DispatchException,
+            ExceptionRecord,
+            ExceptionFrame,
+            TrapFrame,
+            Chance,
+            PreviousMode
     );
 
-    return MapOriginalProviderRoutines.DispatchException(
-        ExceptionRecord,
-        ExceptionFrame,
-        TrapFrame,
-        Chance,
-        PreviousMode
-    );
+    return FALSE;
 }
 
 extern "C"
@@ -133,12 +113,10 @@ MapTerminateProcess(
     _In_ NTSTATUS TerminateStatus
 )
 {
-    MA_TRY_DISPATCH_TO_PROVIDER(Process, TerminateProcess, Process, TerminateStatus);
+    MA_DISPATCH_TO_PROVIDER(MA_DISPATCH_PROCESS, Process,
+        TerminateProcess, Process, TerminateStatus);
 
-    return MapOriginalProviderRoutines.TerminateProcess(
-        Process,
-        TerminateStatus
-    );
+    return STATUS_NOT_IMPLEMENTED;
 }
 
 extern "C"
@@ -150,29 +128,34 @@ MapWalkUserStack(
     _In_ ULONG FrameCount
 )
 {
-    MA_TRY_DISPATCH_TO_PROVIDER(PsGetCurrentProcess(), WalkUserStack,
-        TrapFrame,
-        Callers,
-        FrameCount
+    MA_DISPATCH_TO_PROVIDER(MA_DISPATCH_THREAD, PsGetCurrentThread(),
+        WalkUserStack,
+            TrapFrame,
+            Callers,
+            FrameCount
     );
 
-    return MapOriginalProviderRoutines.WalkUserStack(
-        TrapFrame,
-        Callers,
-        FrameCount
-    );
+    return 0;
 }
 
 //
 // Pico routine dispatchers
 //
 
-#define MA_PROCESS_BELONGS_TO_PROVIDER(process, index)                                          \
-    (([](PEPROCESS p, DWORD i)                                                                  \
+#define MA_DISPATCH_TO_KERNEL(type, object, index, error, function, ...)                        \
+    do                                                                                          \
     {                                                                                           \
-        MA_LOCK_PROCESS_MAP;                                                                    \
-        return MapProcessMap.ProcessBelongsToProvider(p, i);                                    \
-    })((process), (index)))
+        PMA_CONTEXT pContext = NULL;                                                            \
+        MA_GET_OBJECT_CONTEXT(pContext, type, object);                                          \
+        if (pContext != NULL && pContext->Provider == index)                                    \
+        {                                                                                       \
+            return MapOriginalRoutines.function(__VA_ARGS__);                                   \
+        }                                                                                       \
+        else                                                                                    \
+        {                                                                                       \
+            return error;                                                                       \
+        }                                                                                       \
+    } while (FALSE)
 
 static
 NTSTATUS
@@ -183,29 +166,27 @@ MapCreateProcess(
     _Outptr_ PHANDLE ProcessHandle
 )
 {
-    NTSTATUS status = MapOriginalRoutines.CreateProcess(ProcessAttributes, ProcessCreateContext,
-        ProcessHandle);
-
-    if (NT_SUCCESS(status))
+    if (ProcessAttributes == NULL)
     {
-        PEPROCESS pNewProcess = NULL;
-        if (!NT_SUCCESS(PsLookupProcessByProcessId(ProcessHandle, &pNewProcess)))
-        {
-            // Should bugcheck here.
-            DbgBreakPoint();
-        }
+        return STATUS_INVALID_PARAMETER;
+    }
 
-        {
-            MA_LOCK_PROCESS_MAP;
-            status = MapProcessMap.RegisterProcessProvider(pNewProcess, ProviderIndex);
-        }
+    PMA_CONTEXT pContext = MapAllocateContext(ProviderIndex, ProcessAttributes->Context);
+    if (pContext == NULL)
+    {
+        return STATUS_NO_MEMORY;
+    }
+    
+    ProcessAttributes->Context = pContext;
 
-        if (!NT_SUCCESS(status))
-        {
-            MapOriginalRoutines.TerminateProcess(pNewProcess, status);
-        }
+    NTSTATUS status = MapOriginalRoutines.CreateProcess(
+        ProcessAttributes, ProcessCreateContext, ProcessHandle);
 
-        ObDereferenceObject(pNewProcess);
+    ProcessAttributes->Context = pContext->Context;
+
+    if (!NT_SUCCESS(status))
+    {
+        MapFreeContext(pContext);
     }
 
     return status;
@@ -229,14 +210,19 @@ MapCreateThread(
 
     {
         PEPROCESS pHostProcess = NULL;
-        NTSTATUS status = PsLookupProcessByProcessId(ThreadAttributes->Process, &pHostProcess);
+        NTSTATUS status = ObReferenceObjectByHandle(ThreadAttributes->Process, 0, *PsProcessType,
+            KernelMode, (PVOID*)&pHostProcess, 0);
 
         if (!NT_SUCCESS(status))
         {
             return status;
         }
 
-        bBelongsToProvider = MA_PROCESS_BELONGS_TO_PROVIDER(pHostProcess, ProviderIndex);
+        PMA_CONTEXT pHostProcessContext = NULL;
+        MA_GET_OBJECT_CONTEXT(pHostProcessContext, MA_DISPATCH_PROCESS, pHostProcess);
+
+        bBelongsToProvider = pHostProcessContext != NULL
+            && pHostProcessContext->Provider == ProviderIndex;
 
         ObDereferenceObject(pHostProcess);
     }
@@ -246,7 +232,26 @@ MapCreateThread(
         return STATUS_INVALID_PARAMETER;
     }
 
-    return MapOriginalRoutines.CreateThread(ThreadAttributes, ProcessCreateContext, ThreadHandle);
+    PMA_CONTEXT pContext = MapAllocateContext(ProviderIndex, ThreadAttributes->Context);
+
+    if (pContext == NULL)
+    {
+        return STATUS_NO_MEMORY;
+    }
+
+    ThreadAttributes->Context = pContext;
+
+    NTSTATUS status = MapOriginalRoutines.CreateThread(
+        ThreadAttributes, ProcessCreateContext, ThreadHandle);
+
+    ThreadAttributes->Context = pContext->Context;
+
+    if (!NT_SUCCESS(status))
+    {
+        MapFreeContext(pContext);
+    }
+
+    return status;
 }
 
 static
@@ -256,13 +261,15 @@ MapGetProcessContext(
     _In_ PEPROCESS Process
 )
 {
-    if (!MA_PROCESS_BELONGS_TO_PROVIDER(Process, ProviderIndex))
+    PMA_CONTEXT pContext = NULL;
+    MA_GET_OBJECT_CONTEXT(pContext, MA_DISPATCH_PROCESS, Process);
+
+    if (pContext == NULL || pContext->Provider != ProviderIndex)
     {
-        // TODO: Return what on error?
         return NULL;
     }
 
-    return MapOriginalRoutines.GetProcessContext(Process);
+    return pContext->Context;
 }
 
 static
@@ -272,13 +279,15 @@ MapGetThreadContext(
     _In_ PETHREAD Thread
 )
 {
-    if (!MA_PROCESS_BELONGS_TO_PROVIDER(PsGetThreadProcess(Thread), ProviderIndex))
+    PMA_CONTEXT pContext = NULL;
+    MA_GET_OBJECT_CONTEXT(pContext, MA_DISPATCH_THREAD, Thread);
+
+    if (pContext == NULL || pContext->Provider != ProviderIndex)
     {
-        // TODO: Return what on error?
         return NULL;
     }
 
-    return MapOriginalRoutines.GetThreadContext(Thread);
+    return pContext->Context;
 }
 
 static
@@ -289,12 +298,9 @@ MapSetThreadDescriptorBase(
     _In_ ULONG_PTR Base
 )
 {
-#if !DBG
-    UNREFERENCED_PARAMETER(ProviderIndex);
-#endif
-    ASSERT(MA_PROCESS_BELONGS_TO_PROVIDER(PsGetCurrentProcess(), ProviderIndex));
-
-    return MapOriginalRoutines.SetThreadDescriptorBase(Type, Base);
+    MA_DISPATCH_TO_KERNEL(MA_DISPATCH_THREAD, PsGetCurrentThread(),
+        ProviderIndex, (VOID)STATUS_INVALID_PARAMETER,
+        SetThreadDescriptorBase, Type, Base);
 }
 
 static
@@ -305,13 +311,34 @@ MapTerminateProcess(
     _In_ NTSTATUS ExitStatus
 )
 {
-    if (!MA_PROCESS_BELONGS_TO_PROVIDER(Process, ProviderIndex))
+    // TODO: Why __inout for the Process parameter?
+
+    PMA_CONTEXT pContext = NULL;
+    MA_GET_OBJECT_CONTEXT(pContext, MA_DISPATCH_PROCESS, Process);
+
+    if (pContext == NULL || pContext->Provider != ProviderIndex)
     {
         return STATUS_INVALID_PARAMETER;
     }
 
-    // TODO: Why __inout for the Process parameter?
-    return MapOriginalRoutines.TerminateProcess(Process, ExitStatus);
+    // By terminating a process, the provider agrees that it does not need the process anymore.
+    // However, a parent provider might still reference it in some way, for example, Linux's wait4.
+    // Therefore, instead of directly telling the kernel to dispose of the process, we transfer
+    // control to the parent provider and return as normal.
+
+    if (pContext->Parent != NULL)
+    {
+        // Replaces the current context structure with the parent's context structure.
+        // We need do swap the contents in-place since NT does not allow us to change the context
+        // pointer.
+        return MapPopContext(pContext);
+    }
+    else
+    {
+        // No more known parents waiting for the process.
+        // Directly terminate it and wait for MapProcessExit to clean up the context.
+        return MapOriginalRoutines.TerminateProcess(Process, ExitStatus);
+    }
 }
 
 static
@@ -325,13 +352,9 @@ MapSetContextThreadInternal(
     _In_ BOOLEAN PerformUnwind
 )
 {
-    if (!MA_PROCESS_BELONGS_TO_PROVIDER(PsGetThreadProcess(Thread), ProviderIndex))
-    {
-        return STATUS_INVALID_PARAMETER;
-    }
-
-    return MapOriginalRoutines.SetContextThreadInternal(
-        Thread, ThreadContext, ProbeMode, CtxMode, PerformUnwind);
+    MA_DISPATCH_TO_KERNEL(MA_DISPATCH_THREAD, Thread,
+        ProviderIndex, STATUS_INVALID_PARAMETER,
+        SetContextThreadInternal, Thread, ThreadContext, ProbeMode, CtxMode, PerformUnwind);
 }
 
 static
@@ -345,13 +368,9 @@ MapGetContextThreadInternal(
     _In_ BOOLEAN PerformUnwind
 )
 {
-    if (!MA_PROCESS_BELONGS_TO_PROVIDER(PsGetThreadProcess(Thread), ProviderIndex))
-    {
-        return STATUS_INVALID_PARAMETER;
-    }
-
-    return MapOriginalRoutines.GetContextThreadInternal(
-        Thread, ThreadContext, ProbeMode, CtxMode, PerformUnwind);
+    MA_DISPATCH_TO_KERNEL(MA_DISPATCH_THREAD, Thread,
+        ProviderIndex, STATUS_INVALID_PARAMETER,
+        GetContextThreadInternal, Thread, ThreadContext, ProbeMode, CtxMode, PerformUnwind);
 }
 
 static
@@ -363,12 +382,26 @@ MapTerminateThread(
     _In_ BOOLEAN DirectTerminate
 )
 {
-    if (!MA_PROCESS_BELONGS_TO_PROVIDER(PsGetThreadProcess(Thread), ProviderIndex))
+    // The same strategy is applied as MapTerminateProcess, see the above function for details.
+
+    PMA_CONTEXT pContext = NULL;
+    MA_GET_OBJECT_CONTEXT(pContext, MA_DISPATCH_THREAD, Thread);
+
+    if (pContext == NULL || pContext->Provider != ProviderIndex)
     {
         return STATUS_INVALID_PARAMETER;
     }
 
-    return MapOriginalRoutines.TerminateThread(Thread, ExitStatus, DirectTerminate);
+    if (pContext->Parent != NULL)
+    {
+        return MapPopContext(pContext);
+    }
+    else
+    {
+        // No more known parents waiting for the process.
+        // Directly terminate it and wait for MapProcessExit to clean up the context.
+        return MapOriginalRoutines.TerminateThread(Thread, ExitStatus, DirectTerminate);
+    }
 }
 
 static
@@ -379,12 +412,9 @@ MapSuspendThread(
     _Out_opt_ PULONG PreviousSuspendCount
 )
 {
-    if (!MA_PROCESS_BELONGS_TO_PROVIDER(PsGetThreadProcess(Thread), ProviderIndex))
-    {
-        return STATUS_INVALID_PARAMETER;
-    }
-
-    return MapOriginalRoutines.SuspendThread(Thread, PreviousSuspendCount);
+    MA_DISPATCH_TO_KERNEL(MA_DISPATCH_THREAD, Thread,
+        ProviderIndex, STATUS_INVALID_PARAMETER,
+        SuspendThread, Thread, PreviousSuspendCount);
 }
 
 static
@@ -395,12 +425,9 @@ MapResumeThread(
     _Out_opt_ PULONG PreviousSuspendCount
 )
 {
-    if (!MA_PROCESS_BELONGS_TO_PROVIDER(PsGetThreadProcess(Thread), ProviderIndex))
-    {
-        return STATUS_INVALID_PARAMETER;
-    }
-
-    return MapOriginalRoutines.ResumeThread(Thread, PreviousSuspendCount);
+    MA_DISPATCH_TO_KERNEL(MA_DISPATCH_THREAD, Thread,
+        ProviderIndex, STATUS_INVALID_PARAMETER,
+        ResumeThread, Thread, PreviousSuspendCount);
 }
 
 #define MONIKA_PROVIDER(index)                                                                  \
