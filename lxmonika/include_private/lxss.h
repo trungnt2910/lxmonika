@@ -269,11 +269,35 @@ struct _LX_IOVECTOR
 // There have been no real-world tests for the validity of these structures,
 // USE THEM AT YOUR OWN RISK.
 
+typedef struct _LX_VFS_DEVICE LX_VFS_DEVICE, *PLX_VFS_DEVICE;
+
+typedef INT LX_VFS_DEVICE_OPEN(
+    _In_ PLX_CALL_CONTEXT CallContext,
+    _In_ PLX_VFS_DEVICE Device,
+    _In_ ULONG Flags,
+    _Out_ PVOID* PFile);
+typedef INT LX_VFS_DEVICE_DELETE(
+    _Inout_ PLX_VFS_DEVICE Device);
+
+typedef LX_VFS_DEVICE_OPEN* PLX_VFS_DEVICE_OPEN;
+typedef LX_VFS_DEVICE_DELETE* PLX_VFS_DEVICE_DELETE;
+
+typedef struct _LX_VFS_DEVICE_TYPE {
+    PLX_VFS_DEVICE_OPEN Open;
+    PLX_VFS_DEVICE_DELETE Delete;
+} LX_VFS_DEVICE_TYPE, *PLX_VFS_DEVICE_TYPE;
+
+typedef struct _LX_VFS_DEVICE {
+    ULONG_PTR ReferenceCount;
+    PLX_VFS_DEVICE_TYPE Type;
+    UINT64 Reserved[5];
+} LX_VFS_DEVICE, *PLX_VFS_DEVICE;
+
 typedef struct _LX_STRING {
     SIZE_T Length;
     SIZE_T MaximumLength;
     PCHAR Buffer;
-} LX_STRING, * PLX_STRING;
+} LX_STRING, *PLX_STRING;
 
 typedef struct _LX_WAIT_OBJECT *PLX_WAIT_OBJECT;
 
@@ -299,20 +323,30 @@ typedef struct _LX_WAIT_OBJECT {
     UINT64 Reserved3[5];
 } LX_WAIT_OBJECT, *PLX_WAIT_OBJECT;
 
-typedef struct _LX_INSTANCE {
-    UINT64 Reserved[3];
-    EX_RUNDOWN_REF RundownProtection;
-    UINT64 Reserved1[33];
-    LIST_ENTRY Sessions;
-    UINT64 Reserved2[5];
+typedef struct _LX_GLOBAL {
+    PDEVICE_OBJECT ControlDevice;
+    LIST_ENTRY Instances;
     EX_PUSH_LOCK Lock;
-    UINT64 Reserved3[264];
+} LX_GLOBAL, *PLX_GLOBAL;
+
+typedef struct _LX_INSTANCE {
+    LIST_ENTRY ListEntry;
+    ULONG_PTR ReferenceCount;
+    EX_RUNDOWN_REF RundownProtection;
+    PDEVICE_OBJECT ControlDevice;
+    GUID Guid;
+    UINT64 Reserved2[30];
+    LIST_ENTRY Sessions;
+    UINT64 Reserved3[5];
+    EX_PUSH_LOCK Lock;
+    UINT64 Reserved4[264];
 } LX_INSTANCE, *PLX_INSTANCE;
 
 typedef struct _LX_SESSION {
     LX_WAIT_OBJECT WaitObject;
     LIST_ENTRY ListEntry;
-    UINT64 Reserved[2];
+    PLX_VFS_DEVICE SessionTerminal;
+    UINT64 Reserved;
     LIST_ENTRY ProcessGroups;
     UINT64 Reserved1;
 } LX_SESSION, *PLX_SESSION;
@@ -342,15 +376,17 @@ typedef struct _LX_THREAD_GROUP {
     UINT64 Reserved1[3];
     PLX_PROCESS Process;
     PLX_INSTANCE Instance;
-    UINT64 Reserved2[7];
+    UINT64 Reserved2[5];
+    PLX_PROCESS_GROUP ProcessGroup;
+    UINT64 Reserved3[1];
     LIST_ENTRY ListEntry;
-    UINT64 Reserved3;
+    UINT64 Reserved4;
     EX_RUNDOWN_REF RundownProtection;
-    UINT64 Reserved4[3];
+    UINT64 Reserved5[3];
     LIST_ENTRY Threads;
     UINT32 ThreadCount;
-    UINT32 Reserved5;
-    UINT64 Reserved6[720];
+    UINT32 Reserved6;
+    UINT64 Reserved7[720];
 } LX_THREAD_GROUP, *PLX_THREAD_GROUP;
 
 typedef struct _LX_THREAD_GROUP_LAUNCH_PARAMETERS {
