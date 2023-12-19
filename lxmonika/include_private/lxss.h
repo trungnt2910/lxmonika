@@ -269,6 +269,12 @@ struct _LX_IOVECTOR
 // There have been no real-world tests for the validity of these structures,
 // USE THEM AT YOUR OWN RISK.
 
+typedef struct _LX_STRING {
+    SIZE_T Length;
+    SIZE_T MaximumLength;
+    PCHAR Buffer;
+} LX_STRING, * PLX_STRING;
+
 typedef struct _LX_WAIT_OBJECT *PLX_WAIT_OBJECT;
 
 typedef VOID LX_WAIT_OBJECT_LAST_DEREFERENCE(
@@ -287,7 +293,7 @@ typedef struct _LX_WAIT_OBJECT {
     UINT64 Reserved[1];
     NTSTATUS Status;
     UINT32 Reserved2;
-    UINT64 ReferenceCount;
+    ULONG_PTR ReferenceCount;
     LIST_ENTRY Events;
     LIST_ENTRY ThreadGroups;
     UINT64 Reserved3[5];
@@ -327,8 +333,7 @@ typedef struct _LX_PROCESS {
     EX_PUSH_LOCK Lock;
     LIST_ENTRY ThreadGroups;
     UINT64 Reserved2[1];
-    PUNICODE_STRING ExecutablePath;
-    PVOID SomethingThatNeedsToBeFreedWithTheProcess;
+    UNICODE_STRING ExecutablePath;
     UINT64 Reserved3[39];
 } LX_PROCESS, *PLX_PROCESS;
 
@@ -347,6 +352,11 @@ typedef struct _LX_THREAD_GROUP {
     UINT32 Reserved5;
     UINT64 Reserved6[720];
 } LX_THREAD_GROUP, *PLX_THREAD_GROUP;
+
+typedef struct _LX_THREAD_GROUP_LAUNCH_PARAMETERS {
+    PLX_STRING Reserved;
+    UINT64 Reserved1[31];
+} LX_THREAD_GROUP_LAUNCH_PARAMETERS, *PLX_THREAD_GROUP_LAUNCH_PARAMETERS;
 
 typedef struct _LX_FILE_DESCRIPTOR_TABLE {
     UINT64 ReferenceCount;
@@ -367,7 +377,10 @@ typedef struct _LX_NT_STATE_THREAD_DATA {
 } LX_NT_STATE_THREAD_DATA, *PLX_NT_STATE_THREAD_DATA;
 
 typedef struct _LX_NT_STATE_THREAD {
-    UINT64 Reserved[4];
+    EX_PUSH_LOCK Lock;
+    ULONG64 StartTime;
+    ULONG64 KernelTime;
+    ULONG64 UserTime;
     PLX_NT_STATE_THREAD_DATA Data;
 } LX_NT_STATE_THREAD, *PLX_NT_STATE_THREAD;
 
@@ -404,9 +417,3 @@ typedef struct _LX_CALL_CONTEXT {
     LX_CALL_CONTEXT_FLAGS Flags;
     UINT32 Reserved2;
 } LX_CALL_CONTEXT, *PLX_CALL_CONTEXT;
-
-typedef struct _LX_STRING {
-    SIZE_T Length;
-    SIZE_T MaximumLength;
-    PCHAR Buffer;
-} LX_STRING, *PLX_STRING;
