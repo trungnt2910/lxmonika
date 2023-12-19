@@ -130,6 +130,9 @@ MapInitialize()
             MapProviderRoutines[0] = MapOriginalProviderRoutines;
             *pLxpRoutines = MapRoutines[0];
 
+            // Use a special hook designed for WSL instead of the generic lxmonika shims.
+            MapProviderRoutines[0].DispatchSystemCall = MapLxssSystemCallHook;
+
             // The release string has never been changed since Windows 10,
             // so it is safe to hard code it here.
             // We do not really need the Windows NT build number, otherwise a dynamic query to

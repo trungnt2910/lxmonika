@@ -32,41 +32,32 @@
 // Linux syscall hooks
 //
 
-BOOLEAN
-MapPreSyscallHook(
-    _In_ PPS_PICO_SYSTEM_CALL_INFORMATION pSyscallInfo
-)
-{
-    UNREFERENCED_PARAMETER(pSyscallInfo);
-
-    // Return TRUE to allow the Linux syscall to proceed.
-    return TRUE;
-}
-
+extern "C"
 VOID
-MapPostSyscallHook(
-    _In_ PPS_PICO_SYSTEM_CALL_INFORMATION pPreviousSyscallInfo,
-    _In_ PPS_PICO_SYSTEM_CALL_INFORMATION pCurrentSyscallInfo
+MapLxssSystemCallHook(
+    _In_ PPS_PICO_SYSTEM_CALL_INFORMATION pSyscallInfo
 )
 {
     BOOLEAN bIsUname = FALSE;
 
 #ifdef AMD64
     // Check for SYS_uname
-    bIsUname = pPreviousSyscallInfo->TrapFrame->Rax == 63;
+    bIsUname = pSyscallInfo->TrapFrame->Rax == 63;
     if (bIsUname)
     {
-        Logger::LogTrace("uname(", (PVOID)pPreviousSyscallInfo->TrapFrame->Rdi, ")");
+        Logger::LogTrace("uname(", (PVOID)pSyscallInfo->TrapFrame->Rdi, ")");
     }
 #else
 #error Detect the syscall arguments for this architecture!
 #endif
 
+    MapOriginalProviderRoutines.DispatchSystemCall(pSyscallInfo);
+
     if (bIsUname
         // Also check for a success return value.
         // Otherwise, pUtsName may be an invalid pointer.
 #ifdef AMD64
-        && pCurrentSyscallInfo->TrapFrame->Rax == 0)
+        && pSyscallInfo->TrapFrame->Rax == 0)
 #else
 #error Detect the syscall return value for this architecture!
 #endif
@@ -81,7 +72,7 @@ MapPostSyscallHook(
 
         // We should be in the context of the calling process.
         // Therefore, it is safe to access the raw pointers.
-        pUtsName = (old_utsname*)pCurrentSyscallInfo->TrapFrame->Rdi;
+        pUtsName = (old_utsname*)pSyscallInfo->TrapFrame->Rdi;
 
         Logger::LogTrace("pUtsName->sysname  ", (PCSTR)pUtsName->sysname);
         Logger::LogTrace("pUtsName->nodename ", (PCSTR)pUtsName->nodename);

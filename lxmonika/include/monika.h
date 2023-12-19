@@ -73,15 +73,9 @@ NTSTATUS
 VOID
     MapCleanup();
 
-BOOLEAN
-    MapPreSyscallHook(
-        _In_ PPS_PICO_SYSTEM_CALL_INFORMATION pSyscallInfo
-    );
-
 VOID
-    MapPostSyscallHook(
-        _In_ PPS_PICO_SYSTEM_CALL_INFORMATION pPreviousSyscallInfo,
-        _In_ PPS_PICO_SYSTEM_CALL_INFORMATION pCurrentSyscallInfo
+    MapLxssSystemCallHook(
+        _In_ PPS_PICO_SYSTEM_CALL_INFORMATION pSyscallInfo
     );
 
 NTSTATUS
