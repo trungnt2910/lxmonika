@@ -293,6 +293,59 @@ typedef struct _LX_VFS_DEVICE {
     UINT64 Reserved[5];
 } LX_VFS_DEVICE, *PLX_VFS_DEVICE;
 
+typedef struct _LX_VFS_FILE_TYPE {
+    PVOID Delete;
+    PVOID Reserved;
+    PVOID Reserved1;
+    PVOID Reserved2;
+    PVOID WriteVector;
+    PVOID Map;
+    PVOID Reserved3;
+    PVOID Ioctl;
+    PVOID Reserved4;
+    PVOID Reserved5;
+    PVOID Release;
+    PVOID ReadVector;
+    PVOID Reserved6;
+    PVOID Reserved7;
+    PVOID Reserved8;
+    PVOID Reserved9;
+    PVOID GetPathString;
+    PVOID GetNtDeviceType;
+    PVOID Reserved10;
+    PVOID Reserved11;
+} LX_VFS_FILE_TYPE, *PLX_VFS_FILE_TYPE;
+
+typedef struct _LX_VFS_FILE {
+    UINT64 Reserved[3];
+    PLX_VFS_FILE_TYPE Type;
+    ULONG_PTR LifetimeReferenceCount;
+    UINT64 Reserved1;
+    ULONG_PTR ReferenceCount;
+    UINT64 Reserved2[9];
+} LX_VFS_FILE, *PLX_VFS_FILE;
+
+typedef struct _LX_VFS_FILE_DESCRIPTOR {
+    ULONG_PTR File;
+    UINT64 Reserved;
+} LX_VFS_FILE_DESCRIPTOR, *PLX_VFS_FILE_DESCRIPTOR;
+
+typedef struct _LX_VFS_DEV_TTY_CONSOLE_STATE {
+    HANDLE Input;
+    HANDLE Output;
+    HANDLE Console;
+    UINT64 Reserved[4];
+    PEPROCESS Process;
+} LX_VFS_DEV_TTY_CONSOLE_STATE, *PLX_VFS_DEV_TTY_CONSOLE_STATE;
+
+typedef struct _LX_VFS_DEV_TTY_DEVICE {
+    ULONG_PTR ReferenceCount;
+    PLX_VFS_DEVICE_TYPE Type;
+    UINT64 Reserved[20];
+    PLX_VFS_DEV_TTY_CONSOLE_STATE ConsoleState;
+    UINT64 Reserved1[2];
+} LX_VFS_DEV_TTY_DEVICE, *PLX_VFS_DEV_TTY_DEVICE;
+
 typedef struct _LX_STRING {
     SIZE_T Length;
     SIZE_T MaximumLength;
@@ -395,8 +448,15 @@ typedef struct _LX_THREAD_GROUP_LAUNCH_PARAMETERS {
 } LX_THREAD_GROUP_LAUNCH_PARAMETERS, *PLX_THREAD_GROUP_LAUNCH_PARAMETERS;
 
 typedef struct _LX_FILE_DESCRIPTOR_TABLE {
-    UINT64 ReferenceCount;
-    UINT64 Reserved[9];
+    ULONG_PTR ReferenceCount;
+    UINT64 Reserved;
+    EX_PUSH_LOCK Lock;
+    UINT32 Size;
+    UINT32 Opened;
+    UINT32 Capacity;
+    UINT32 Reserved1;
+    PLX_VFS_FILE_DESCRIPTOR FileDescriptors;
+    UINT64 Reserved3[4];
 } LX_FILE_DESCRIPTOR_TABLE, *PLX_FILE_DESCRIPTOR_TABLE;
 
 typedef struct _LX_FILE_SYSTEM {
