@@ -1,0 +1,25 @@
+{
+    "configurations": [
+        {
+            "name": "ELF",
+            "includePath": [
+                "${workspaceFolder}/../../lxmonika/include"
+            ],
+            "defines": [],
+            "compilerArgs": [
+                "-static",
+                "-nostdlib",
+                "-Werror",
+                "-Wall",
+                "-Wpedantic",
+                "-Wextra",
+                "-Wno-multichar",
+                "-O2"
+            ],
+            "cStandard": "c17",
+            "cppStandard": "c++23",
+            "intelliSenseMode": "linux-gcc-x64"
+        }
+    ],
+    "version": 4
+}
