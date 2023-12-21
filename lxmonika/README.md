@@ -117,6 +117,23 @@ YMMV.
 Only `x86_64` is currently supported; the Pico structs have not been tested for `arm64` Windows
 yet, as I do not own an `arm64` Windows device.
 
+## Building your own Pico provider
+
+Your driver will need to add a reference to `lxmonika`. It should also have headers in the
+[`include/`](include) directory included.
+
+```xml
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(SolutionDir)\lxmonika\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(SolutionDir)\lxmonika\$(OutDir)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>%(AdditionalDependencies);lxmonika.lib</AdditionalDependencies>
+    </Link>
+```
+
+See the included sample, [`mxss`](../mxss), for more details.
+
 ## Future plans
 
 - [**DONE**] Fetch `LxpRoutines` from `lxcore.sys`. These are essential routines any pico provider
@@ -126,7 +143,7 @@ boolean guard (`PspPicoRegistrationDisabled`).
 - [**DONE**] Create a `MaRegisterPicoProvider` and let `lxmonika` manage these providers instead.
 Even if we override the boolean guard, `PsRegisterPicoProvider` would not correctly handle multiple
 Pico drivers, since `PspPicoProviderRoutines` is not an array or table but just a global variable.
-- Provide a sample Pico provider.
+- [**DONE**] Provide a sample Pico provider.
 - (Far, far future) Port a newer version of Linux, Darwin, or even Haiku???
 - (Far, far future) Revive project Astoria???
 
