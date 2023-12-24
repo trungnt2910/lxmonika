@@ -41,8 +41,8 @@ typedef struct _PS_PICO_PROCESS_ATTRIBUTES {
 
 typedef struct _PS_PICO_PROCESS_CREATE_CONTEXT {
     PFILE_OBJECT ImageFile;
-    PUNICODE_STRING* ImageName;
-    PUNICODE_STRING* CommandLine;
+    PUNICODE_STRING ImageName;
+    PUNICODE_STRING CommandLine;
 } PS_PICO_PROCESS_CREATE_CONTEXT, *PPS_PICO_PROCESS_CREATE_CONTEXT;
 
 typedef struct _PS_PICO_THREAD_ATTRIBUTES {
@@ -54,7 +54,7 @@ typedef struct _PS_PICO_THREAD_ATTRIBUTES {
 
 #if defined(_AMD64_)
 
-    ULONG UserFsBase;
+    ULONG64 UserFsBase;
     ULONG64 UserGsBase;
     ULONG_PTR Rax;
     ULONG_PTR Rcx;
