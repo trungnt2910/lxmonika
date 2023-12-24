@@ -9,6 +9,7 @@
 #define MA_DISPATCH_PROCESS         (0x1)
 #define MA_DISPATCH_THREAD          (0x2)
 #define MA_DISPATCH_FREE            (0x4)
+#define MA_DISPATCH_NO_FALLBACK     (0x8)
 
 #define MA_GET_OBJECT_CONTEXT(var, type, object)                                                \
     do                                                                                          \
@@ -48,9 +49,12 @@
                 }                                                                               \
             }                                                                                   \
         }                                                                                       \
-        else if (MapOriginalProviderRoutines.function != NULL)                                  \
+        else if constexpr (!((type) & MA_DISPATCH_NO_FALLBACK))                                 \
         {                                                                                       \
-            return MapOriginalProviderRoutines.function(__VA_ARGS__);                           \
+            if (MapOriginalProviderRoutines.function != NULL)                                   \
+            {                                                                                   \
+                return MapOriginalProviderRoutines.function(__VA_ARGS__);                       \
+            }                                                                                   \
         }                                                                                       \
     } while (FALSE)
 
@@ -94,7 +98,19 @@ MapDispatchException(
     _In_ KPROCESSOR_MODE PreviousMode
 )
 {
-    MA_DISPATCH_TO_PROVIDER(MA_DISPATCH_THREAD, PsGetCurrentThread(),
+    MA_DISPATCH_TO_PROVIDER(MA_DISPATCH_THREAD | MA_DISPATCH_NO_FALLBACK, PsGetCurrentThread(),
+        DispatchException,
+            ExceptionRecord,
+            ExceptionFrame,
+            TrapFrame,
+            Chance,
+            PreviousMode
+    );
+
+    // This happens when a process like taskmgr.exe attachs one of its threads to a Pico process.
+    // The current thread would not be a Pico thread (and has no Pico context), but NT still calls
+    // the Pico exception dispatcher.
+    MA_DISPATCH_TO_PROVIDER(MA_DISPATCH_PROCESS, PsGetCurrentProcess(),
         DispatchException,
             ExceptionRecord,
             ExceptionFrame,
@@ -176,7 +192,7 @@ MapCreateProcess(
     {
         return STATUS_NO_MEMORY;
     }
-    
+
     ProcessAttributes->Context = pContext;
 
     NTSTATUS status = MapOriginalRoutines.CreateProcess(
