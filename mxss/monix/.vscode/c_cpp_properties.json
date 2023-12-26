@@ -3,7 +3,7 @@
         {
             "name": "ELF",
             "includePath": [
-                "${workspaceFolder}/../../lxmonika/include"
+                "${workspaceFolder}/../../../lxmonika/include"
             ],
             "defines": [],
             "compilerArgs": [

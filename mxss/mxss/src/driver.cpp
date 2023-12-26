@@ -2,6 +2,7 @@
 
 #include <monika.h>
 
+#include "device.h"
 #include "provider.h"
 
 extern "C"
@@ -14,6 +15,15 @@ DriverEntry(
     UNREFERENCED_PARAMETER(RegistryPath);
 
     NTSTATUS status = STATUS_SUCCESS;
+
+    status = DeviceInit(DriverObject);
+
+    if (!NT_SUCCESS(status))
+    {
+        KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
+            "Failed to initialize control driver, status=%x\n", status));
+        return status;
+    }
 
     PS_PICO_PROVIDER_ROUTINES providerRoutines =
     {
@@ -65,7 +75,7 @@ DriverUnload(
     _In_ PDRIVER_OBJECT DriverObject
 )
 {
-    UNREFERENCED_PARAMETER(DriverObject);
+    DeviceCleanup(DriverObject);
 
     // TODO: Unregister Pico provider when such an API exists.
 }

@@ -3,6 +3,7 @@
 #include <intsafe.h>
 
 #include "console.h"
+#include "process.h"
 #include "provider.h"
 
 extern "C"
@@ -12,6 +13,18 @@ SyscallExit(
 )
 {
     PEPROCESS pCurrentProcess = PsGetCurrentProcess();
+
+    PMX_PROCESS pContext = (PMX_PROCESS)MxRoutines.GetProcessContext(pCurrentProcess);
+    if (pContext != NULL)
+    {
+        // TODO: Do some conversion to/from NTSTATUS values?
+        pContext->ExitStatus = status;
+
+        // We do not need a context attached to our process anymore.
+        MxProcessFree(pContext);
+        pContext = NULL;
+    }
+
     // Actually not suicide, we will still return.
     MxRoutines.TerminateProcess(pCurrentProcess, status);
 
@@ -48,8 +61,6 @@ SyscallWrite(
     INT_PTR returnValue = 0;
     SIZE_T written = 0;
 
-    HANDLE hdlCurrentTerminal = NULL;
-    
     HANDLE hdlConsole = NULL;
     HANDLE hdlOutput = NULL;
 
@@ -88,21 +99,21 @@ SyscallWrite(
         return status;
     };
 
-    // CoOpenNewestWslHandle IS A QUICK HACK!!! DO NOT FOLLOW THIS EXAMPLE!!!
-    // This function has a high chance of attaching to the wrong terminal if multiple windows are
-    // open.
-    // The "correct" way is to have a Win32 host declaring itself to us through an ioctl.
-#pragma warning(push)
-#pragma warning(disable: 4996)
-    NTSTATUS status = CoOpenNewestWslHandle(&hdlCurrentTerminal);
-#pragma warning(pop)
+    PEPROCESS pCurrentProcess = PsGetCurrentProcess();
 
-    if (!NT_SUCCESS(status))
+    PMX_PROCESS pContext = (PMX_PROCESS)MxRoutines.GetProcessContext(pCurrentProcess);
+
+    if (pContext == NULL)
     {
-        return status;
+        // Some random process assigned to us by lxmonika. Write not supported.
+        // In the future, there are plans to unify console handle management.
+        returnValue = -1;
+        goto end;
     }
 
-    status = CoAttachKernelConsole(hdlCurrentTerminal, &hdlConsole);
+    NTSTATUS status;
+
+    status = CoAttachKernelConsole(PsGetProcessId(pContext->HostProcess), &hdlConsole);
 
     if (!NT_SUCCESS(status))
     {

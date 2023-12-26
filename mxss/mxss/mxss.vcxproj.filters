@@ -24,7 +24,16 @@
     </Inf>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\console.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\device.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="src\driver.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\process.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\provider.cpp">
@@ -33,12 +42,21 @@
     <ClCompile Include="src\syscall.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\console.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\console.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\device.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="include\driver.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\os.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\process.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\provider.h">
@@ -47,7 +65,7 @@
     <ClInclude Include="include\syscall.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\console.h">
+    <ClInclude Include="include\AutoResource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

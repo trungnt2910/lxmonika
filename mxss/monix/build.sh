@@ -53,18 +53,8 @@ for filename in src/*; do
         -mno-red-zone
 done
 
-mkdir -p obj/$ARCH/etc
-cp etc/* obj/$ARCH/etc
-
-# TODO: Monix rootfs in here.
-mkdir -p obj/$ARCH/rootfs
-
-# Standard Linux directories.
-mkdir -p obj/$ARCH/dev
-mkdir -p obj/$ARCH/mnt
-
 mkdir -p bin/$ARCH
 
-tar -C obj/$ARCH -czf bin/$ARCH/monix-wsl-$ARCH.tar.gz .
+tar -C obj/$ARCH -czf bin/$ARCH/monix-$ARCH.tar.gz .
 
 popd > /dev/null

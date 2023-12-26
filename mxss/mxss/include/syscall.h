@@ -4,7 +4,7 @@
 //
 // Monix system call emulation
 
-#include <ntddk.h>
+#include <ntifs.h>
 
 #ifdef __cplusplus
 extern "C"

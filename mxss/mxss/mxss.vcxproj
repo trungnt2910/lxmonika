@@ -85,7 +85,7 @@
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>$(SolutionDir)\lxmonika\$(OutDir)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>%(AdditionalDependencies);lxmonika.lib</AdditionalDependencies>
+      <AdditionalDependencies>%(AdditionalDependencies);Wdmsec.lib;lxmonika.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -96,15 +96,22 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\console.cpp" />
+    <ClCompile Include="src\device.cpp" />
     <ClCompile Include="src\driver.cpp" />
+    <ClCompile Include="src\process.cpp" />
     <ClCompile Include="src\provider.cpp" />
     <ClCompile Include="src\syscall.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\console.h" />
+    <ClInclude Include="include\device.h" />
     <ClInclude Include="include\driver.h" />
+    <ClInclude Include="include\elf.h" />
+    <ClInclude Include="include\os.h" />
+    <ClInclude Include="include\process.h" />
     <ClInclude Include="include\provider.h" />
     <ClInclude Include="include\syscall.h" />
+    <ClInclude Include="include\AutoResource.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" />

@@ -4,6 +4,7 @@
 //
 // Pico provider standard functions.
 
+#include <ntifs.h>
 #include <pico.h>
 
 #ifdef __cplusplus
