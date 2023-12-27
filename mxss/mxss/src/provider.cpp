@@ -1,6 +1,7 @@
 #include "provider.h"
 
 #include "syscall.h"
+#include "thread.h"
 
 PS_PICO_ROUTINES MxRoutines
 {
@@ -34,23 +35,34 @@ MxSystemCallDispatch(
     UNREFERENCED_PARAMETER(uArg5);
     UNREFERENCED_PARAMETER(uArg6);
 
+    PMX_THREAD pMxThread = (PMX_THREAD)MxRoutines.GetThreadContext(PsGetCurrentThread());
+    if (pMxThread != NULL)
+    {
+        pMxThread->CurrentSystemCall = SystemCall;
+    }
+
     // Syscall numbers are defined here:
     // https://github.com/itsmevjnk/sysx/blob/main/exec/syscall.h
     switch (iSysNum)
     {
-        case 0: // SYSCALL_EXIT
+        case SYSCALL_EXIT:  // 0
         {
             iRet = SyscallExit((INT)uArg1);
         }
         break;
-        case 1: // SYSCALL_READ
+        case SYSCALL_READ:  // 1
         {
             DbgBreakPoint();
         }
         break;
-        case 2: // SYSCALL_WRITE
+        case SYSCALL_WRITE: // 2
         {
             iRet = SyscallWrite((INT)uArg1, (PVOID)uArg2, (SIZE_T)uArg3);
+        }
+        break;
+        case SYSCALL_FORK:  // 3
+        {
+            iRet = SyscallFork();
         }
         break;
         default:
@@ -63,6 +75,11 @@ MxSystemCallDispatch(
 #else
 #error Set the syscall return value for this architecture!
 #endif
+
+    if (pMxThread != NULL)
+    {
+        pMxThread->CurrentSystemCall = NULL;
+    }
 }
 
 extern "C"

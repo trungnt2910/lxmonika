@@ -3,6 +3,7 @@
 #include "elf.h"
 #include "os.h"
 #include "provider.h"
+#include "thread.h"
 
 #include "AutoResource.h"
 
@@ -138,22 +139,54 @@ MxProcessExecute(
     }
 
     PVOID pStackBaseAddress = NULL;
-    SIZE_T uStackSize = 0x800000;
-    MX_RETURN_IF_FAIL(ZwAllocateVirtualMemory(hdlProcess, &pStackBaseAddress, 0,
-        &uStackSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
+    SIZE_T szStackSize = 0x800000;
+    LARGE_INTEGER liStackSize
+    {
+        .QuadPart = (LONGLONG)szStackSize
+    };
+    HANDLE hdlStackSection = NULL;
+    MX_RETURN_IF_FAIL(ZwCreateSection(
+        &hdlStackSection,
+        STANDARD_RIGHTS_REQUIRED | SECTION_MAP_READ | SECTION_QUERY | SECTION_EXTEND_SIZE,
+        NULL,
+        &liStackSize,
+        PAGE_WRITECOPY,
+        SEC_COMMIT,
+        NULL
+    ));
+    AUTO_RESOURCE(hdlStackSection, ZwClose);
+    MX_RETURN_IF_FAIL(ZwMapViewOfSection(
+        hdlStackSection,
+        hdlProcess,
+        &pStackBaseAddress,
+        0,
+        szStackSize,
+        NULL,
+        &szStackSize,
+        ViewShare,
+        MX_MEM_PICO,
+        PAGE_WRITECOPY
+    ));
+
+    PMX_THREAD pMxThread = NULL;
+    MX_RETURN_IF_FAIL(MxThreadAllocate(&pMxThread));
+    AUTO_RESOURCE(pMxThread, MxThreadFree);
 
     PS_PICO_THREAD_ATTRIBUTES psPicoThreadAttributes
     {
         .Process = hdlProcess,
-        .UserStack = (ULONG_PTR)pStackBaseAddress + uStackSize,
+        .UserStack = (ULONG_PTR)pStackBaseAddress + szStackSize,
         .StartRoutine = (ULONG_PTR)pCodeBaseAddress,
-        .Context = NULL
+        .Context = pMxThread
     };
 
     HANDLE hdlThread = NULL;
     MX_RETURN_IF_FAIL(MxRoutines.CreateThread(&psPicoThreadAttributes,
         &psPicoProcessCreateContext, &hdlThread));
     AUTO_RESOURCE(hdlThread, ZwClose);
+
+    // One more reference that NT holds.
+    MxThreadReference(pMxThread);
 
     PETHREAD pThread = NULL;
     MX_RETURN_IF_FAIL(ObReferenceObjectByHandle(
@@ -166,6 +199,7 @@ MxProcessExecute(
     ));
     AUTO_RESOURCE(pThread, [](auto pThread)
     {
+        MxThreadFree((PMX_THREAD)MxRoutines.GetThreadContext(pThread));
         MxRoutines.TerminateThread(pThread, STATUS_UNSUCCESSFUL, TRUE);
         ObDereferenceObject(pThread);
     });
@@ -173,16 +207,21 @@ MxProcessExecute(
     ObReferenceObject(pHostProcess);
     pMxProcess->HostProcess = pHostProcess;
 
-    MX_RETURN_IF_FAIL(MxRoutines.ResumeThread(pThread, NULL));
-
     // One more reference for the output. The other reference is given to NT.
-    ++pMxProcess->ReferenceCount;
+    InterlockedIncrementSizeT(&pMxProcess->ReferenceCount);
+
+    pMxProcess->UserStack = pStackBaseAddress;
 
     // These don't need to be dereferenced/terminated anymore.
     pMxProcess->Process = pProcess;
     pProcess = NULL;
     pMxProcess->Thread = pThread;
     pThread = NULL;
+    pMxProcess->MxThread = pMxThread;
+    pMxThread = NULL;
+
+    // We have to properly set the context before allowing execution.
+    MxRoutines.ResumeThread(pMxProcess->Thread, NULL);
 
     *pPMxProcess = pMxProcess;
     pMxProcess = NULL;
@@ -224,6 +263,11 @@ MxProcessFree(
     if (pMxProcess->HostProcess)
     {
         ObDereferenceObject(pMxProcess->HostProcess);
+    }
+
+    if (pMxProcess->MxThread)
+    {
+        MxThreadFree(pMxProcess->MxThread);
     }
 
     ExFreePoolWithTag(pMxProcess, MX_POOL_TAG);
@@ -295,12 +339,6 @@ MxProcessMapMainExecutable(
         ExAllocatePoolZero(PagedPool, szPhdrsBytes, MX_POOL_TAG);
     AUTO_RESOURCE(pProgramHeaders, [](auto p) { ExFreePoolWithTag(p, MX_POOL_TAG); });
     MX_RETURN_IF_FAIL(ReadToEnd(pProgramHeaders, elfHeader.e_phoff, szPhdrsBytes));
-
-    // Actually valid, but we don't support it for now.
-    if (pProgramHeaders[0].p_offset != 0)
-    {
-        return STATUS_INVALID_IMAGE_FORMAT;
-    }
 
     ElfW(Addr) pImageStartVm = (ElfW(Addr))-1;
     ElfW(Addr) pImageEndVm = 0;
@@ -482,5 +520,184 @@ MxProcessMapMainExecutable(
     }
 
     *pEntryPoint = (PVOID)(pImageBase + elfHeader.e_entry);
+    return STATUS_SUCCESS;
+}
+
+extern "C"
+NTSTATUS
+MxProcessFork(
+    _In_ PMX_PROCESS pMxParentProcess,
+    _Out_ PMX_PROCESS* pPMxProcess
+)
+{
+    PMX_PROCESS pMxProcess = (PMX_PROCESS)
+        ExAllocatePoolZero(PagedPool, sizeof(MX_PROCESS), MX_POOL_TAG);
+    if (pMxProcess == NULL)
+    {
+        return STATUS_NO_MEMORY;
+    }
+    AUTO_RESOURCE(pMxProcess, MxProcessFree);
+    pMxProcess->ReferenceCount = 1;
+
+    ULONG uNameLen = 0;
+    ObQueryNameString(pMxParentProcess->MainExecutable, NULL, 0, &uNameLen);
+
+    POBJECT_NAME_INFORMATION pObNameInfo = (POBJECT_NAME_INFORMATION)
+        ExAllocatePoolZero(PagedPool, uNameLen, MX_POOL_TAG);
+    if (pObNameInfo == NULL)
+    {
+        return STATUS_NO_MEMORY;
+    }
+    AUTO_RESOURCE(pObNameInfo, [](auto p) { ExFreePoolWithTag(p, MX_POOL_TAG); });
+    MX_RETURN_IF_FAIL(ObQueryNameString(
+        pMxParentProcess->MainExecutable, pObNameInfo, uNameLen, &uNameLen));
+
+    HANDLE hdlParentProcess = NULL;
+    MX_RETURN_IF_FAIL(ObOpenObjectByPointer(
+        pMxParentProcess->Process,
+        OBJ_KERNEL_HANDLE,
+        NULL,
+        PROCESS_ALL_ACCESS,
+        *PsProcessType,
+        KernelMode,
+        &hdlParentProcess
+    ));
+    AUTO_RESOURCE(hdlParentProcess, ZwClose);
+
+    PS_PICO_PROCESS_ATTRIBUTES psPicoProcessAttributes
+    {
+        .ParentProcess = hdlParentProcess,
+        .Context = pMxProcess,
+        .Flags = PS_PICO_CREATE_PROCESS_CLONE_PARENT | PS_PICO_CREATE_PROCESS_INHERIT_HANDLES
+    };
+
+    PS_PICO_PROCESS_CREATE_CONTEXT psPicoProcessCreateContext
+    {
+        .ImageFile = pMxParentProcess->MainExecutable,
+        .ImageName = &pObNameInfo->Name
+    };
+
+    HANDLE hdlProcess = NULL;
+    MX_RETURN_IF_FAIL(MxRoutines.CreateProcess(
+        &psPicoProcessAttributes, &psPicoProcessCreateContext, &hdlProcess));
+    AUTO_RESOURCE(hdlProcess, ZwClose);
+
+    PEPROCESS pProcess = NULL;
+    MX_RETURN_IF_FAIL(ObReferenceObjectByHandle(
+        hdlProcess,
+        PROCESS_ALL_ACCESS,
+        *PsProcessType,
+        KernelMode,
+        (PVOID*)&pProcess,
+        NULL
+    ));
+    AUTO_RESOURCE(pProcess, [](auto pProcess)
+    {
+        MxRoutines.TerminateProcess(pProcess, STATUS_UNSUCCESSFUL);
+        ObDereferenceObject(pProcess);
+    });
+
+    CONTEXT ctxParent
+    {
+        .ContextFlags = CONTEXT_ALL
+    };
+    MX_RETURN_IF_FAIL(MxRoutines.GetContextThreadInternal(
+        pMxParentProcess->Thread,
+        &ctxParent,
+        KernelMode,
+        UserMode,
+        FALSE
+    ));
+
+    PMX_THREAD pMxThread = NULL;
+    MX_RETURN_IF_FAIL(MxThreadAllocate(&pMxThread));
+    AUTO_RESOURCE(pMxThread, MxThreadFree);
+
+    PS_PICO_THREAD_ATTRIBUTES psPicoThreadAttributes
+    {
+        .Process = hdlProcess,
+        .UserStack = (ULONG_PTR)pMxParentProcess->UserStack,
+        .StartRoutine = (ULONG_PTR)ctxParent.Rip,
+        .Context = pMxThread,
+    };
+
+    HANDLE hdlThread = NULL;
+    MX_RETURN_IF_FAIL(MxRoutines.CreateThread(&psPicoThreadAttributes,
+        &psPicoProcessCreateContext, &hdlThread));
+    AUTO_RESOURCE(hdlThread, ZwClose);
+
+    MxThreadReference(pMxThread);
+
+    PETHREAD pThread = NULL;
+    MX_RETURN_IF_FAIL(ObReferenceObjectByHandle(
+        hdlThread,
+        THREAD_ALL_ACCESS,
+        *PsThreadType,
+        KernelMode,
+        (PVOID*)&pThread,
+        NULL
+    ));
+    AUTO_RESOURCE(pThread, [](auto pThread)
+    {
+        MxThreadFree((PMX_THREAD)MxRoutines.GetThreadContext(pThread));
+        MxRoutines.TerminateThread(pThread, STATUS_UNSUCCESSFUL, TRUE);
+        ObDereferenceObject(pThread);
+    });
+
+#ifdef AMD64
+    // Syscall return result.
+    ctxParent.Rax = 0;
+
+    if (pMxParentProcess->MxThread->CurrentSystemCall != NULL)
+    {
+        // Restore the "real" context from system call information.
+        PKTRAP_FRAME pTrapFrame = pMxParentProcess->MxThread->CurrentSystemCall->TrapFrame;
+        ctxParent.Rcx = pTrapFrame->Rcx;
+        ctxParent.Rdx = pTrapFrame->Rdx;
+        ctxParent.Rbx = pTrapFrame->Rbx;
+        ctxParent.Rbp = pTrapFrame->Rbp;
+        ctxParent.Rsi = pTrapFrame->Rsi;
+        ctxParent.Rdi = pTrapFrame->Rdi;
+        ctxParent.R8 = pTrapFrame->R8;
+        ctxParent.R9 = pTrapFrame->R9;
+        ctxParent.R10 = pTrapFrame->R10;
+        ctxParent.R11 = pTrapFrame->R11;
+        ctxParent.EFlags = pTrapFrame->EFlags;
+    }
+#else
+#error Set the context for this architecture!
+#endif
+
+    MX_RETURN_IF_FAIL(MxRoutines.SetContextThreadInternal(
+        pThread,
+        &ctxParent,
+        KernelMode,
+        UserMode,
+        FALSE
+    ));
+
+    InterlockedIncrementSizeT(&pMxProcess->ReferenceCount);
+
+    pMxProcess->Process = pProcess;
+    pProcess = NULL;
+    pMxProcess->Thread = pThread;
+    pThread = NULL;
+    pMxProcess->MxThread = pMxThread;
+    pMxThread = NULL;
+
+    ObReferenceObject(pMxParentProcess->HostProcess);
+    pMxProcess->HostProcess = pMxParentProcess->HostProcess;
+
+    ObReferenceObject(pMxParentProcess->MainExecutable);
+    pMxProcess->MainExecutable = pMxParentProcess->MainExecutable;
+
+    pMxProcess->UserStack = pMxParentProcess->UserStack;
+
+    // We have to properly set the context before allowing execution.
+    MxRoutines.ResumeThread(pMxProcess->Thread, NULL);
+
+    *pPMxProcess = pMxProcess;
+    pMxProcess = NULL;
+
     return STATUS_SUCCESS;
 }

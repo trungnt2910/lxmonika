@@ -101,6 +101,7 @@
     <ClCompile Include="src\process.cpp" />
     <ClCompile Include="src\provider.cpp" />
     <ClCompile Include="src\syscall.cpp" />
+    <ClCompile Include="src\thread.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\console.h" />
@@ -111,6 +112,7 @@
     <ClInclude Include="include\process.h" />
     <ClInclude Include="include\provider.h" />
     <ClInclude Include="include\syscall.h" />
+    <ClInclude Include="include\thread.h" />
     <ClInclude Include="include\AutoResource.h" />
   </ItemGroup>
   <ItemGroup>

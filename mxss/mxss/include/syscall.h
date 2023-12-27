@@ -16,6 +16,7 @@ extern "C"
 #define SYSCALL_EXIT                            0 // arg1 = return code
 #define SYSCALL_READ                            1 // arg1 = size, arg2 = buffer ptr, arg3 = fd
 #define SYSCALL_WRITE                           2 // arg1 = size, arg2 = buffer ptr, arg3 = fd
+#define SYSCALL_FORK                            3
 
 INT
     SyscallExit(
@@ -28,6 +29,9 @@ INT_PTR
         _In_reads_opt_(size) PVOID buffer,
         _In_ SIZE_T size
     );
+
+INT
+    SyscallFork();
 
 #ifdef __cplusplus
 }

@@ -5,6 +5,7 @@
 #include "console.h"
 #include "process.h"
 #include "provider.h"
+#include "thread.h"
 
 extern "C"
 INT
@@ -30,6 +31,14 @@ SyscallExit(
 
     // Currently Monix processes are single-threaded.
     PETHREAD pCurrentThread = PsGetCurrentThread();
+
+    PMX_THREAD pThreadContext = (PMX_THREAD)MxRoutines.GetThreadContext(pCurrentThread);
+    if (pThreadContext != NULL)
+    {
+        MxThreadFree(pThreadContext);
+        pThreadContext = NULL;
+    }
+
     // Microsoft also uses TRUE, so why don't we?
     MxRoutines.TerminateThread(pCurrentThread, status, TRUE);
 
@@ -195,4 +204,32 @@ end:
     }
 
     return returnValue;
+}
+
+extern "C"
+INT
+SyscallFork()
+{
+    PEPROCESS pCurrentProcess = PsGetCurrentProcess();
+
+    PMX_PROCESS pContext = (PMX_PROCESS)MxRoutines.GetProcessContext(pCurrentProcess);
+
+    if (pContext == NULL)
+    {
+        return -1;
+    }
+
+    PMX_PROCESS pChildContext = NULL;
+    NTSTATUS status = MxProcessFork(pContext, &pChildContext);
+
+    if (!NT_SUCCESS(status))
+    {
+        return -1;
+    }
+
+    INT iNewPid = (INT)(ULONG_PTR)PsGetProcessId(pChildContext->Process);
+
+    MxProcessFree(pChildContext);
+
+    return iNewPid;
 }
