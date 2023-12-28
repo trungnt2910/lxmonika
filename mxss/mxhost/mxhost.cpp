@@ -1,9 +1,12 @@
+#include <filesystem>
 #include <iostream>
 #include <memory>
 #include <string>
 
 #include <Windows.h>
 #include <winternl.h>
+
+#define STATUS_UNSUCCESSFUL              ((NTSTATUS)0xC0000001L)
 
 using WSTRING = std::basic_string<WCHAR>;
 
@@ -15,21 +18,33 @@ typedef struct _MX_EXECUTE_INFORMATION
     UNICODE_STRING ExecutablePath;
 } MX_EXECUTE_INFORMATION, *PMX_EXECUTE_INFORMATION;
 
-DWORD Fail(NTSTATUS status, LPCSTR pMessage)
+template <typename... Args>
+void Print(Args&&... arg)
 {
-    std::cerr << pMessage << ": " << std::hex << status << std::dec << std::endl;
-    return status;
+    (std::wcout << ... << arg);
+    std::wcout << std::endl;
 }
 
-WSTRING GetCurrentDirectory()
+#define MX_INFO(...)    Print(L"[INF] ", __FILE__, ":", __LINE__, ": ", __VA_ARGS__)
+#define MX_WARN(...)    Print(L"[WRN] ", __FILE__, ":", __LINE__, ": ", __VA_ARGS__)
+#define MX_ERROR(...)   Print(L"[ERR] ", __FILE__, ":", __LINE__, ": ", __VA_ARGS__)
+
+#ifdef _DEBUG
+#define MX_DEBUG(...)   Print(L"[DBG] ", __FILE__, ":", __LINE__, ": ", __VA_ARGS__)
+#else
+#define MX_DEBUG(...)
+#endif
+
+WSTRING Win32HandleToPath(HANDLE hdlFile, DWORD dwFlags)
 {
-    SIZE_T dwRequiredSize = GetCurrentDirectoryW(0, NULL);
+    SIZE_T dwRequiredSize = GetFinalPathNameByHandleW(hdlFile, NULL, 0, dwFlags);
 
     WSTRING str(dwRequiredSize * 2, L'\0');
 
     while (TRUE)
     {
-        dwRequiredSize = GetCurrentDirectoryW((DWORD)str.size(), str.data());
+        dwRequiredSize = GetFinalPathNameByHandleW(
+            hdlFile, str.data(), (DWORD)str.size(), dwFlags);
         if (dwRequiredSize > str.size())
         {
             str.resize(max(str.size(), dwRequiredSize) * 2);
@@ -37,20 +52,71 @@ WSTRING GetCurrentDirectory()
         }
 
         str.resize(dwRequiredSize);
-
-        if (str.back() != L'\\')
-        {
-            str.push_back(L'\\');
-        }
-
         str.shrink_to_fit();
+
         return str;
     }
 }
 
-int main()
+BOOL IntializeRootDirectory(PCSTR pUserParameter, WSTRING* pDosDirectory)
 {
-    SetConsoleCP(CP_WINUNICODE);
+    WSTRING strDosPath;
+    if (pUserParameter != NULL)
+    {
+        for (; *pUserParameter != '\0'; ++pUserParameter)
+        {
+            strDosPath.push_back(*pUserParameter);
+        }
+    }
+    else
+    {
+        strDosPath = L".";
+    }
+
+    HANDLE hdlDir = CreateFileW(
+        strDosPath.data(),
+        GENERIC_READ | GENERIC_WRITE,
+        FILE_SHARE_READ | FILE_SHARE_WRITE,
+        NULL,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL | FILE_FLAG_BACKUP_SEMANTICS,
+        NULL
+    );
+
+    if (hdlDir == INVALID_HANDLE_VALUE)
+    {
+        return FALSE;
+    }
+
+    *pDosDirectory = Win32HandleToPath(hdlDir, VOLUME_NAME_DOS) + L"\\";
+    CloseHandle(hdlDir);
+    return TRUE;
+}
+
+class ConsoleCPSetter
+{
+private:
+    UINT m_oldcp;
+public:
+    ConsoleCPSetter(UINT wCodePageID)
+        : m_oldcp(GetConsoleCP())
+    {
+        SetConsoleCP(wCodePageID);
+    }
+    ~ConsoleCPSetter()
+    {
+        SetConsoleCP(m_oldcp);
+    }
+};
+
+int main(int argc, const char** argv)
+{
+    auto _ConsoleCP = ConsoleCPSetter(CP_WINUNICODE);
+
+    MX_INFO(L"Monix version 0.0.1 prealpha (compiled ", __DATE__, " ", __TIME__, ")");
+    MX_INFO(L"Copyright <C> 2023 Trung Nguyen (trungnt2910)");
+
+    MX_INFO(L"initializing kernel device");
 
     UNICODE_STRING strDevicePath;
     RtlInitUnicodeString(&strDevicePath, L"\\Device\\mxss");
@@ -83,48 +149,109 @@ int main()
 
     if (!NT_SUCCESS(status))
     {
-        return Fail(status, "Failed to open mxss device");
+        MX_ERROR("Cannot open kernel device: ", (LPVOID)(ULONG_PTR)status);
+        return status;
     }
 
-    std::shared_ptr<VOID> _(hdlDevice, [](HANDLE hdl) { NtClose(hdl); });
+    std::shared_ptr<VOID> _hdlDevice(hdlDevice, [](HANDLE hdl) { NtClose(hdl); });
 
-    WSTRING strNtFilePath = L"\\??\\Global\\";
-    strNtFilePath += GetCurrentDirectory();
-    strNtFilePath += L"bin\\hello";
+    MX_INFO(L"initializing system root");
 
-    MX_EXECUTE_INFORMATION mxExecuteInformation = MX_EXECUTE_INFORMATION
+    PCSTR pRootPath = NULL;
+    if (argc >= 2)
     {
-        .ExecutablePath = UNICODE_STRING
+        pRootPath = argv[1];
+    }
+
+    WSTRING strDosRootDir;
+
+    if (!IntializeRootDirectory(pRootPath, &strDosRootDir))
+    {
+        MX_ERROR("Cannot initialize root directory");
+        return STATUS_UNSUCCESSFUL;
+    }
+
+    WSTRING strDosBinDir = strDosRootDir + L"bin\\";
+
+    std::wcout << L"Available binaries: " << std::endl;
+    bool bFirstFile = true;
+    for (const auto& entry : std::filesystem::directory_iterator(strDosBinDir))
+    {
+        if (entry.is_regular_file())
         {
-            .Length = (WORD)(strNtFilePath.size() * sizeof(WCHAR)),
-            .MaximumLength = (WORD)(strNtFilePath.size() * sizeof(WCHAR)),
-            .Buffer = strNtFilePath.data()
+            if (bFirstFile)
+            {
+                bFirstFile = false;
+            }
+            else
+            {
+                std::wcout << L", ";
+            }
+            std::wcout << entry.path().filename().wstring();
         }
-    };
-    NTSTATUS statusExecute = 0;
-
-    status = NtDeviceIoControlFile(
-        hdlDevice,
-        NULL,
-        NULL,
-        NULL,
-        &ioStatus,
-        IOCTL_MX_METHOD_BUFFERED,
-        &mxExecuteInformation,
-        sizeof(mxExecuteInformation),
-        &statusExecute,
-        sizeof(statusExecute)
-    );
-
-    if (!NT_SUCCESS(status))
-    {
-        return Fail(status, "Failed to perform IO operation");
     }
+    std::wcout << L"." << std::endl;
 
-    std::wcout
-        << L"Executed program \"" << strNtFilePath.c_str() << "\" "
-        << L"with status code " << std::hex << statusExecute << std::dec
-        << "." << std::endl;
+    while (TRUE)
+    {
+        std::wcout.put(L'>');
+        WSTRING strInput;
+        std::getline(std::wcin, strInput);
+        if (strInput.empty())
+        {
+            continue;
+        }
+
+        HANDLE hdlWin32BinFile = CreateFileW(
+            (strDosBinDir + strInput).data(),
+            GENERIC_READ,
+            FILE_SHARE_READ | FILE_SHARE_WRITE,
+            NULL,
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL,
+            NULL
+        );
+
+        if (hdlWin32BinFile == INVALID_HANDLE_VALUE)
+        {
+            Print(L"Binary ", strInput, L" not found\n");
+            continue;
+        }
+
+        WSTRING strNtFilePath = Win32HandleToPath(hdlWin32BinFile, VOLUME_NAME_NT);
+
+        MX_INFO("creating new process");
+
+        MX_EXECUTE_INFORMATION mxExecuteInformation
+        {
+            .ExecutablePath = UNICODE_STRING
+            {
+                .Length = (WORD)(strNtFilePath.size() * sizeof(WCHAR)),
+                .MaximumLength = (WORD)(strNtFilePath.size() * sizeof(WCHAR)),
+                .Buffer = strNtFilePath.data()
+            }
+        };
+        NTSTATUS statusExecute = 0;
+
+        status = NtDeviceIoControlFile(
+            hdlDevice,
+            NULL,
+            NULL,
+            NULL,
+            &ioStatus,
+            IOCTL_MX_METHOD_BUFFERED,
+            &mxExecuteInformation,
+            sizeof(mxExecuteInformation),
+            &statusExecute,
+            sizeof(statusExecute)
+        );
+
+        if (!NT_SUCCESS(status))
+        {
+            MX_ERROR("Cannot create process: ", (LPVOID)(ULONG_PTR)status, "\n");
+            continue;
+        }
+    }
 
     return 0;
 }
