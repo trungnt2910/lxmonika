@@ -5,8 +5,8 @@
 LONG Logger::_Initialized = 0;
 FAST_MUTEX Logger::_Mutex;
 
-#define WRITE(format, ...)								\
-    DbgPrintEx(											\
+#define WRITE(format, ...)                              \
+    DbgPrintEx(                                         \
         /* Just do what everyone does. */               \
         DPFLTR_IHVDRIVER_ID,                            \
         /* Prevent it from being filtered in WinDbg */  \

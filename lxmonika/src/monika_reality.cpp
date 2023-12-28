@@ -224,7 +224,7 @@ MaUpdateFileInformation(
         Write(_snprintf(pFile->Data + pFile->Length, uSizeLeft + 1,
             "ProviderId:\t%d", pContext->Provider
         ));
-        
+
         // Check if the context has a parent
         if (pContext->Parent != NULL)
         {
@@ -840,5 +840,7 @@ MapRealityEscape()
     }
 
     // Magic code to escape into your reality
-    RtlFailFast(FAST_FAIL_SET_CONTEXT_DENIED);
+    (VOID)KeRaiseIrqlToDpcLevel();
+    *(volatile UCHAR*)NULL = 0;
+    RtlFailFast(MA_REALITY_MINOR);
 }

@@ -108,7 +108,7 @@ shutdown /r /t 00
 ### Notes
 
 For the latest Windows builds, WinDbg and Debug mode may not be required, since PatchGuard might
-have removed `PspPicoProviderRoutines` from its	`PsKernelRangeList`. Therefore, modifying the
+have removed `PspPicoProviderRoutines` from its `PsKernelRangeList`. Therefore, modifying the
 structure may not cause the BSOD anymore.
 
 The driver has only been tested on Windows build 22621 (Windows 11 23H2). For other Windows builds,
