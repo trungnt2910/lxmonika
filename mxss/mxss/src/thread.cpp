@@ -24,7 +24,11 @@ MxThreadReference(
     _Inout_ PMX_THREAD pMxThread
 )
 {
-    ASSERT(InterlockedIncrementSizeT(&pMxThread->ReferenceCount) != 1);
+    ULONG_PTR uNewCount = InterlockedIncrementSizeT(&pMxThread->ReferenceCount);
+
+    UNREFERENCED_PARAMETER(uNewCount);
+    ASSERT(uNewCount != 1);
+
     return STATUS_SUCCESS;
 }
 
