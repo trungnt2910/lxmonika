@@ -19,11 +19,77 @@ extern "C"
 {
 #endif
 
+typedef
+NTSTATUS
+    MA_PICO_GET_ALLOCATED_PROVIDER_NAME(
+        _Outptr_ PUNICODE_STRING *ProviderName
+    ), *PMA_PICO_GET_ALLOCATED_PROVIDER_NAME;
+
+typedef struct _MA_PICO_SESSION_ATTRIBUTES {
+    SIZE_T Size;
+    HANDLE HostProcess;
+    HANDLE Console;
+    HANDLE Input;
+    HANDLE Output;
+    HANDLE RootDirectory;
+    HANDLE CurrentWorkingDirectory;
+    SIZE_T ProviderArgsCount;
+    PUNICODE_STRING ProviderArgs;
+    SIZE_T ArgsCount;
+    PUNICODE_STRING Args;
+    SIZE_T EnvironmentCount;
+    PUNICODE_STRING Environment;
+} MA_PICO_SESSION_ATTRIBUTES, *PMA_PICO_SESSION_ATTRIBUTES;
+
+typedef
+NTSTATUS
+    MA_PICO_START_SESSION(
+        _In_ PMA_PICO_SESSION_ATTRIBUTES Attributes
+    ), *PMA_PICO_START_SESSION;
+
+typedef
+NTSTATUS
+    MA_PICO_GET_CURRENT_WORKING_DIRECTORY(
+        _In_ PEPROCESS Process,
+        _Out_ PHANDLE CurrentWorkingDirectory
+    ), *PMA_PICO_GET_CURRENT_WORKING_DIRECTORY;
+
+typedef
+NTSTATUS
+    MA_PICO_GET_CONSOLE(
+        _In_ PEPROCESS Process,
+        _Out_opt_ PHANDLE Console,
+        _Out_opt_ PHANDLE Input,
+        _Out_opt_ PHANDLE Output
+    ), *PMA_PICO_GET_CONSOLE;
+
+typedef struct _MA_PICO_PROVIDER_ROUTINES {
+    SIZE_T Size;
+    PMA_PICO_GET_ALLOCATED_PROVIDER_NAME GetAllocatedProviderName;
+    PMA_PICO_START_SESSION StartSession;
+    PMA_PICO_GET_CURRENT_WORKING_DIRECTORY GetCurrentWorkingDirectory;
+    PMA_PICO_GET_CONSOLE GetConsole;
+} MA_PICO_PROVIDER_ROUTINES, *PMA_PICO_PROVIDER_ROUTINES;
+
+typedef struct _MA_PICO_ROUTINES {
+    SIZE_T Size;
+} MA_PICO_ROUTINES, *PMA_PICO_ROUTINES;
+
 MONIKA_EXPORT
 NTSTATUS NTAPI
     MaRegisterPicoProvider(
         _In_ PPS_PICO_PROVIDER_ROUTINES ProviderRoutines,
         _Inout_ PPS_PICO_ROUTINES PicoRoutines
+    );
+
+MONIKA_EXPORT
+NTSTATUS NTAPI
+    MaRegisterPicoProviderEx(
+        _In_ PPS_PICO_PROVIDER_ROUTINES ProviderRoutines,
+        _Inout_ PPS_PICO_ROUTINES PicoRoutines,
+        _In_opt_ PMA_PICO_PROVIDER_ROUTINES AdditionalProviderRoutines,
+        _Inout_opt_ PMA_PICO_ROUTINES AdditionalPicoRoutines,
+        _Out_opt_ PSIZE_T Index
     );
 
 /// <summary>Sets the name of the specified provider.</summary>

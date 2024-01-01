@@ -15,6 +15,8 @@ PS_PICO_ROUTINES MapOriginalRoutines;
 
 PS_PICO_PROVIDER_ROUTINES MapProviderRoutines[MaPicoProviderMaxCount];
 PS_PICO_ROUTINES MapRoutines[MaPicoProviderMaxCount];
+MA_PICO_PROVIDER_ROUTINES MapAdditionalProviderRoutines[MaPicoProviderMaxCount];
+MA_PICO_ROUTINES MapAdditionalRoutines[MaPicoProviderMaxCount];
 CHAR MapProviderNames[MaPicoProviderMaxCount][MA_NAME_MAX + 1];
 SIZE_T MapProvidersCount = 0;
 
@@ -109,6 +111,15 @@ MapInitialize()
 #include "monika_providers.cpp"
 #undef MONIKA_PROVIDER
 
+    // Initialize additional pico routines
+#define MONIKA_PROVIDER(index)                                              \
+    MapAdditionalRoutines[MaPicoProvider##index] =                          \
+    {                                                                       \
+        .Size = sizeof(MA_PICO_ROUTINES)                                    \
+    };
+#include "monika_providers.cpp"
+#undef MONIKA_PROVIDER
+
     // Optional step: Register WSL as a lxmonika client to simplify Pico process routines handling.
     HANDLE hdlLxCore;
     if (NT_SUCCESS(MdlpFindModuleByName("lxcore.sys", &hdlLxCore, NULL)))
@@ -190,6 +201,20 @@ MaRegisterPicoProvider(
     _Inout_ PPS_PICO_ROUTINES PicoRoutines
 )
 {
+    return MaRegisterPicoProviderEx(ProviderRoutines, PicoRoutines, NULL, NULL, NULL);
+}
+
+extern "C"
+MONIKA_EXPORT
+NTSTATUS NTAPI
+MaRegisterPicoProviderEx(
+    _In_ PPS_PICO_PROVIDER_ROUTINES ProviderRoutines,
+    _Inout_ PPS_PICO_ROUTINES PicoRoutines,
+    _In_opt_ PMA_PICO_PROVIDER_ROUTINES AdditionalProviderRoutines,
+    _Inout_opt_ PMA_PICO_ROUTINES AdditionalPicoRoutines,
+    _Out_opt_ PSIZE_T Index
+)
+{
     if (ProviderRoutines->Size != sizeof(PS_PICO_PROVIDER_ROUTINES)
         || PicoRoutines->Size != sizeof(PS_PICO_ROUTINES))
     {
@@ -225,6 +250,25 @@ MaRegisterPicoProvider(
 
     MapProviderRoutines[uProviderIndex] = *ProviderRoutines;
     *PicoRoutines = MapRoutines[uProviderIndex];
+
+    // Allows compatibility between different versions of lxmonika.
+    // (Hopefully, at least when the API becomes stable).
+    if (AdditionalProviderRoutines != NULL)
+    {
+        memcpy(&MapAdditionalProviderRoutines[uProviderIndex], AdditionalProviderRoutines,
+            min(sizeof(MA_PICO_PROVIDER_ROUTINES), AdditionalProviderRoutines->Size));
+    }
+
+    if (AdditionalPicoRoutines != NULL)
+    {
+        memcpy(AdditionalPicoRoutines, &MapAdditionalRoutines[uProviderIndex],
+            min(sizeof(MA_PICO_ROUTINES), AdditionalPicoRoutines->Size));
+    }
+
+    if (Index != NULL)
+    {
+        *Index = uProviderIndex;
+    }
 
     return STATUS_SUCCESS;
 }
