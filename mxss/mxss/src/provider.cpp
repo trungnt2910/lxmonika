@@ -1,11 +1,18 @@
 #include "provider.h"
 
+#include <monika.h>
+
 #include "syscall.h"
 #include "thread.h"
 
 PS_PICO_ROUTINES MxRoutines
 {
     .Size = sizeof(PS_PICO_ROUTINES)
+};
+
+MA_PICO_ROUTINES MxAdditionalRoutines
+{
+    .Size = sizeof(MA_PICO_ROUTINES)
 };
 
 extern "C"
@@ -146,4 +153,16 @@ MxWalkUserStack(
     UNREFERENCED_PARAMETER(FrameCount);
 
     return 0;
+}
+
+static UNICODE_STRING MxProviderName = RTL_CONSTANT_STRING(L"Monix-0.0.1-prealpha");
+
+extern "C"
+NTSTATUS
+MxGetAllocatedProviderName(
+    _Outptr_ PUNICODE_STRING* pOutProviderName
+)
+{
+    *pOutProviderName = &MxProviderName;
+    return STATUS_SUCCESS;
 }

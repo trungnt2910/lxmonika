@@ -218,9 +218,13 @@ MaUpdateFileInformation(
         // The worst thing this can cause is gibberish being printed out for this field. A buffer
         // overrun cannot occur since the last byte (index MA_NAME_MAX) of every entry is
         // guaranteed to be null and untouched.
-        Write(_snprintf(pFile->Data + pFile->Length, uSizeLeft + 1,
-            "ProviderName:\t%s", MapProviderNames[pContext->Provider]
-        ));
+        PUNICODE_STRING pProviderName;
+        if (NT_SUCCESS(MaGetAllocatedPicoProviderName(pContext->Provider, &pProviderName)))
+        {
+            Write(_snprintf(pFile->Data + pFile->Length, uSizeLeft + 1,
+                "ProviderName:\t%wZ", pProviderName
+            ));
+        }
         Write(_snprintf(pFile->Data + pFile->Length, uSizeLeft + 1,
             "ProviderId:\t%d", pContext->Provider
         ));
@@ -234,9 +238,14 @@ MaUpdateFileInformation(
             // And the parent is also valid.
             if (pContext->Parent->Magic == MA_CONTEXT_MAGIC)
             {
-                Write(_snprintf(pFile->Data + pFile->Length, uSizeLeft + 1,
-                    "ProviderParentName:\t%s", MapProviderNames[pContext->Parent->Provider]
-                ));
+                PUNICODE_STRING pParentProviderName;
+                if (NT_SUCCESS(MaGetAllocatedPicoProviderName(pContext->Provider,
+                    &pParentProviderName)))
+                {
+                    Write(_snprintf(pFile->Data + pFile->Length, uSizeLeft + 1,
+                        "ProviderParentName:\t%wZ", pParentProviderName
+                    ));
+                }
                 Write(_snprintf(pFile->Data + pFile->Length, uSizeLeft + 1,
                     "ProviderParentId:\t%d", pContext->Parent->Provider
                 ));
@@ -566,32 +575,25 @@ MaFileIoctl(
                 PCSTR pRequestedProvider = (PCSTR)pBuffer;
                 Logger::LogTrace("MA_IOCTL_SET_PROVIDER ", pRequestedProvider);
 
-                SIZE_T uProviderLength = strnlen(pRequestedProvider, MA_NAME_MAX);
+                UTF8_STRING strUtf8RequestedProvider;
+                RtlInitUTF8String(&strUtf8RequestedProvider, (PCSZ)pBuffer);
 
-                // Prevent reading newer providers.
-                SIZE_T uCurrentRegisteredCount = min(MapProvidersCount, MaPicoProviderMaxCount);
+                UNICODE_STRING strUnicodeRequestedProvider;
+                NTSTATUS status = RtlUTF8StringToUnicodeString(
+                    &strUnicodeRequestedProvider, &strUtf8RequestedProvider, TRUE);
 
-                SIZE_T uBestMatchLength = 0;
-                DWORD uBestMatchIndex = 0;
-
-                // Potential race condition in this loop while reading the names,
-                // discussed in more details in other places.
-                for (SIZE_T i = 0; i < uCurrentRegisteredCount; ++i)
+                if (!NT_SUCCESS(status))
                 {
-                    SIZE_T uCurrentMatch = RtlCompareMemory(pBuffer, MapProviderNames[i],
-                        min(uProviderLength, sizeof(MapProviderNames[i])));
-
-                    if (uCurrentMatch > uBestMatchLength)
-                    {
-                        uBestMatchLength = uCurrentMatch;
-                        uBestMatchIndex = (DWORD)i;
-                    }
+                    return LxpUtilTranslateStatus(status);
                 }
 
-                if (uBestMatchLength == 0)
+                SIZE_T uNewIndex;
+                status = MaFindPicoProvider(strUnicodeRequestedProvider.Buffer, &uNewIndex);
+                RtlFreeUnicodeString(&strUnicodeRequestedProvider);
+
+                if (!NT_SUCCESS(status))
                 {
-                    // Nothing actually matches!
-                    return -LINUX_EINVAL;
+                    return LxpUtilTranslateStatus(status);
                 }
 
                 PMA_CONTEXT pMaContext = (PMA_CONTEXT)
@@ -599,15 +601,15 @@ MaFileIoctl(
 
                 if (pMaContext != NULL && pMaContext->Magic == MA_CONTEXT_MAGIC)
                 {
-                    if (pMaContext->Provider != uBestMatchIndex)
+                    if (pMaContext->Provider != uNewIndex)
                     {
-                        PMA_CONTEXT pNewContext = MapAllocateContext(uBestMatchIndex, NULL);
+                        PMA_CONTEXT pNewContext = MapAllocateContext((DWORD)uNewIndex, NULL);
                         if (pNewContext == NULL)
                         {
                             return -LINUX_ENOMEM;
                         }
 
-                        NTSTATUS status = MapPushContext(pMaContext, pNewContext);
+                        status = MapPushContext(pMaContext, pNewContext);
 
                         if (!NT_SUCCESS(status))
                         {
@@ -623,8 +625,7 @@ MaFileIoctl(
                     return -LINUX_EPERM;
                 }
 
-                Logger::LogTrace("Successfully switched process to provider ID ", uBestMatchIndex);
-                Logger::LogTrace("New provider name: ", MapProviderNames[uBestMatchIndex]);
+                Logger::LogTrace("Successfully switched process to provider ID ", uNewIndex);
 
                 return 0;
             }

@@ -5,7 +5,7 @@
 // Pico provider standard functions.
 
 #include <ntifs.h>
-#include <pico.h>
+#include <monika.h>
 
 #ifdef __cplusplus
 extern "C"
@@ -13,6 +13,7 @@ extern "C"
 #endif
 
 extern PS_PICO_ROUTINES MxRoutines;
+extern MA_PICO_ROUTINES MxAdditionalRoutines;
 
 VOID
     MxSystemCallDispatch(
@@ -50,6 +51,11 @@ ULONG
         _In_ PKTRAP_FRAME TrapFrame,
         _Out_writes_to_(FrameCount, return) PVOID* Callers,
         _In_ ULONG FrameCount
+    );
+
+NTSTATUS
+    MxGetAllocatedProviderName(
+        _Outptr_ PUNICODE_STRING* pOutProviderName
     );
 
 #ifdef __cplusplus

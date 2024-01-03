@@ -44,7 +44,16 @@ DriverEntry(
 
     MxRoutines.Size = sizeof(PS_PICO_ROUTINES);
 
-    status = MaRegisterPicoProvider(&providerRoutines, &MxRoutines);
+    MA_PICO_PROVIDER_ROUTINES additionalProviderRoutines =
+    {
+        .Size = sizeof(MA_PICO_PROVIDER_ROUTINES),
+        .GetAllocatedProviderName = MxGetAllocatedProviderName
+    };
+
+    MxAdditionalRoutines.Size = sizeof(MA_PICO_ROUTINES);
+
+    status = MaRegisterPicoProviderEx(&providerRoutines, &MxRoutines,
+        &additionalProviderRoutines, &MxAdditionalRoutines, NULL);
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
         "Initialized Windows Subsystem for Monix, status=%x\n", status));
@@ -52,16 +61,6 @@ DriverEntry(
     if (!NT_SUCCESS(status))
     {
         return status;
-    }
-
-    status = MaSetPicoProviderName(&providerRoutines, "Monix-0.0.1-alpha");
-
-    if (!NT_SUCCESS(status))
-    {
-        KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "Failed to set Pico provider name, status=%x\n", status));
-
-        // Non-fatal.
     }
 
     DriverObject->DriverUnload = DriverUnload;

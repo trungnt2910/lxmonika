@@ -29,7 +29,7 @@
 #endif
 
 //
-// Linux syscall hooks
+// LXSS hooked provider routines
 //
 
 extern "C"
@@ -89,4 +89,19 @@ MapLxssSystemCallHook(
             "#" MONIKA_KERNEL_BUILD_NUMBER "-Just-Monika " MONIKA_KERNEL_TIMESTAMP,
             sizeof(pUtsName->version));
     }
+}
+
+// The release string has never been changed since Windows 10,
+// so it is safe to hard code it here.
+// We do not really need the Windows NT build number, otherwise a dynamic query to
+// fetch version string resources would be required.
+static UNICODE_STRING MaLxssProviderName = RTL_CONSTANT_STRING(L"Linux-4.4.0-Microsoft-WSL1");
+
+NTSTATUS
+MapLxssGetAllocatedProviderName(
+    _Outptr_ PUNICODE_STRING* pOutProviderName
+)
+{
+    *pOutProviderName = &MaLxssProviderName;
+    return STATUS_SUCCESS;
 }

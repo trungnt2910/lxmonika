@@ -40,13 +40,13 @@
     <ClCompile Include="src\monika_dispatcher.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\monika_lxss.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="src\monika_providers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\monika_reality.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\monika_syscallhook.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\monika.cpp">

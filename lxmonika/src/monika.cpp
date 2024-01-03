@@ -17,7 +17,6 @@ PS_PICO_PROVIDER_ROUTINES MapProviderRoutines[MaPicoProviderMaxCount];
 PS_PICO_ROUTINES MapRoutines[MaPicoProviderMaxCount];
 MA_PICO_PROVIDER_ROUTINES MapAdditionalProviderRoutines[MaPicoProviderMaxCount];
 MA_PICO_ROUTINES MapAdditionalRoutines[MaPicoProviderMaxCount];
-CHAR MapProviderNames[MaPicoProviderMaxCount][MA_NAME_MAX + 1];
 SIZE_T MapProvidersCount = 0;
 
 BOOLEAN MapPatchedLxss = FALSE;
@@ -144,11 +143,8 @@ MapInitialize()
             // Use a special hook designed for WSL instead of the generic lxmonika shims.
             MapProviderRoutines[0].DispatchSystemCall = MapLxssSystemCallHook;
 
-            // The release string has never been changed since Windows 10,
-            // so it is safe to hard code it here.
-            // We do not really need the Windows NT build number, otherwise a dynamic query to
-            // fetch version string resources would be required.
-            strncpy(MapProviderNames[0], "Linux-4.4.0-Microsoft-WSL1", MA_NAME_MAX);
+            MapAdditionalProviderRoutines[0].GetAllocatedProviderName =
+                MapLxssGetAllocatedProviderName;
 
             MapPatchedLxss = TRUE;
 
@@ -276,11 +272,16 @@ MaRegisterPicoProviderEx(
 extern "C"
 MONIKA_EXPORT
 NTSTATUS NTAPI
-MaSetPicoProviderName(
-    _In_ PVOID ProviderDetails,
-    _In_ PCSTR Name
+MaFindPicoProvider(
+    _In_ PCWSTR ProviderName,
+    _Out_ PSIZE_T Index
 )
 {
+    if (ProviderName == NULL || Index == NULL)
+    {
+        return STATUS_INVALID_PARAMETER;
+    }
+
     // Ignore any potential increments of MapProvidersCount by MaRegisterPicoProvider.
     // We cannot set a provider's name and then register it!
     SIZE_T uCurrentProvidersCount = MapProvidersCount;
@@ -289,22 +290,57 @@ MaSetPicoProviderName(
     // 17th provider. Using min should protect us from this issue.
     uCurrentProvidersCount = min(uCurrentProvidersCount, MaPicoProviderMaxCount);
 
-    if ((*(PSIZE_T)ProviderDetails) != sizeof(PS_PICO_PROVIDER_ROUTINES))
-    {
-        // We currently only support passing the PS_PICO_PROVIDER_ROUTINES struct. In future
-        // versions, we may support using an opaque handle or the provider index itself.
-        return STATUS_INVALID_PARAMETER;
-    }
+    SIZE_T uNameLenBytes = (wcslen(ProviderName) + 1) * sizeof(WCHAR);
+
+    SIZE_T uBestMatchLength = 0;
+    SIZE_T uBestMatchIndex = 0;
 
     for (SIZE_T i = 0; i < uCurrentProvidersCount; ++i)
     {
-        if (memcmp(ProviderDetails, &MapProviderRoutines[i],
-            sizeof(PS_PICO_PROVIDER_ROUTINES)) == 0)
+        if (MapAdditionalProviderRoutines[i].GetAllocatedProviderName != NULL)
         {
-            strncpy(MapProviderNames[i], Name, MA_NAME_MAX);
-            return STATUS_SUCCESS;
+            PUNICODE_STRING pName = NULL;
+            if (!NT_SUCCESS(MapAdditionalProviderRoutines[i].GetAllocatedProviderName(&pName)))
+            {
+                continue;
+            }
+            SIZE_T uCurrentMatch = RtlCompareMemory(pName->Buffer, ProviderName,
+                min(pName->Length, uNameLenBytes));
+
+            if (uCurrentMatch > uBestMatchLength)
+            {
+                uBestMatchLength = uCurrentMatch;
+                uBestMatchIndex = i;
+            }
         }
     }
 
-    return STATUS_NOT_FOUND;
+    if (uBestMatchLength == 0)
+    {
+        return STATUS_NOT_FOUND;
+    }
+
+    *Index = uBestMatchIndex;
+    return STATUS_SUCCESS;
+}
+
+MONIKA_EXPORT
+NTSTATUS NTAPI
+MaGetAllocatedPicoProviderName(
+    _In_ SIZE_T Index,
+    _Out_ PUNICODE_STRING* ProviderName
+)
+{
+    if (Index >= MaPicoProviderMaxCount || Index >= MapProvidersCount
+        || ProviderName == NULL)
+    {
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    if (MapAdditionalProviderRoutines[Index].GetAllocatedProviderName == NULL)
+    {
+        return STATUS_NOT_SUPPORTED;
+    }
+
+    return MapAdditionalProviderRoutines[Index].GetAllocatedProviderName(ProviderName);
 }

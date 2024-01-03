@@ -22,8 +22,9 @@ extern "C"
 typedef
 NTSTATUS
     MA_PICO_GET_ALLOCATED_PROVIDER_NAME(
-        _Outptr_ PUNICODE_STRING *ProviderName
-    ), *PMA_PICO_GET_ALLOCATED_PROVIDER_NAME;
+        _Outptr_ PUNICODE_STRING* ProviderName
+    );
+typedef MA_PICO_GET_ALLOCATED_PROVIDER_NAME* PMA_PICO_GET_ALLOCATED_PROVIDER_NAME;
 
 typedef struct _MA_PICO_SESSION_ATTRIBUTES {
     SIZE_T Size;
@@ -45,14 +46,16 @@ typedef
 NTSTATUS
     MA_PICO_START_SESSION(
         _In_ PMA_PICO_SESSION_ATTRIBUTES Attributes
-    ), *PMA_PICO_START_SESSION;
+    );
+typedef MA_PICO_START_SESSION* PMA_PICO_START_SESSION;
 
 typedef
 NTSTATUS
     MA_PICO_GET_CURRENT_WORKING_DIRECTORY(
         _In_ PEPROCESS Process,
         _Out_ PHANDLE CurrentWorkingDirectory
-    ), *PMA_PICO_GET_CURRENT_WORKING_DIRECTORY;
+    );
+typedef MA_PICO_GET_CURRENT_WORKING_DIRECTORY* PMA_PICO_GET_CURRENT_WORKING_DIRECTORY;
 
 typedef
 NTSTATUS
@@ -61,7 +64,8 @@ NTSTATUS
         _Out_opt_ PHANDLE Console,
         _Out_opt_ PHANDLE Input,
         _Out_opt_ PHANDLE Output
-    ), *PMA_PICO_GET_CONSOLE;
+    );
+typedef MA_PICO_GET_CONSOLE* PMA_PICO_GET_CONSOLE;
 
 typedef struct _MA_PICO_PROVIDER_ROUTINES {
     SIZE_T Size;
@@ -73,7 +77,8 @@ typedef struct _MA_PICO_PROVIDER_ROUTINES {
 
 typedef struct _MA_PICO_ROUTINES {
     SIZE_T Size;
-} MA_PICO_ROUTINES, *PMA_PICO_ROUTINES;
+} MA_PICO_ROUTINES;
+typedef MA_PICO_ROUTINES* PMA_PICO_ROUTINES;
 
 MONIKA_EXPORT
 NTSTATUS NTAPI
@@ -94,33 +99,35 @@ NTSTATUS NTAPI
 
 /// <summary>Sets the name of the specified provider.</summary>
 ///
-/// <param name="ProviderDetails">
-/// An opaque structure representing the Pico provider. For this version of <c>lxmonika</c>, a
-/// pointer to a structure that is equal to the provider routines passed to
-/// <see cref="MaRegisterPicoProvider" /> should work.
+/// <param name="Name">
+/// A null-terminated Unicode string. The name is recommended (but not required) to have the
+/// following format: <c>"{Kernel Name}-{Kernel Release}-{Other details}"</c>.
 /// </param>
 ///
-/// <param name="Name">
-/// A null-terminated string. If the string exceeds <see cref="MA_NAME_MAX" /> characters (not
-/// including the null terminator), it will be truncated when registered. The name is recommended
-/// (but not required) to have the following format:
-/// <c>"{Kernel Name}-{Kernel Release}-{Other details}"</c>.
+/// <param name="Index">
+/// A pointer to receive the found index.
 /// </param>
 ///
 /// <remarks>
-/// The function must be called when the provider has no active processes. Trying to change/set
-/// the Pico provider name while hosting processes results in undefined behavior.
-/// When a Pico process requests a provider by name, these registered names will be searched.
-/// The first registered provider with the longest common prefix with the queried name will be
-/// selected.
-/// For example, if "Linux-5.15" and "Linux-6.6" are registered in this order, "Linux" would match
+/// The function looks for providers based on the names provided by the
+/// <c>GetAllocatedProviderName</c> extended provider routine.
+/// The first provider reporting the name with the longest common prefix with the queried name will
+/// be selected.
+/// For example, if "Linux-5.15" and "Linux-6.6" are reported in this order, "Linux" would match
 /// "Linux-5.15", while "Linux-6" would match "Linux-6.6".
 /// </remarks>
 MONIKA_EXPORT
 NTSTATUS NTAPI
-    MaSetPicoProviderName(
-        _In_ PVOID ProviderDetails,
-        _In_ PCSTR Name
+    MaFindPicoProvider(
+        _In_ PCWSTR ProviderName,
+        _Out_ PSIZE_T Index
+    );
+
+MONIKA_EXPORT
+NTSTATUS NTAPI
+    MaGetAllocatedPicoProviderName(
+        _In_ SIZE_T Index,
+        _Out_ PUNICODE_STRING* ProviderName
     );
 
 #include "monika_constants.h"
@@ -142,6 +149,11 @@ VOID
 VOID
     MapLxssSystemCallHook(
         _In_ PPS_PICO_SYSTEM_CALL_INFORMATION pSyscallInfo
+    );
+
+NTSTATUS
+    MapLxssGetAllocatedProviderName(
+        _Outptr_ PUNICODE_STRING* pOutProviderName
     );
 
 NTSTATUS
@@ -269,7 +281,6 @@ extern PS_PICO_ROUTINES MapOriginalRoutines;
 
 extern PS_PICO_PROVIDER_ROUTINES MapProviderRoutines[MaPicoProviderMaxCount];
 extern PS_PICO_ROUTINES MapRoutines[MaPicoProviderMaxCount];
-extern CHAR MapProviderNames[MaPicoProviderMaxCount][MA_NAME_MAX + 1];
 extern SIZE_T MapProvidersCount;
 
 extern BOOLEAN MapPatchedLxss;
