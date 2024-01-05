@@ -4,7 +4,7 @@
 //
 // Just Monika.
 
-#include <ntddk.h>
+#include <ntifs.h>
 
 #include "pico.h"
 
@@ -12,6 +12,10 @@
 #define MONIKA_EXPORT __declspec(dllexport)
 #else
 #define MONIKA_EXPORT __declspec(dllimport)
+#endif
+
+#ifdef MONIKA_IN_DRIVER
+#include "monika_private.h"
 #endif
 
 #ifdef __cplusplus
@@ -130,162 +134,27 @@ NTSTATUS NTAPI
         _Out_ PUNICODE_STRING* ProviderName
     );
 
-#include "monika_constants.h"
-
-#ifdef MONIKA_IN_DRIVER
-
-#include <intsafe.h>
-
-//
-// Monika private definitions
-//
-
-NTSTATUS
-    MapInitialize();
-
-VOID
-    MapCleanup();
-
-VOID
-    MapLxssSystemCallHook(
-        _In_ PPS_PICO_SYSTEM_CALL_INFORMATION pSyscallInfo
-    );
-
-NTSTATUS
-    MapLxssGetAllocatedProviderName(
-        _Outptr_ PUNICODE_STRING* pOutProviderName
-    );
-
-NTSTATUS
-    MapInitializeLxssDevice(
-        _In_ PDRIVER_OBJECT DriverObject
-    );
-
-VOID
-    MapCleanupLxssDevice();
-
-VOID
-    MapSystemCallDispatch(
-        _In_ PPS_PICO_SYSTEM_CALL_INFORMATION SystemCall
-    );
-
-VOID
-    MapThreadExit(
-        _In_ PETHREAD Thread
-    );
-
-VOID
-    MapProcessExit(
-        _In_ PEPROCESS Process
-    );
-
-BOOLEAN
-    MapDispatchException(
-        _Inout_ PEXCEPTION_RECORD ExceptionRecord,
-        _Inout_ PKEXCEPTION_FRAME ExceptionFrame,
-        _Inout_ PKTRAP_FRAME TrapFrame,
-        _In_ ULONG Chance,
-        _In_ KPROCESSOR_MODE PreviousMode
-    );
-
-NTSTATUS
-    MapTerminateProcess(
+MONIKA_EXPORT
+NTSTATUS NTAPI
+    MaGetConsole(
         _In_ PEPROCESS Process,
-        _In_ NTSTATUS TerminateStatus
-    );
-
-_Ret_range_(<= , FrameCount)
-ULONG
-    MapWalkUserStack(
-        _In_ PKTRAP_FRAME TrapFrame,
-        _Out_writes_to_(FrameCount, return) PVOID* Callers,
-        _In_ ULONG FrameCount
+        _Out_opt_ PHANDLE Console,
+        _Out_opt_ PHANDLE Input,
+        _Out_opt_ PHANDLE Output
     );
 
 //
-// Monika-managed context
+// Monika utilities
 //
 
-#define MA_CONTEXT_MAGIC ('moni')
-
-typedef struct _MA_CONTEXT {
-    ULONG                   Magic;
-    DWORD                   Provider;
-    PVOID                   Context;
-    struct _MA_CONTEXT*     Parent;
-} MA_CONTEXT, *PMA_CONTEXT;
-
-PMA_CONTEXT
-    MapAllocateContext(
-        _In_ DWORD Provider,
-        _In_opt_ PVOID OriginalContext
+MONIKA_EXPORT
+NTSTATUS NTAPI
+    MaUtilDuplicateKernelHandle(
+        _In_ HANDLE SourceHandle,
+        _Out_ PHANDLE TargetHandle
     );
 
-VOID
-    MapFreeContext(
-        _In_ PMA_CONTEXT Context
-    );
-
-/// <summary>
-/// Sets <paramref name="CurrentContext"/> as the parent of <paramref name="NewContext"/>,
-/// then swaps the contents of the two pointed structs.
-/// </summary>
-NTSTATUS
-    MapPushContext(
-        _Inout_ PMA_CONTEXT CurrentContext,
-        _In_ PMA_CONTEXT NewContext
-    );
-
-/// <summary>
-/// Sets <paramref name="CurrentContext"/> to the contents of its own parent,
-/// then destorys the parent's memory.
-/// </summary>
-NTSTATUS
-    MapPopContext(
-        _Inout_ PMA_CONTEXT CurrentContext
-    );
-
-//
-// Monika provider-specific callbacks
-//
-
-enum
-{
-#define MONIKA_PROVIDER(index) MaPicoProvider##index = index,
-#include "monika_providers.cpp"
-#undef MONIKA_PROVIDER
-    MaPicoProviderMaxCount
-};
-
-#define MONIKA_PROVIDER(index)                                                          \
-    extern PS_PICO_CREATE_PROCESS               MaPicoCreateProcess##index;             \
-    extern PS_PICO_CREATE_THREAD                MaPicoCreateThread##index;              \
-    extern PS_PICO_GET_PROCESS_CONTEXT          MaPicoGetProcessContext##index;         \
-    extern PS_PICO_GET_THREAD_CONTEXT           MaPicoGetThreadContext##index;          \
-    extern PS_PICO_SET_THREAD_DESCRIPTOR_BASE   MaPicoSetThreadDescriptorBase##index;   \
-    extern PS_PICO_TERMINATE_PROCESS            MaPicoTerminateProcess##index;          \
-    extern PS_SET_CONTEXT_THREAD_INTERNAL       MaPicoSetContextThreadInternal##index;  \
-    extern PS_GET_CONTEXT_THREAD_INTERNAL       MaPicoGetContextThreadInternal##index;  \
-    extern PS_TERMINATE_THREAD                  MaPicoTerminateThread##index;           \
-    extern PS_SUSPEND_THREAD                    MaPicoSuspendThread##index;             \
-    extern PS_RESUME_THREAD                     MaPicoResumeThread##index;
-#include "monika_providers.cpp"
-#undef MONIKA_PROVIDER
-
-//
-// Monika data
-//
-
-extern PS_PICO_PROVIDER_ROUTINES MapOriginalProviderRoutines;
-extern PS_PICO_ROUTINES MapOriginalRoutines;
-
-extern PS_PICO_PROVIDER_ROUTINES MapProviderRoutines[MaPicoProviderMaxCount];
-extern PS_PICO_ROUTINES MapRoutines[MaPicoProviderMaxCount];
-extern SIZE_T MapProvidersCount;
-
-extern BOOLEAN MapPatchedLxss;
-
-#endif // MONIKA_IN_DRIVER
+#include "monika_constants.h"
 
 #ifdef __cplusplus
 }

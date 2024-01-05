@@ -1,7 +1,7 @@
 #pragma once
 
 #include <intsafe.h>
-#include <ntddk.h>
+#include <ntifs.h>
 
 enum class LogLevel
 {

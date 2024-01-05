@@ -78,6 +78,9 @@
     <ClInclude Include="include_private\module.h">
       <Filter>Private Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include_private\monika_private.h">
+      <Filter>Private Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="include_private\os.h">
       <Filter>Private Header Files</Filter>
     </ClInclude>
@@ -93,6 +96,9 @@
     <ClInclude Include="include_private\winresource.h">
       <Filter>Private Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include_private\AutoResource.h">
+      <Filter>Private Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="include_private\Locker.h">
       <Filter>Private Header Files</Filter>
     </ClInclude>
@@ -105,6 +111,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\monika.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\monika_constants.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\pico.h">

@@ -1,7 +1,10 @@
 #include "monika.h"
 
-#include <ntddk.h>
+#include <ntifs.h>
 
+#include "lxss.h"
+
+#include "AutoResource.h"
 #include "Logger.h"
 
 //
@@ -103,5 +106,86 @@ MapLxssGetAllocatedProviderName(
 )
 {
     *pOutProviderName = &MaLxssProviderName;
+    return STATUS_SUCCESS;
+}
+
+NTSTATUS
+MapLxssGetConsole(
+    _In_ PEPROCESS Process,
+    _Out_opt_ PHANDLE Console,
+    _Out_opt_ PHANDLE Input,
+    _Out_opt_ PHANDLE Output
+)
+{
+    HANDLE hdlConsole = NULL;
+    AUTO_RESOURCE(hdlConsole, ZwClose);
+    HANDLE hdlInput = NULL;
+    AUTO_RESOURCE(hdlInput, ZwClose);
+    HANDLE hdlOutput = NULL;
+    AUTO_RESOURCE(hdlOutput, ZwClose);
+
+    __try
+    {
+        PLX_PROCESS pLxProcess = (PLX_PROCESS)
+            MaPicoGetProcessContext0(Process);
+
+        PLX_SESSION pLxSession = CONTAINING_RECORD(
+            pLxProcess->ThreadGroups.Flink, LX_THREAD_GROUP, ListEntry)
+                ->ProcessGroup->Session;
+        PLX_VFS_DEV_TTY_DEVICE pSessionTerminal =
+            (PLX_VFS_DEV_TTY_DEVICE)pLxSession->SessionTerminal;
+
+        if (pSessionTerminal == NULL)
+        {
+            return STATUS_NOT_FOUND;
+        }
+
+        if (Console != NULL)
+        {
+            MA_RETURN_IF_FAIL(MaUtilDuplicateKernelHandle(
+                pSessionTerminal->ConsoleState->Console,
+                &hdlConsole
+            ));
+        }
+
+        if (Input != NULL)
+        {
+            MA_RETURN_IF_FAIL(MaUtilDuplicateKernelHandle(
+                pSessionTerminal->ConsoleState->Input,
+                &hdlInput
+            ));
+        }
+
+        if (Output != NULL)
+        {
+            MA_RETURN_IF_FAIL(MaUtilDuplicateKernelHandle(
+                pSessionTerminal->ConsoleState->Output,
+                &hdlOutput
+            ));
+        }
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    if (Console != NULL)
+    {
+        *Console = hdlConsole;
+        hdlConsole = NULL;
+    }
+
+    if (Input != NULL)
+    {
+        *Input = hdlInput;
+        hdlInput = NULL;
+    }
+
+    if (Output != NULL)
+    {
+        *Output = hdlOutput;
+        hdlOutput = NULL;
+    }
+
     return STATUS_SUCCESS;
 }

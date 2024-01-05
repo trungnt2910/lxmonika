@@ -145,6 +145,7 @@ MapInitialize()
 
             MapAdditionalProviderRoutines[0].GetAllocatedProviderName =
                 MapLxssGetAllocatedProviderName;
+            MapAdditionalProviderRoutines[0].GetConsole = MapLxssGetConsole;
 
             MapPatchedLxss = TRUE;
 
@@ -324,6 +325,17 @@ MaFindPicoProvider(
     return STATUS_SUCCESS;
 }
 
+#define MA_CALL_IF_SUPPORTED(index, function, ...)                                              \
+    do                                                                                          \
+    {                                                                                           \
+        if (MapAdditionalProviderRoutines[index].function == NULL)                              \
+        {                                                                                       \
+            return STATUS_INVALID_PARAMETER;                                                    \
+        }                                                                                       \
+        return MapAdditionalProviderRoutines[index].function(__VA_ARGS__);                      \
+    }                                                                                           \
+    while (TRUE);
+
 MONIKA_EXPORT
 NTSTATUS NTAPI
 MaGetAllocatedPicoProviderName(
@@ -337,10 +349,40 @@ MaGetAllocatedPicoProviderName(
         return STATUS_INVALID_PARAMETER;
     }
 
-    if (MapAdditionalProviderRoutines[Index].GetAllocatedProviderName == NULL)
-    {
-        return STATUS_NOT_SUPPORTED;
-    }
+    MA_CALL_IF_SUPPORTED(Index, GetAllocatedProviderName, ProviderName);
+}
 
-    return MapAdditionalProviderRoutines[Index].GetAllocatedProviderName(ProviderName);
+MONIKA_EXPORT
+NTSTATUS NTAPI
+MaGetConsole(
+    _In_ PEPROCESS Process,
+    _Out_opt_ PHANDLE Console,
+    _Out_opt_ PHANDLE Input,
+    _Out_opt_ PHANDLE Output
+)
+{
+    PMA_CONTEXT pContext = NULL;
+    MA_RETURN_IF_FAIL(MapGetObjectContext(Process, &pContext));
+
+    MA_CALL_IF_SUPPORTED(pContext->Provider, GetConsole, Process, Console, Input, Output);
+}
+
+MONIKA_EXPORT
+NTSTATUS NTAPI
+MaUtilDuplicateKernelHandle(
+    _In_ HANDLE SourceHandle,
+    _Out_ PHANDLE TargetHandle
+)
+{
+    // Any process handle should work if we are dealing with
+    // kernel object handles.
+    return ZwDuplicateObject(
+        ZwCurrentProcess(),
+        SourceHandle,
+        ZwCurrentProcess(),
+        TargetHandle,
+        0,
+        OBJ_KERNEL_HANDLE,
+        DUPLICATE_SAME_ACCESS
+    );
 }

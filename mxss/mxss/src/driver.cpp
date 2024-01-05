@@ -47,7 +47,8 @@ DriverEntry(
     MA_PICO_PROVIDER_ROUTINES additionalProviderRoutines =
     {
         .Size = sizeof(MA_PICO_PROVIDER_ROUTINES),
-        .GetAllocatedProviderName = MxGetAllocatedProviderName
+        .GetAllocatedProviderName = MxGetAllocatedProviderName,
+        .GetConsole = MxGetConsole
     };
 
     MxAdditionalRoutines.Size = sizeof(MA_PICO_ROUTINES);

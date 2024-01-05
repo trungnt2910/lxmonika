@@ -2,40 +2,33 @@
 
 #include "os.h"
 
+#include "AutoResource.h"
+
 //
 // Pico provider dispatchers
 //
 
-#define MA_DISPATCH_PROCESS         (0x1)
-#define MA_DISPATCH_THREAD          (0x2)
-#define MA_DISPATCH_FREE            (0x4)
-#define MA_DISPATCH_NO_FALLBACK     (0x8)
+// Mess up these concepts, and the runtime consequences will be severe.
+static_assert(MaDetails::KernelProcess<PEPROCESS>, "Concept broken");
+static_assert(!MaDetails::KernelProcess<PETHREAD>, "Concept broken");
+static_assert(!MaDetails::KernelProcess<PVOID>, "Concept broken");
 
-#define MA_GET_OBJECT_CONTEXT(var, type, object)                                                \
-    do                                                                                          \
-    {                                                                                           \
-        if constexpr ((type) & MA_DISPATCH_PROCESS)                                             \
-        {                                                                                       \
-            var = (PMA_CONTEXT)MapOriginalRoutines.GetProcessContext((PEPROCESS)object);        \
-        }                                                                                       \
-        else if constexpr ((type) & MA_DISPATCH_THREAD)                                         \
-        {                                                                                       \
-            var = (PMA_CONTEXT)MapOriginalRoutines.GetThreadContext((PETHREAD)object);          \
-        }                                                                                       \
-        if (var != NULL && var->Magic != MA_CONTEXT_MAGIC)                                      \
-        {                                                                                       \
-            var = NULL;                                                                         \
-        }                                                                                       \
-    }                                                                                           \
-    while (FALSE)
+static_assert(MaDetails::KernelThread<PETHREAD>, "Concept broken");
+static_assert(!MaDetails::KernelThread<PEPROCESS>, "Concept broken");
+static_assert(!MaDetails::KernelThread<PVOID>, "Concept broken");
 
+static_assert(MaDetails::KernelProcessOrThread<PEPROCESS>, "Concept broken");
+static_assert(MaDetails::KernelProcessOrThread<PETHREAD>, "Concept broken");
+static_assert(!MaDetails::KernelProcessOrThread<PVOID>, "Concept broken");
+
+#define MA_DISPATCH_FREE            (0x1)
+#define MA_DISPATCH_NO_FALLBACK     (0x2)
 
 #define MA_DISPATCH_TO_PROVIDER(type, object, function, ...)                                    \
     do                                                                                          \
     {                                                                                           \
         PMA_CONTEXT pContext = NULL;                                                            \
-        MA_GET_OBJECT_CONTEXT(pContext, type, object);                                          \
-        if (pContext != NULL)                                                                   \
+        if (NT_SUCCESS(MapGetObjectContext(object, &pContext)))                                 \
         {                                                                                       \
             __try                                                                               \
             {                                                                                   \
@@ -64,8 +57,7 @@ MapSystemCallDispatch(
     _In_ PPS_PICO_SYSTEM_CALL_INFORMATION SystemCall
 )
 {
-    MA_DISPATCH_TO_PROVIDER(MA_DISPATCH_THREAD, PsGetCurrentThread(),
-        DispatchSystemCall, SystemCall);
+    MA_DISPATCH_TO_PROVIDER(0, PsGetCurrentThread(), DispatchSystemCall, SystemCall);
 }
 
 extern "C"
@@ -74,8 +66,7 @@ MapThreadExit(
     _In_ PETHREAD Thread
 )
 {
-    MA_DISPATCH_TO_PROVIDER(MA_DISPATCH_THREAD | MA_DISPATCH_FREE, Thread,
-        ExitThread, Thread);
+    MA_DISPATCH_TO_PROVIDER(MA_DISPATCH_FREE, Thread, ExitThread, Thread);
 }
 
 extern "C"
@@ -84,8 +75,7 @@ MapProcessExit(
     _In_ PEPROCESS Process
 )
 {
-    MA_DISPATCH_TO_PROVIDER(MA_DISPATCH_PROCESS | MA_DISPATCH_FREE, Process,
-        ExitProcess, Process);
+    MA_DISPATCH_TO_PROVIDER(MA_DISPATCH_FREE, Process, ExitProcess, Process);
 }
 
 extern "C"
@@ -98,7 +88,7 @@ MapDispatchException(
     _In_ KPROCESSOR_MODE PreviousMode
 )
 {
-    MA_DISPATCH_TO_PROVIDER(MA_DISPATCH_THREAD | MA_DISPATCH_NO_FALLBACK, PsGetCurrentThread(),
+    MA_DISPATCH_TO_PROVIDER(MA_DISPATCH_NO_FALLBACK, PsGetCurrentThread(),
         DispatchException,
             ExceptionRecord,
             ExceptionFrame,
@@ -110,7 +100,7 @@ MapDispatchException(
     // This happens when a process like taskmgr.exe attachs one of its threads to a Pico process.
     // The current thread would not be a Pico thread (and has no Pico context), but NT still calls
     // the Pico exception dispatcher.
-    MA_DISPATCH_TO_PROVIDER(MA_DISPATCH_PROCESS, PsGetCurrentProcess(),
+    MA_DISPATCH_TO_PROVIDER(0, PsGetCurrentProcess(),
         DispatchException,
             ExceptionRecord,
             ExceptionFrame,
@@ -129,8 +119,7 @@ MapTerminateProcess(
     _In_ NTSTATUS TerminateStatus
 )
 {
-    MA_DISPATCH_TO_PROVIDER(MA_DISPATCH_PROCESS, Process,
-        TerminateProcess, Process, TerminateStatus);
+    MA_DISPATCH_TO_PROVIDER(0, Process, TerminateProcess, Process, TerminateStatus);
 
     return STATUS_NOT_IMPLEMENTED;
 }
@@ -144,7 +133,7 @@ MapWalkUserStack(
     _In_ ULONG FrameCount
 )
 {
-    MA_DISPATCH_TO_PROVIDER(MA_DISPATCH_THREAD, PsGetCurrentThread(),
+    MA_DISPATCH_TO_PROVIDER(0, PsGetCurrentThread(),
         WalkUserStack,
             TrapFrame,
             Callers,
@@ -158,12 +147,11 @@ MapWalkUserStack(
 // Pico routine dispatchers
 //
 
-#define MA_DISPATCH_TO_KERNEL(type, object, index, error, function, ...)                        \
+#define MA_DISPATCH_TO_KERNEL(object, index, error, function, ...)                              \
     do                                                                                          \
     {                                                                                           \
         PMA_CONTEXT pContext = NULL;                                                            \
-        MA_GET_OBJECT_CONTEXT(pContext, type, object);                                          \
-        if (pContext != NULL && pContext->Provider == index)                                    \
+        if (NT_SUCCESS(MapGetObjectContext(object, index, &pContext)))                          \
         {                                                                                       \
             return MapOriginalRoutines.function(__VA_ARGS__);                                   \
         }                                                                                       \
@@ -226,21 +214,21 @@ MapCreateThread(
 
     {
         PEPROCESS pHostProcess = NULL;
-        NTSTATUS status = ObReferenceObjectByHandle(ThreadAttributes->Process, 0, *PsProcessType,
-            KernelMode, (PVOID*)&pHostProcess, 0);
-
-        if (!NT_SUCCESS(status))
-        {
-            return status;
-        }
+        MA_RETURN_IF_FAIL(ObReferenceObjectByHandle(
+            ThreadAttributes->Process,
+            0,
+            *PsProcessType,
+            KernelMode,
+            (PVOID*)&pHostProcess,
+            0
+        ));
+        AUTO_RESOURCE(pHostProcess, ObfDereferenceObject);
 
         PMA_CONTEXT pHostProcessContext = NULL;
-        MA_GET_OBJECT_CONTEXT(pHostProcessContext, MA_DISPATCH_PROCESS, pHostProcess);
+        MA_RETURN_IF_FAIL(MapGetObjectContext(pHostProcess, &pHostProcessContext));
 
         bBelongsToProvider = pHostProcessContext != NULL
             && pHostProcessContext->Provider == ProviderIndex;
-
-        ObDereferenceObject(pHostProcess);
     }
 
     if (!bBelongsToProvider)
@@ -278,9 +266,8 @@ MapGetProcessContext(
 )
 {
     PMA_CONTEXT pContext = NULL;
-    MA_GET_OBJECT_CONTEXT(pContext, MA_DISPATCH_PROCESS, Process);
-
-    if (pContext == NULL || pContext->Provider != ProviderIndex)
+    if (!NT_SUCCESS(MapGetObjectContext(Process, &pContext))
+        || pContext->Provider != ProviderIndex)
     {
         return NULL;
     }
@@ -296,9 +283,8 @@ MapGetThreadContext(
 )
 {
     PMA_CONTEXT pContext = NULL;
-    MA_GET_OBJECT_CONTEXT(pContext, MA_DISPATCH_THREAD, Thread);
-
-    if (pContext == NULL || pContext->Provider != ProviderIndex)
+    if (!NT_SUCCESS(MapGetObjectContext(Thread, &pContext))
+        || pContext->Provider != ProviderIndex)
     {
         return NULL;
     }
@@ -314,8 +300,7 @@ MapSetThreadDescriptorBase(
     _In_ ULONG_PTR Base
 )
 {
-    MA_DISPATCH_TO_KERNEL(MA_DISPATCH_THREAD, PsGetCurrentThread(),
-        ProviderIndex, (VOID)STATUS_INVALID_PARAMETER,
+    MA_DISPATCH_TO_KERNEL(PsGetCurrentThread(), ProviderIndex, (VOID)STATUS_INVALID_PARAMETER,
         SetThreadDescriptorBase, Type, Base);
 }
 
@@ -330,12 +315,7 @@ MapTerminateProcess(
     // TODO: Why __inout for the Process parameter?
 
     PMA_CONTEXT pContext = NULL;
-    MA_GET_OBJECT_CONTEXT(pContext, MA_DISPATCH_PROCESS, Process);
-
-    if (pContext == NULL || pContext->Provider != ProviderIndex)
-    {
-        return STATUS_INVALID_PARAMETER;
-    }
+    MA_RETURN_IF_FAIL(MapGetObjectContext(Process, ProviderIndex, &pContext));
 
     // By terminating a process, the provider agrees that it does not need the process anymore.
     // However, a parent provider might still reference it in some way, for example, Linux's wait4.
@@ -368,8 +348,7 @@ MapSetContextThreadInternal(
     _In_ BOOLEAN PerformUnwind
 )
 {
-    MA_DISPATCH_TO_KERNEL(MA_DISPATCH_THREAD, Thread,
-        ProviderIndex, STATUS_INVALID_PARAMETER,
+    MA_DISPATCH_TO_KERNEL(Thread, ProviderIndex, STATUS_INVALID_PARAMETER,
         SetContextThreadInternal, Thread, ThreadContext, ProbeMode, CtxMode, PerformUnwind);
 }
 
@@ -384,8 +363,7 @@ MapGetContextThreadInternal(
     _In_ BOOLEAN PerformUnwind
 )
 {
-    MA_DISPATCH_TO_KERNEL(MA_DISPATCH_THREAD, Thread,
-        ProviderIndex, STATUS_INVALID_PARAMETER,
+    MA_DISPATCH_TO_KERNEL(Thread, ProviderIndex, STATUS_INVALID_PARAMETER,
         GetContextThreadInternal, Thread, ThreadContext, ProbeMode, CtxMode, PerformUnwind);
 }
 
@@ -401,12 +379,7 @@ MapTerminateThread(
     // The same strategy is applied as MapTerminateProcess, see the above function for details.
 
     PMA_CONTEXT pContext = NULL;
-    MA_GET_OBJECT_CONTEXT(pContext, MA_DISPATCH_THREAD, Thread);
-
-    if (pContext == NULL || pContext->Provider != ProviderIndex)
-    {
-        return STATUS_INVALID_PARAMETER;
-    }
+    MA_RETURN_IF_FAIL(MapGetObjectContext(Thread, ProviderIndex, &pContext));
 
     if (pContext->Parent != NULL)
     {
@@ -428,8 +401,7 @@ MapSuspendThread(
     _Out_opt_ PULONG PreviousSuspendCount
 )
 {
-    MA_DISPATCH_TO_KERNEL(MA_DISPATCH_THREAD, Thread,
-        ProviderIndex, STATUS_INVALID_PARAMETER,
+    MA_DISPATCH_TO_KERNEL(Thread, ProviderIndex, STATUS_INVALID_PARAMETER,
         SuspendThread, Thread, PreviousSuspendCount);
 }
 
@@ -441,8 +413,7 @@ MapResumeThread(
     _Out_opt_ PULONG PreviousSuspendCount
 )
 {
-    MA_DISPATCH_TO_KERNEL(MA_DISPATCH_THREAD, Thread,
-        ProviderIndex, STATUS_INVALID_PARAMETER,
+    MA_DISPATCH_TO_KERNEL(Thread, ProviderIndex, STATUS_INVALID_PARAMETER,
         ResumeThread, Thread, PreviousSuspendCount);
 }
 

@@ -58,6 +58,14 @@ NTSTATUS
         _Outptr_ PUNICODE_STRING* pOutProviderName
     );
 
+NTSTATUS
+    MxGetConsole(
+        _In_ PEPROCESS Process,
+        _Out_opt_ PHANDLE Console,
+        _Out_opt_ PHANDLE Input,
+        _Out_opt_ PHANDLE Output
+    );
+
 #ifdef __cplusplus
 }
 #endif

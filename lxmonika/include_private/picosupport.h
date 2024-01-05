@@ -1,6 +1,6 @@
 #pragma once
 
-#include <ntddk.h>
+#include <ntifs.h>
 
 #include "pico.h"
 #include "picooffsets.h"

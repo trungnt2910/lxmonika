@@ -126,20 +126,23 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include_private\driver.h" />
-    <ClInclude Include="include_private\Locker.h" />
-    <ClInclude Include="include_private\Logger.h" />
     <ClInclude Include="include_private\lxerrno.h" />
     <ClInclude Include="include_private\lxss.h" />
     <ClInclude Include="include_private\module.h" />
+    <ClInclude Include="include_private\monika_private.h" />
     <ClInclude Include="include_private\os.h" />
     <ClInclude Include="include_private\pe.h" />
     <ClInclude Include="include_private\picooffsets.h" />
     <ClInclude Include="include_private\picosupport.h" />
-    <ClInclude Include="include_private\PoolAllocator.h" />
     <ClInclude Include="include_private\winresource.h" />
+    <ClInclude Include="include_private\AutoResource.h" />
+    <ClInclude Include="include_private\Locker.h" />
+    <ClInclude Include="include_private\Logger.h" />
+    <ClInclude Include="include_private\PoolAllocator.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\monika.h" />
+    <ClInclude Include="include\monika_constants.h" />
     <ClInclude Include="include\pico.h" />
   </ItemGroup>
   <ItemGroup>

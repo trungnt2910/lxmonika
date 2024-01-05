@@ -2,8 +2,12 @@
 
 #include <monika.h>
 
+#include "console.h"
+#include "process.h"
 #include "syscall.h"
 #include "thread.h"
+
+#include "AutoResource.h"
 
 PS_PICO_ROUTINES MxRoutines
 {
@@ -14,6 +18,15 @@ MA_PICO_ROUTINES MxAdditionalRoutines
 {
     .Size = sizeof(MA_PICO_ROUTINES)
 };
+
+#define MX_RETURN_IF_FAIL(s)        \
+    do                              \
+    {                               \
+        NTSTATUS status__ = (s);    \
+        if (!NT_SUCCESS(status__))  \
+            return status__;        \
+    }                               \
+    while (FALSE)
 
 extern "C"
 VOID
@@ -164,5 +177,34 @@ MxGetAllocatedProviderName(
 )
 {
     *pOutProviderName = &MxProviderName;
+    return STATUS_SUCCESS;
+}
+
+extern "C"
+NTSTATUS
+MxGetConsole(
+    _In_ PEPROCESS Process,
+    _Out_opt_ PHANDLE Console,
+    _Out_opt_ PHANDLE Input,
+    _Out_opt_ PHANDLE Output
+)
+{
+    PMX_PROCESS pMxProcess = (PMX_PROCESS)MxRoutines.GetProcessContext(Process);
+
+    HANDLE hdlConsole = NULL;
+    MX_RETURN_IF_FAIL(CoAttachKernelConsole(pMxProcess->HostProcess, &hdlConsole));
+    AUTO_RESOURCE(hdlConsole, ZwClose);
+
+    if (Input != NULL || Output != NULL)
+    {
+        MX_RETURN_IF_FAIL(CoOpenStandardHandles(hdlConsole, Input, Output));
+    }
+
+    if (Console != NULL)
+    {
+        *Console = hdlConsole;
+        hdlConsole = NULL;
+    }
+
     return STATUS_SUCCESS;
 }
