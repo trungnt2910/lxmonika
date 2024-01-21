@@ -67,7 +67,9 @@ PicoSppLocateProviderRoutines(
     }
 
     PCWSTR pVersionInfoStringUnicode;
-    status = MdlpGetProductVersion(hdlNtKernel, (PCWSTR*)&pVersionInfoStringUnicode);
+    SIZE_T uVersionInfoStringBytes = uNtKernelSize;
+    status = MdlpGetProductVersion(hdlNtKernel,
+        (PCWSTR*)&pVersionInfoStringUnicode, &uVersionInfoStringBytes);
 
     if (NT_SUCCESS(status))
     {
@@ -309,7 +311,9 @@ PicoSppLocateRoutines(
     {
         PCWSTR pVersionInfoStringUnicode;
         CHAR pVersionInfoStringAnsi[32];
-        status = MdlpGetProductVersion(hdlNtKernel, (PCWSTR*)&pVersionInfoStringUnicode);
+        SIZE_T uVersionInfoStringBytes = uNtKernelSize;
+        status = MdlpGetProductVersion(hdlNtKernel,
+            (PCWSTR*)&pVersionInfoStringUnicode, &uVersionInfoStringBytes);
 
         if (!NT_SUCCESS(status))
         {

@@ -7,6 +7,14 @@
 #include "Logger.h"
 #include "PoolAllocator.h"
 
+#define MDL_RETURN_IF_OUT_OF_BOUNDS(ptr, error) \
+    do                                          \
+    {                                           \
+        if ((PCHAR)(ptr) > (PCHAR)(pEnd))       \
+            return (error);                     \
+    }                                           \
+    while (FALSE);
+
 extern "C"
 NTSTATUS
 MdlpFindModuleByName(
@@ -98,19 +106,14 @@ MdlpFindModuleSectionByName(
     PIMAGE_NT_HEADERS pPeHeader = (PIMAGE_NT_HEADERS)(pStart + pDosHeader->e_lfanew);
 
     // Check if the end of the PE header is in the module range.
-    if ((PCHAR)&pPeHeader[1] > pEnd)
-    {
-        return STATUS_INVALID_PARAMETER;
-    }
+    MDL_RETURN_IF_OUT_OF_BOUNDS(&pPeHeader[1], STATUS_INVALID_PARAMETER);
 
     // The section headers array comes right after the PE header.
     PIMAGE_SECTION_HEADER pSectionHeaders = (PIMAGE_SECTION_HEADER)(&pPeHeader[1]);
 
     // Check if the section headers are in range.
-    if ((PCHAR)&pSectionHeaders[pPeHeader->FileHeader.NumberOfSections] > pEnd)
-    {
-        return STATUS_INVALID_PARAMETER;
-    }
+    MDL_RETURN_IF_OUT_OF_BOUNDS(&pSectionHeaders[pPeHeader->FileHeader.NumberOfSections],
+        STATUS_INVALID_PARAMETER);
 
     PIMAGE_SECTION_HEADER pInterestedSectionHeader = NULL;
 
@@ -127,6 +130,10 @@ MdlpFindModuleSectionByName(
     {
         return STATUS_NOT_FOUND;
     }
+
+    MDL_RETURN_IF_OUT_OF_BOUNDS(pStart + pInterestedSectionHeader->VirtualAddress
+                                + pInterestedSectionHeader->Misc.VirtualSize,
+        STATUS_INVALID_PARAMETER);
 
     if (pStart + pInterestedSectionHeader->VirtualAddress
         + pInterestedSectionHeader->Misc.VirtualSize > pEnd)
@@ -185,6 +192,7 @@ static
 NTSTATUS
 MdlpGetResourceDirectory(
     _In_ HANDLE hModule,
+    _In_ SIZE_T uModuleSize,
     _In_ LPSTR pIntResource,
     _In_ WORD wId,
     _Out_ PVOID* pPRsrcSectionStart,
@@ -192,12 +200,15 @@ MdlpGetResourceDirectory(
 )
 {
     PCHAR pStart = (PCHAR)hModule;
+    PCHAR pEnd = pStart + uModuleSize;
 
     PIMAGE_DOS_HEADER pDosHeader = (PIMAGE_DOS_HEADER)pStart;
     PIMAGE_NT_HEADERS pPeHeader = (PIMAGE_NT_HEADERS)(pStart + pDosHeader->e_lfanew);
+    MDL_RETURN_IF_OUT_OF_BOUNDS(pPeHeader, STATUS_INVALID_PARAMETER);
 
     PIMAGE_RESOURCE_DIRECTORY pResourceDirectory = (PIMAGE_RESOURCE_DIRECTORY)(pStart +
         pPeHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_RESOURCE].VirtualAddress);
+    MDL_RETURN_IF_OUT_OF_BOUNDS(pResourceDirectory, STATUS_INVALID_PARAMETER);
 
     // For calculating offsets.
     PCHAR pRsrcSectionStart = (PCHAR)pResourceDirectory;
@@ -205,9 +216,11 @@ MdlpGetResourceDirectory(
     // The entries come right after the directory.
     PIMAGE_RESOURCE_DIRECTORY_ENTRY pEntryList = (PIMAGE_RESOURCE_DIRECTORY_ENTRY)
         (pResourceDirectory + 1);
+    MDL_RETURN_IF_OUT_OF_BOUNDS(pEntryList, STATUS_INVALID_PARAMETER);
 
     SIZE_T uTotalEntries = pResourceDirectory->NumberOfIdEntries
         + pResourceDirectory->NumberOfNamedEntries;
+    MDL_RETURN_IF_OUT_OF_BOUNDS(&pEntryList[uTotalEntries], STATUS_INVALID_PARAMETER);
 
     WORD pResourcePath[] =
     {
@@ -219,10 +232,16 @@ MdlpGetResourceDirectory(
     {
         pResourceDirectory = (PIMAGE_RESOURCE_DIRECTORY)
             (pRsrcSectionStart + pEntry->OffsetToDirectory);
+        MDL_RETURN_IF_OUT_OF_BOUNDS(pResourceDirectory, STATUS_INVALID_PARAMETER);
 
         pEntryList = (PIMAGE_RESOURCE_DIRECTORY_ENTRY)(pResourceDirectory + 1);
+        MDL_RETURN_IF_OUT_OF_BOUNDS(pEntryList, STATUS_INVALID_PARAMETER);
+
         uTotalEntries = pResourceDirectory->NumberOfIdEntries
             + pResourceDirectory->NumberOfNamedEntries;
+        MDL_RETURN_IF_OUT_OF_BOUNDS(&pEntryList[uTotalEntries], STATUS_INVALID_PARAMETER);
+
+        return STATUS_SUCCESS;
     };
 
     for (SIZE_T i = 0; i < ARRAYSIZE(pResourcePath); ++i)
@@ -234,7 +253,12 @@ MdlpGetResourceDirectory(
                 && pEntryList[j].DataIsDirectory)
             {
                 // Go down to the tree on this path.
-                GoDownPath(&pEntryList[j]);
+                NTSTATUS status = GoDownPath(&pEntryList[j]);
+
+                if (!NT_SUCCESS(status))
+                {
+                    return status;
+                }
 
                 Logger::LogTrace("Found level ", i + 1, " directory with ", uTotalEntries,
                     " entries.");
@@ -260,7 +284,8 @@ extern "C"
 NTSTATUS
 MdlpGetProductVersion(
     _In_ HANDLE hModule,
-    _Out_ PCWSTR* pPProductVersion
+    _Out_ PCWSTR* pPProductVersion,
+    _Inout_opt_ PSIZE_T puSize
 )
 {
     if (hModule == NULL || pPProductVersion == NULL)
@@ -269,12 +294,19 @@ MdlpGetProductVersion(
     }
 
     PCHAR pStart = (PCHAR)hModule;
+    PCHAR pEnd = (PCHAR)-1;
+
+    if (puSize != NULL && *puSize != 0)
+    {
+        pEnd = pStart + *puSize;
+    }
 
     PIMAGE_RESOURCE_DIRECTORY pResourceDirectory;
     PCHAR pRsrcSectionStart;
 
     NTSTATUS status = MdlpGetResourceDirectory(
         hModule,
+        pEnd - pStart,
         RT_VERSION,
         // This param must be 1
         // https://learn.microsoft.com/en-us/windows/win32/menurc/versioninfo-resource
@@ -285,15 +317,21 @@ MdlpGetProductVersion(
 
     if (!NT_SUCCESS(status))
     {
+        Logger::LogError("Cannot find resource directory. Maybe the OS has already unloaded it?");
         return status;
     }
+
+    MDL_RETURN_IF_OUT_OF_BOUNDS(pResourceDirectory, STATUS_INVALID_PARAMETER);
+    MDL_RETURN_IF_OUT_OF_BOUNDS(pRsrcSectionStart, STATUS_INVALID_PARAMETER);
 
     // The entries come right after the directory.
     PIMAGE_RESOURCE_DIRECTORY_ENTRY pEntryList = (PIMAGE_RESOURCE_DIRECTORY_ENTRY)
         (pResourceDirectory + 1);
+    MDL_RETURN_IF_OUT_OF_BOUNDS(pEntryList, STATUS_INVALID_PARAMETER);
 
     SIZE_T uTotalEntries = pResourceDirectory->NumberOfIdEntries
         + pResourceDirectory->NumberOfNamedEntries;
+    MDL_RETURN_IF_OUT_OF_BOUNDS(&pEntryList[uTotalEntries], STATUS_INVALID_PARAMETER);
 
     // Take the first directory type entry. Should be a leaf of the VS_VERSIONINFO data type.
     // https://learn.microsoft.com/en-us/windows/win32/menurc/vs-versioninfo
@@ -303,9 +341,11 @@ MdlpGetProductVersion(
         {
             PIMAGE_RESOURCE_DATA_ENTRY pDataEntry = (PIMAGE_RESOURCE_DATA_ENTRY)
                 (pRsrcSectionStart + pEntryList[i].OffsetToData);
+            MDL_RETURN_IF_OUT_OF_BOUNDS(pDataEntry, STATUS_INVALID_PARAMETER);
 
             SIZE_T uVersionInfoLength = pDataEntry->Size;
             PCHAR pVersionInfoStart = pStart + pDataEntry->OffsetToData;
+            MDL_RETURN_IF_OUT_OF_BOUNDS(pVersionInfoStart, STATUS_INVALID_PARAMETER);
 
             PCHAR pProductVersion = pVersionInfoStart;
 
@@ -332,62 +372,12 @@ MdlpGetProductVersion(
                 pProductVersion + sizeof(pPattern), 4);
 
             *pPProductVersion = pProductVersionValue;
-            return STATUS_SUCCESS;
-        }
-    }
 
-    // No languages available?
-    Logger::LogError("Cannot find leaf");
-    return STATUS_RESOURCE_LANG_NOT_FOUND;
-}
+            if (puSize != NULL)
+            {
+                *puSize = wcslen(pProductVersionValue) * sizeof(WCHAR);
+            }
 
-extern "C"
-NTSTATUS
-MdlpGetMessageTable(
-    _In_ HANDLE hModule,
-    _Out_ PMESSAGE_RESOURCE_DATA* pPMessageTable
-)
-{
-    if (hModule == NULL || pPMessageTable == NULL)
-    {
-        return STATUS_INVALID_PARAMETER;
-    }
-
-    PCHAR pStart = (PCHAR)hModule;
-
-    PIMAGE_RESOURCE_DIRECTORY pResourceDirectory;
-    PCHAR pRsrcSectionStart;
-
-    NTSTATUS status = MdlpGetResourceDirectory(
-        hModule,
-        RT_MESSAGETABLE,
-        1,
-        (PVOID*)&pRsrcSectionStart,
-        &pResourceDirectory
-    );
-
-    if (!NT_SUCCESS(status))
-    {
-        return status;
-    }
-
-    // The entries come right after the directory.
-    PIMAGE_RESOURCE_DIRECTORY_ENTRY pEntryList = (PIMAGE_RESOURCE_DIRECTORY_ENTRY)
-        (pResourceDirectory + 1);
-
-    SIZE_T uTotalEntries = pResourceDirectory->NumberOfIdEntries
-        + pResourceDirectory->NumberOfNamedEntries;
-
-    for (SIZE_T i = 0; i < uTotalEntries; ++i)
-    {
-        if (!pEntryList[i].DataIsDirectory)
-        {
-            PIMAGE_RESOURCE_DATA_ENTRY pDataEntry = (PIMAGE_RESOURCE_DATA_ENTRY)
-                (pRsrcSectionStart + pEntryList[i].OffsetToData);
-
-            PCHAR pResourceDataStart = pStart + pDataEntry->OffsetToData;
-
-            *pPMessageTable = (PMESSAGE_RESOURCE_DATA)pResourceDataStart;
             return STATUS_SUCCESS;
         }
     }

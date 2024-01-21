@@ -48,13 +48,8 @@ NTSTATUS
 NTSTATUS
     MdlpGetProductVersion(
         _In_ HANDLE hModule,
-        _Out_ PCWSTR* pPProductVersion
-    );
-
-NTSTATUS
-    MdlpGetMessageTable(
-        _In_ HANDLE hModule,
-        _Out_ PMESSAGE_RESOURCE_DATA* pPMessageTable
+        _Out_ PCWSTR* pPProductVersion,
+        _Inout_opt_ PSIZE_T puSize
     );
 
 #ifdef __cplusplus
