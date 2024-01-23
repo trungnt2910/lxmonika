@@ -34,7 +34,7 @@ MxSystemCallDispatch(
     _In_ PPS_PICO_SYSTEM_CALL_INFORMATION SystemCall
 )
 {
-#ifdef AMD64
+#ifdef _M_AMD64
     INT iSysNum = (INT)SystemCall->TrapFrame->Rax;
     UINT_PTR uArg1 = SystemCall->TrapFrame->Rdi;
     UINT_PTR uArg2 = SystemCall->TrapFrame->Rsi;
@@ -42,6 +42,14 @@ MxSystemCallDispatch(
     UINT_PTR uArg4 = SystemCall->TrapFrame->R10;
     UINT_PTR uArg5 = SystemCall->TrapFrame->R8;
     UINT_PTR uArg6 = SystemCall->TrapFrame->R9;
+#elif defined(_M_ARM64)
+    INT iSysNum = (INT)SystemCall->TrapFrame->X8;
+    UINT_PTR uArg1 = SystemCall->TrapFrame->X0;
+    UINT_PTR uArg2 = SystemCall->TrapFrame->X1;
+    UINT_PTR uArg3 = SystemCall->TrapFrame->X2;
+    UINT_PTR uArg4 = SystemCall->TrapFrame->X3;
+    UINT_PTR uArg5 = SystemCall->TrapFrame->X4;
+    UINT_PTR uArg6 = SystemCall->TrapFrame->X5;
 #else
 #error Detect the syscall arguments for this architecture!
 #endif
@@ -90,8 +98,10 @@ MxSystemCallDispatch(
                 "Unimplemented syscall: %x\n", iSysNum));
     }
 
-#ifdef AMD64
+#ifdef _M_AMD64
     SystemCall->TrapFrame->Rax = (ULONG64)iRet;
+#elif defined(_M_ARM64)
+    SystemCall->TrapFrame->X0 = (ULONG64)iRet;
 #else
 #error Set the syscall return value for this architecture!
 #endif

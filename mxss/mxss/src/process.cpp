@@ -617,7 +617,13 @@ MxProcessFork(
     {
         .Process = hdlProcess,
         .UserStack = (ULONG_PTR)pMxParentProcess->UserStack,
+#ifdef _M_AMD64
         .StartRoutine = (ULONG_PTR)ctxParent.Rip,
+#elif defined(_M_ARM64)
+        .StartRoutine = (ULONG_PTR)ctxParent.Pc,
+#else
+#error Copy the instruction pointer for this architecture!
+#endif
         .Context = pMxThread,
     };
 
@@ -644,7 +650,7 @@ MxProcessFork(
         ObDereferenceObject(pThread);
     });
 
-#ifdef AMD64
+#ifdef _M_AMD64
     // Syscall return result.
     ctxParent.Rax = 0;
 
@@ -663,6 +669,41 @@ MxProcessFork(
         ctxParent.R10 = pTrapFrame->R10;
         ctxParent.R11 = pTrapFrame->R11;
         ctxParent.EFlags = pTrapFrame->EFlags;
+    }
+#elif defined(_M_ARM64)
+    // Syscall return result.
+    ctxParent.X0 = 0;
+
+    if (pMxParentProcess->MxThread->CurrentSystemCall != NULL)
+    {
+        // Restore the "real" context from system call information.
+        PKTRAP_FRAME pTrapFrame = pMxParentProcess->MxThread->CurrentSystemCall->TrapFrame;
+        ctxParent.X1 = pTrapFrame->X1;
+        ctxParent.X2 = pTrapFrame->X2;
+        ctxParent.X3 = pTrapFrame->X3;
+        ctxParent.X4 = pTrapFrame->X4;
+        ctxParent.X5 = pTrapFrame->X5;
+        ctxParent.X6 = pTrapFrame->X6;
+        ctxParent.X7 = pTrapFrame->X7;
+        ctxParent.X8 = pTrapFrame->X8;
+        ctxParent.X9 = pTrapFrame->X9;
+        ctxParent.X10 = pTrapFrame->X10;
+        ctxParent.X11 = pTrapFrame->X11;
+        ctxParent.X12 = pTrapFrame->X12;
+        ctxParent.X13 = pTrapFrame->X13;
+        ctxParent.X14 = pTrapFrame->X14;
+        ctxParent.X15 = pTrapFrame->X15;
+        ctxParent.X16 = pTrapFrame->X16;
+        ctxParent.X17 = pTrapFrame->X17;
+        ctxParent.X18 = pTrapFrame->X18;
+        ctxParent.Lr = pTrapFrame->Lr;
+        ctxParent.Fp = pTrapFrame->Fp;
+        ctxParent.Pc = pTrapFrame->Pc;
+        ctxParent.Sp = pTrapFrame->Sp;
+        memcpy(&ctxParent.Bcr, &pTrapFrame->Bcr, sizeof(ctxParent.Bcr));
+        memcpy(&ctxParent.Bvr, &pTrapFrame->Bvr, sizeof(ctxParent.Bvr));
+        memcpy(&ctxParent.Wcr, &pTrapFrame->Wcr, sizeof(ctxParent.Wcr));
+        memcpy(&ctxParent.Wvr, &pTrapFrame->Wvr, sizeof(ctxParent.Wvr));
     }
 #else
 #error Set the context for this architecture!

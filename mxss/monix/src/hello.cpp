@@ -151,7 +151,6 @@ MonixSyscall(
 #define STRING_AND_SIZE(str) (str), (sizeof(str) - 1)
 
 extern "C"
-__attribute__((force_align_arg_pointer))
 void _start()
 {
     MonixSyscall(SYSCALL_WRITE, 1, STRING_AND_SIZE("Hello, userland World!\n"));
