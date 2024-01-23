@@ -52,7 +52,7 @@ typedef struct _PS_PICO_THREAD_ATTRIBUTES {
     ULONG_PTR StartParameter1;
     ULONG_PTR StartParameter2;
 
-#if defined(_AMD64_)
+#if defined(_M_X64)
 
     ULONG64 UserFsBase;
     ULONG64 UserGsBase;
@@ -73,7 +73,7 @@ typedef struct _PS_PICO_THREAD_ATTRIBUTES {
     ULONG_PTR R14;
     ULONG_PTR R15;
 
-#elif defined(_X86_)
+#elif defined(_M_IX86)
 
     ULONG UserFsBase;
     ULONG UserGsBase;
@@ -89,7 +89,7 @@ typedef struct _PS_PICO_THREAD_ATTRIBUTES {
     ULONG_PTR Esi;
     ULONG_PTR Ebp;
 
-#elif defined(_ARM_)
+#elif defined(_M_ARM32)
 
     ULONG UserRoBase;
     ULONG UserRwBase;
@@ -106,6 +106,41 @@ typedef struct _PS_PICO_THREAD_ATTRIBUTES {
     ULONG R10;
     ULONG R11;
     ULONG R12;
+
+#elif defined(_M_ARM64)
+
+    ULONG64 UserRoBase;
+    ULONG64 UserRwBase;
+
+    ULONG_PTR X2;
+    ULONG_PTR X3;
+    ULONG_PTR X4;
+    ULONG_PTR X5;
+    ULONG_PTR X6;
+    ULONG_PTR X7;
+    ULONG_PTR X8;
+    ULONG_PTR X9;
+    ULONG_PTR X10;
+    ULONG_PTR X11;
+    ULONG_PTR X12;
+    ULONG_PTR X13;
+    ULONG_PTR X14;
+    ULONG_PTR X15;
+    ULONG_PTR X16;
+    ULONG_PTR X17;
+    ULONG_PTR X18;
+    ULONG_PTR X19;
+    ULONG_PTR X20;
+    ULONG_PTR X21;
+    ULONG_PTR X22;
+    ULONG_PTR X23;
+    ULONG_PTR X24;
+    ULONG_PTR X25;
+    ULONG_PTR X26;
+    ULONG_PTR X27;
+    ULONG_PTR X28;
+    ULONG_PTR Fp;
+    ULONG_PTR Lr;
 
 #endif
 
@@ -144,12 +179,12 @@ typedef PS_PICO_GET_THREAD_CONTEXT* PPS_PICO_GET_THREAD_CONTEXT;
 
 typedef enum _PS_PICO_THREAD_DESCRIPTOR_TYPE {
 
-#if defined(_X86_) || defined(_AMD64_)
+#if defined(_M_IX86) || defined(_M_X64)
 
     PicoThreadDescriptorTypeFs,
     PicoThreadDescriptorTypeGs,
 
-#elif defined(_ARM_)
+#elif defined(_M_ARM) || defined(_M_ARM64)
 
     PicoThreadDescriptorTypeUserRo,
     PicoThreadDescriptorTypeUserRw,
@@ -233,7 +268,7 @@ typedef struct _PS_PICO_ROUTINES {
 typedef struct _PS_PICO_SYSTEM_CALL_INFORMATION {
     PKTRAP_FRAME TrapFrame;
 
-#if defined(_ARM_)
+#if defined(_M_ARM)
 
     ULONG R4;
     ULONG R5;
@@ -243,7 +278,7 @@ typedef struct _PS_PICO_SYSTEM_CALL_INFORMATION {
 
 } PS_PICO_SYSTEM_CALL_INFORMATION, *PPS_PICO_SYSTEM_CALL_INFORMATION;
 
-#if defined(_ARM_)
+#if defined(_M_ARM)
 
 //
 // Structure offsets known to assembler code that does not use genxx, verify

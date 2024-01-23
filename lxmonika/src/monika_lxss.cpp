@@ -41,41 +41,51 @@ MapLxssSystemCallHook(
     _In_ PPS_PICO_SYSTEM_CALL_INFORMATION pSyscallInfo
 )
 {
-    BOOLEAN bIsUname = FALSE;
+    struct old_utsname {
+        char sysname[65];
+        char nodename[65];
+        char release[65];
+        char version[65];
+        char machine[65];
+    }* pUtsName = NULL;
 
-#ifdef AMD64
     // Check for SYS_uname
-    bIsUname = pSyscallInfo->TrapFrame->Rax == 63;
-    if (bIsUname)
+#ifdef _M_X64
+    if (pSyscallInfo->TrapFrame->Rax == 63)
     {
-        Logger::LogTrace("uname(", (PVOID)pSyscallInfo->TrapFrame->Rdi, ")");
+        pUtsName = (old_utsname*)pSyscallInfo->TrapFrame->Rdi;
+    }
+#elif defined(_M_ARM64)
+    if (pSyscallInfo->TrapFrame->X8 == 160)
+    {
+        pUtsName = (old_utsname*)pSyscallInfo->TrapFrame->X0;
     }
 #else
 #error Detect the syscall arguments for this architecture!
 #endif
 
+    // Compared to the old checks, this will miss `uname` calls where the argument is NULL.
+    // However, we do not intend to intercept such calls anyway.
+    if (pUtsName != NULL)
+    {
+        Logger::LogTrace("uname(", pUtsName, ")");
+    }
+
     MapOriginalProviderRoutines.DispatchSystemCall(pSyscallInfo);
 
-    if (bIsUname
+    if (pUtsName != NULL
         // Also check for a success return value.
         // Otherwise, pUtsName may be an invalid pointer.
-#ifdef AMD64
+#ifdef _M_X64
         && pSyscallInfo->TrapFrame->Rax == 0)
+#elif defined(_M_ARM64)
+        && pSyscallInfo->TrapFrame->X0 == 0)
 #else
 #error Detect the syscall return value for this architecture!
 #endif
     {
-        struct old_utsname {
-            char sysname[65];
-            char nodename[65];
-            char release[65];
-            char version[65];
-            char machine[65];
-        }* pUtsName = NULL;
-
         // We should be in the context of the calling process.
         // Therefore, it is safe to access the raw pointers.
-        pUtsName = (old_utsname*)pSyscallInfo->TrapFrame->Rdi;
 
         Logger::LogTrace("pUtsName->sysname  ", (PCSTR)pUtsName->sysname);
         Logger::LogTrace("pUtsName->nodename ", (PCSTR)pUtsName->nodename);

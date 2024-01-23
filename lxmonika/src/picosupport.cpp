@@ -391,17 +391,35 @@ PicoSppGetOffsets(
 
     if (pArchitecture == NULL)
     {
-#ifdef AMD64
+#ifdef _M_X64
         pArchitecture = "x64";
+#elif defined(_M_ARM64)
+        pArchitecture = "arm64";
 #else
-#error "Define the identifier for this architecture!"
+#error Define the identifier for this architecture!
 #endif
     }
+
+    Logger::LogTrace("Finding offsets for Windows version ", pVersion,
+        " of architecture ", pArchitecture);
 
     for (SIZE_T i = 0; i < ARRAYSIZE(MaPspPicoProviderRoutinesOffsets); ++i)
     {
         PMA_PSP_PICO_PROVIDER_ROUTINES_OFFSETS pCurrentOffsets =
             (PMA_PSP_PICO_PROVIDER_ROUTINES_OFFSETS)&MaPspPicoProviderRoutinesOffsets[i];
+
+        if (pCurrentOffsets->Version == NULL)
+        {
+            Logger::LogTrace("Wait, why is the version NULL? (i=", i, ")");
+            continue;
+        }
+
+        if (pCurrentOffsets->Architecture == NULL)
+        {
+            Logger::LogTrace("Wait, why is the architecture NULL? (i=", i, ")");
+            continue;
+        }
+
         if (strcmp(pVersion, pCurrentOffsets->Version) == 0
             && strcmp(pArchitecture, pCurrentOffsets->Architecture) == 0)
         {
@@ -409,6 +427,10 @@ PicoSppGetOffsets(
             return STATUS_SUCCESS;
         }
     }
+
+    Logger::LogInfo("Failed to find suitable offsets for this Windows version.");
+    Logger::LogInfo("Maybe it's time to update these offsets.");
+    Logger::LogInfo("See https://github.com/trungnt2910/PspPicoProviderRoutinesOffsetGen");
 
     return STATUS_NOT_FOUND;
 }
