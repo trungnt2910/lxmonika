@@ -30,7 +30,8 @@ cd /repo/root/mxss/monix
 ./build.sh $ARCH
 ```
 
-Replace `$ARCH` with the architecture of the target machine. Currently only `x86_64` is supported.
+Replace `$ARCH` with the architecture of the target machine. Currently `x86_64` and `aarch64` are
+supported.
 
 A C++23 compiler is required. The latest of `g++` or `clang++` should suffice.
 

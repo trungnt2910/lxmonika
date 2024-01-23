@@ -114,8 +114,13 @@ structure may not cause the BSOD anymore.
 The driver has only been tested on Windows build 22621 (Windows 11 23H2). For other Windows builds,
 YMMV.
 
-Only `x86_64` is currently supported; the Pico structs have not been tested for `arm64` Windows
-yet, as I do not own an `arm64` Windows device.
+Only `x86_64` and `arm64` are supported. The 32-bit counterparts, `x86` and `arm`, being legacy
+platforms, are not supported. While `pico.h` also contains definitions for these older
+architectures, other parts may not work, especially those that rely on `lxcore.sys` (missing from
+both `x86` and `arm` except for very early Insider builds of Windows 10 Mobile).
+[`PspPicoProviderRoutinesOffsetGen`](https://github.com/trungnt2910/PspPicoProviderRoutinesOffsetGen),
+the source of known NT kernel function positions required for `lxmonika`, also does **not** offer
+information for 32-bit Windows.
 
 ## Building your own Pico provider
 
@@ -164,6 +169,9 @@ Thanks to Bill Zissimopoulos ([**@billziss-gh**](https://github.com/billziss-gh)
 [lxdk](https://github.com/billziss-gh/lxdk), which documents the various symbols exposed by
 `lxcore`, enabling the functionality of `/dev/reality`. Unfortunately, due to licensing issues,
 his great project cannot be directly incorporated into `lxmonika`.
+
+Thanks to Justine Tunney ([**@jart**](https://github.com/jart)) for providing me with the funds for
+an ARM64 device. Without this, the ARM64 port is virtually impossible.
 
 ## Suggested readings
 
