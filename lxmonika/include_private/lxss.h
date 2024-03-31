@@ -29,6 +29,7 @@
 #pragma warning(disable: 4201)           /* nameless struct/union */
 
 typedef INT64 OFF_T, *POFF_T;
+typedef _Success_(return >= 0) INT LXSTATUS;
 
 typedef struct _LX_SUBSYSTEM LX_SUBSYSTEM, *PLX_SUBSYSTEM;
 typedef struct _LX_INSTANCE LX_INSTANCE, *PLX_INSTANCE;
@@ -49,59 +50,59 @@ typedef INT LX_SUBSYSTEM_CREATE_INITIAL_NAMESPACE(
 
 typedef LX_SUBSYSTEM_CREATE_INITIAL_NAMESPACE* PLX_SUBSYSTEM_CREATE_INITIAL_NAMESPACE;
 
-typedef INT LX_DEVICE_OPEN(
+typedef LXSTATUS LX_DEVICE_OPEN(
     _In_ PLX_CALL_CONTEXT CallContext,
     _In_ PLX_DEVICE Device,
     _In_ ULONG Flags,
     _Out_ PLX_FILE* PFile);
-typedef INT LX_DEVICE_DELETE(
+typedef LXSTATUS LX_DEVICE_DELETE(
     _Inout_ PLX_DEVICE Device);
 
 typedef LX_DEVICE_OPEN* PLX_DEVICE_OPEN;
 typedef LX_DEVICE_DELETE* PLX_DEVICE_DELETE;
 
-typedef INT LX_FILE_DELETE(
+typedef LXSTATUS LX_FILE_DELETE(
     _In_ PLX_CALL_CONTEXT CallContext,
     _Inout_ PLX_FILE File);
-typedef INT LX_FILE_FLUSH(
+typedef LXSTATUS LX_FILE_FLUSH(
     _In_ PLX_CALL_CONTEXT CallContext,
     _Inout_ PLX_FILE File);
-typedef INT LX_FILE_IOCTL(
+typedef LXSTATUS LX_FILE_IOCTL(
     _In_ PLX_CALL_CONTEXT CallContext,
     _Inout_ PLX_FILE File,
     _In_ ULONG Code,
     _Inout_ PVOID Buffer);
-typedef INT LX_FILE_READ(
+typedef LXSTATUS LX_FILE_READ(
     _In_ PLX_CALL_CONTEXT CallContext,
     _Inout_ PLX_FILE File,
     _Out_ PVOID Buffer,
     _In_ SIZE_T Length,
     _Inout_opt_ POFF_T POffset,
     _Out_ PSIZE_T PBytesTransferred);
-typedef INT LX_FILE_READ_VECTOR(
+typedef LXSTATUS LX_FILE_READ_VECTOR(
     _In_ PLX_CALL_CONTEXT CallContext,
     _Inout_ PLX_FILE File,
     _In_ PLX_IOVECTOR IoVector,
     _Inout_ POFF_T POffset,
     _In_ ULONG Flags,
     _Out_ PSIZE_T PBytesTransferred);
-typedef INT LX_FILE_RELEASE(
+typedef LXSTATUS LX_FILE_RELEASE(
     _In_ PLX_CALL_CONTEXT CallContext,
     _Inout_ PLX_FILE File);
-typedef INT LX_FILE_SEEK(
+typedef LXSTATUS LX_FILE_SEEK(
     _In_ PLX_CALL_CONTEXT CallContext,
     _Inout_ PLX_FILE File,
     _In_ OFF_T Offset,
     _In_ INT Whence,
     _Out_ POFF_T PResultOffset);
-typedef INT LX_FILE_WRITE(
+typedef LXSTATUS LX_FILE_WRITE(
     _In_ PLX_CALL_CONTEXT CallContext,
     _Inout_ PLX_FILE File,
     _In_ PVOID Buffer,
     _In_ SIZE_T Length,
     _Inout_ POFF_T POffset,
     _Out_ PSIZE_T PBytesTransferred);
-typedef INT LX_FILE_WRITE_VECTOR(
+typedef LXSTATUS LX_FILE_WRITE_VECTOR(
     _In_ PLX_CALL_CONTEXT CallContext,
     _Inout_ PLX_FILE File,
     _In_ PLX_IOVECTOR IoVector,

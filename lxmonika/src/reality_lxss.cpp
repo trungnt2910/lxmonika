@@ -209,7 +209,7 @@ RlCreateInitialLxssNamespace(
 }
 
 static
-INT
+LXSTATUS
 RlLxssDeviceOpen(
     _In_ PLX_CALL_CONTEXT pContext,
     _In_ PLX_DEVICE pDevice,
@@ -244,7 +244,7 @@ RlLxssDeviceOpen(
 }
 
 static
-INT
+LXSTATUS
 RlLxssDeviceDelete(
     _Inout_ PLX_DEVICE pDevice
 )
@@ -255,7 +255,7 @@ RlLxssDeviceDelete(
 }
 
 static
-INT
+LXSTATUS
 RlLxssFileDelete(
     _In_ PLX_CALL_CONTEXT pContext,
     _Inout_ PLX_FILE pFile
@@ -268,7 +268,7 @@ RlLxssFileDelete(
 }
 
 static
-INT
+LXSTATUS
 RlLxssFileRead(
     _In_ PLX_CALL_CONTEXT pContext,
     _Inout_ PLX_FILE pFile,
@@ -294,7 +294,7 @@ RlLxssFileRead(
 }
 
 static
-INT
+LXSTATUS
 RlLxssFileWrite(
     _In_ PLX_CALL_CONTEXT pContext,
     _Inout_ PLX_FILE pFile,
@@ -319,7 +319,7 @@ RlLxssFileWrite(
 }
 
 static
-INT
+LXSTATUS
 RlLxssFileIoctl(
     _In_ PLX_CALL_CONTEXT pContext,
     _Inout_ PLX_FILE pFile,
@@ -417,7 +417,7 @@ RlLxssFileIoctl(
 }
 
 static
-INT
+LXSTATUS
 RlLxssFileFlush(
     _In_ PLX_CALL_CONTEXT pContext,
     _Inout_ PLX_FILE pFile
@@ -430,7 +430,7 @@ RlLxssFileFlush(
 }
 
 static
-INT
+LXSTATUS
 RlLxssFileSeek(
     _In_ PLX_CALL_CONTEXT pContext,
     _Inout_ PLX_FILE pFile,
