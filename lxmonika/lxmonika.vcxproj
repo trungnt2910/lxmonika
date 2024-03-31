@@ -112,16 +112,18 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\driver.cpp" />
-    <ClCompile Include="src\Logger.cpp" />
     <ClCompile Include="src\module.cpp" />
     <ClCompile Include="src\monika.cpp" />
     <ClCompile Include="src\monika_context.cpp" />
     <ClCompile Include="src\monika_dispatcher.cpp" />
     <ClCompile Include="src\monika_lxss.cpp" />
     <ClCompile Include="src\monika_providers.cpp" />
-    <ClCompile Include="src\monika_reality.cpp" />
     <ClCompile Include="src\picooffsets.cpp" />
     <ClCompile Include="src\picosupport.cpp" />
+    <ClCompile Include="src\reality.cpp" />
+    <ClCompile Include="src\reality_lxss.cpp" />
+    <ClCompile Include="src\reality_win32.cpp" />
+    <ClCompile Include="src\Logger.cpp" />
     <ClCompile Include="src\PoolAllocator.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -134,6 +136,7 @@
     <ClInclude Include="include_private\pe.h" />
     <ClInclude Include="include_private\picooffsets.h" />
     <ClInclude Include="include_private\picosupport.h" />
+    <ClInclude Include="include_private\reality_private.h" />
     <ClInclude Include="include_private\winresource.h" />
     <ClInclude Include="include_private\AutoResource.h" />
     <ClInclude Include="include_private\Locker.h" />
@@ -144,6 +147,7 @@
     <ClInclude Include="include\monika.h" />
     <ClInclude Include="include\monika_constants.h" />
     <ClInclude Include="include\pico.h" />
+    <ClInclude Include="include\reality.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" />

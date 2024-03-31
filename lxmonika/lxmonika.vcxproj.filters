@@ -46,9 +46,6 @@
     <ClCompile Include="src\monika_providers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\monika_reality.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\monika.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -56,6 +53,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\picosupport.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\reality_lxss.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\reality_win32.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\reality.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\Logger.cpp">
@@ -93,6 +99,9 @@
     <ClInclude Include="include_private\picosupport.h">
       <Filter>Private Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include_private\reality_private.h">
+      <Filter>Private Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="include_private\winresource.h">
       <Filter>Private Header Files</Filter>
     </ClInclude>
@@ -117,6 +126,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\pico.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\reality.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

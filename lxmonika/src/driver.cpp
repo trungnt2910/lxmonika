@@ -7,6 +7,7 @@
 #include "module.h"
 #include "monika.h"
 #include "picosupport.h"
+#include "reality.h"
 
 PDRIVER_OBJECT DriverGlobalObject;
 
@@ -36,20 +37,21 @@ DriverEntry(
         return status;
     }
 
-    // /dev/reality
-    // Initializing the reality device requires knowing our DRIVER_OBJECT.
+    // /dev/reality and \Device\Reality
+    // Initializing the reality devices requires knowing our DRIVER_OBJECT.
     // As MapInitialize may be indirectly called by other drivers through MaRegisterPicoProvider,
     // we cannot guarantee the availablity of DriverObject when MapInitialize is called.
-    // For this reason, MapInitializeLxssDevice needs to be directly handled by DriverEntry.
-    status = MapInitializeLxssDevice(DriverObject);
+    // For this reason, RlpInitializeDevices needs to be directly handled by DriverEntry.
+    status = RlpInitializeDevices(DriverObject);
 
     if (!NT_SUCCESS(status))
     {
-        Logger::LogWarning("Failed to initialize lxss device, status=", (PVOID)status);
-        Logger::LogWarning("WSL integration features will not work.");
-        Logger::LogWarning("Make sure WSL1 is enabled and lxcore.sys is loaded.");
+        MapCleanup();
 
-        // Non-fatal.
+        // The reality device (at least the Win32 one) is required for userland hosts to launch
+        // Pico processes.
+        Logger::LogError("Failed to initialize the reality device, status=", (PVOID)status);
+        return status;
     }
 
     DriverObject->DriverUnload = DriverUnload;
@@ -65,7 +67,7 @@ DriverUnload(
 {
     UNREFERENCED_PARAMETER(DriverObject);
 
-    MapCleanupLxssDevice();
+    RlpCleanupDevices();
 
     MapCleanup();
 }

@@ -45,14 +45,6 @@ NTSTATUS
         _Out_opt_ PHANDLE Output
     );
 
-NTSTATUS
-    MapInitializeLxssDevice(
-        _In_ PDRIVER_OBJECT DriverObject
-    );
-
-VOID
-    MapCleanupLxssDevice();
-
 //
 // Monika Pico provider callbacks
 //
