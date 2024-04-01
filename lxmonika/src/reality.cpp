@@ -200,7 +200,7 @@ RlpFileWrite(
     {
         PCHAR pCharBuffer = (PCHAR)pBuffer;
         SIZE_T uPatternLength = sizeof("love") - 1;
-        for (SIZE_T i = 0; i + uPatternLength < szLength; ++i)
+        for (SIZE_T i = 0; i + uPatternLength <= szLength; ++i)
         {
             bool equal = true;
             for (SIZE_T j = 0; j < uPatternLength; ++j)
