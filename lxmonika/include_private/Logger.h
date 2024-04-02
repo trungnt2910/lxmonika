@@ -57,15 +57,13 @@ public:
 
     template <LogLevel level, typename... TRest>
     static bool _Log(const char* file, int line, const char* function,
-        TRest... args)
+        [[maybe_unused]] TRest... args)
     {
         if constexpr (level < LOGGER_MINIMUM_LEVEL)
         {
             UNREFERENCED_PARAMETER(file);
             UNREFERENCED_PARAMETER(line);
             UNREFERENCED_PARAMETER(function);
-            PVOID unused[] = {&args...};
-            UNREFERENCED_PARAMETER(unused);
             return false;
         }
         else
