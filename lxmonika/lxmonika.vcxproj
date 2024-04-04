@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -114,6 +114,7 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\condrv.cpp" />
     <ClCompile Include="src\driver.cpp" />
     <ClCompile Include="src\module.cpp" />
     <ClCompile Include="src\monika.cpp" />
@@ -130,6 +131,7 @@
     <ClCompile Include="src\PoolAllocator.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include_private\condrv.h" />
     <ClInclude Include="include_private\driver.h" />
     <ClInclude Include="include_private\lxerrno.h" />
     <ClInclude Include="include_private\lxss.h" />
