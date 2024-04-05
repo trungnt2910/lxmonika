@@ -136,6 +136,13 @@ NTSTATUS NTAPI
 
 MONIKA_EXPORT
 NTSTATUS NTAPI
+    MaStartSession(
+        _In_ SIZE_T Index,
+        _In_ PMA_PICO_SESSION_ATTRIBUTES SessionAttributes
+    );
+
+MONIKA_EXPORT
+NTSTATUS NTAPI
     MaGetConsole(
         _In_ PEPROCESS Process,
         _Out_opt_ PHANDLE Console,

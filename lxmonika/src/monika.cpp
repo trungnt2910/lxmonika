@@ -354,6 +354,22 @@ MaGetAllocatedPicoProviderName(
 
 MONIKA_EXPORT
 NTSTATUS NTAPI
+MaStartSession(
+    _In_ SIZE_T Index,
+    _In_ PMA_PICO_SESSION_ATTRIBUTES SessionAttributes
+)
+{
+    if (Index >= MaPicoProviderMaxCount || Index >= MapProvidersCount
+        || SessionAttributes == NULL)
+    {
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    MA_CALL_IF_SUPPORTED(Index, StartSession, SessionAttributes);
+}
+
+MONIKA_EXPORT
+NTSTATUS NTAPI
 MaGetConsole(
     _In_ PEPROCESS Process,
     _Out_opt_ PHANDLE Console,
