@@ -3,12 +3,14 @@
 #include <ntifs.h>
 #include <ntstrsafe.h>
 
+#include "condrv.h"
 #include "lxerrno.h"
 #include "lxss.h"
 #include "module.h"
 #include "monika.h"
 #include "os.h"
 
+#include "AutoResource.h"
 #include "Locker.h"
 #include "Logger.h"
 #include "PoolAllocator.h"
@@ -239,10 +241,195 @@ RlpFileIoctl(
 )
 {
     UNREFERENCED_PARAMETER(pFile);
-    UNREFERENCED_PARAMETER(ulCode);
-    UNREFERENCED_PARAMETER(pData);
 
-    return STATUS_NOT_IMPLEMENTED;
+    switch (ulCode)
+    {
+    case RlIoctlPicoStartSession:
+    {
+        PRL_PICO_SESSION_ATTRIBUTES pUserAttributes = (PRL_PICO_SESSION_ATTRIBUTES)pData;
+
+        OBJECT_ATTRIBUTES objectAttributes;
+        IO_STATUS_BLOCK ioStatus;
+
+        HANDLE hdlHostProcess = NULL;
+        HANDLE hdlConsole = NULL;
+        HANDLE hdlInput = NULL;
+        HANDLE hdlOutput = NULL;
+        HANDLE hdlRootDirectory = NULL;
+        HANDLE hdlCurrentWorkingDirectory = NULL;
+
+        AUTO_RESOURCE(hdlHostProcess, ZwClose);
+        AUTO_RESOURCE(hdlConsole, ZwClose);
+        AUTO_RESOURCE(hdlInput, ZwClose);
+        AUTO_RESOURCE(hdlOutput, ZwClose);
+        AUTO_RESOURCE(hdlRootDirectory, ZwClose);
+        AUTO_RESOURCE(hdlCurrentWorkingDirectory, ZwClose);
+
+        PWSTR pRootDirectory = NULL;
+        PWSTR pCurrentWorkingDirectory = NULL;
+        PWSTR pProviderArgs = NULL;
+        PWSTR pArgs = NULL;
+        PWSTR pEnvironment = NULL;
+
+        constexpr auto Free = [](auto p) { ExFreePoolWithTag(p, MA_REALITY_TAG); };
+        AUTO_RESOURCE(pRootDirectory, Free);
+        AUTO_RESOURCE(pCurrentWorkingDirectory, Free);
+        AUTO_RESOURCE(pProviderArgs, Free);
+        AUTO_RESOURCE(pArgs, Free);
+        AUTO_RESOURCE(pEnvironment, Free);
+
+        UNICODE_STRING strRootDirectory = { 0 };
+        UNICODE_STRING strCurrentWorkingDirectory = { 0 };
+        UNICODE_STRING strProviderArgs = { 0 };
+        UNICODE_STRING strArgs = { 0 };
+        UNICODE_STRING strEnvironment = { 0 };
+
+        SIZE_T uProviderIndex;
+
+        __try
+        {
+            if (pUserAttributes->Size != sizeof(RL_PICO_SESSION_ATTRIBUTES))
+            {
+                return STATUS_INVALID_PARAMETER;
+            }
+
+            if (pUserAttributes->ProviderIndex < MaPicoProviderMaxCount)
+            {
+                uProviderIndex = pUserAttributes->ProviderIndex;
+            }
+            else
+            {
+                MA_RETURN_IF_FAIL(MaFindPicoProvider(
+                    pUserAttributes->ProviderName->Buffer,
+                    &uProviderIndex)
+                );
+            }
+
+            // Convert these paths into handles
+
+            InitializeObjectAttributes(
+                &objectAttributes,
+                pUserAttributes->RootDirectory,
+                OBJ_KERNEL_HANDLE | OBJ_CASE_INSENSITIVE,
+                NULL,
+                NULL
+            );
+
+            MA_RETURN_IF_FAIL(ZwCreateFile(
+                &hdlRootDirectory,
+                FILE_LIST_DIRECTORY | FILE_TRAVERSE,
+                &objectAttributes,
+                &ioStatus,
+                NULL,
+                0,
+                FILE_SHARE_VALID_FLAGS,
+                FILE_OPEN,
+                FILE_DIRECTORY_FILE,
+                NULL,
+                0
+            ));
+
+            InitializeObjectAttributes(
+                &objectAttributes,
+                pUserAttributes->CurrentWorkingDirectory,
+                OBJ_KERNEL_HANDLE | OBJ_CASE_INSENSITIVE,
+                NULL,
+                NULL
+            );
+
+            MA_RETURN_IF_FAIL(ZwCreateFile(
+                &hdlCurrentWorkingDirectory,
+                FILE_LIST_DIRECTORY | FILE_TRAVERSE,
+                &objectAttributes,
+                &ioStatus,
+                NULL,
+                0,
+                FILE_SHARE_VALID_FLAGS,
+                FILE_OPEN,
+                FILE_DIRECTORY_FILE,
+                NULL,
+                0
+            ));
+
+            // While the ioctl is blocking, other threads may still modify the passes strings as
+            // they please. Sanitize and keep our own coyp of these strings before we exit the
+            // __try block.
+
+            const auto Copy = [](PWSTR& dst, UNICODE_STRING& dstString, PUNICODE_STRING& src)
+            {
+                dst = (PWSTR)ExAllocatePoolZero(PagedPool,
+                    (src->Length + 1) * sizeof(WCHAR), MA_REALITY_TAG);
+                if (dst == NULL)
+                {
+                    return STATUS_NO_MEMORY;
+                }
+                // YOLO: We're in a __try/__except block.
+                memcpy(dst, src->Buffer, src->Length * sizeof(WCHAR));
+                dstString.Buffer = dst;
+                dstString.Length = src->Length;
+                dstString.MaximumLength = src->Length;
+                return STATUS_SUCCESS;
+            };
+
+            MA_RETURN_IF_FAIL(Copy(pRootDirectory, strRootDirectory,
+                pUserAttributes->RootDirectory));
+            MA_RETURN_IF_FAIL(Copy(pCurrentWorkingDirectory, strCurrentWorkingDirectory,
+                pUserAttributes->CurrentWorkingDirectory));
+            MA_RETURN_IF_FAIL(Copy(pProviderArgs, strProviderArgs,
+                pUserAttributes->ProviderArgs));
+            MA_RETURN_IF_FAIL(Copy(pArgs, strArgs,
+                pUserAttributes->Args));
+            MA_RETURN_IF_FAIL(Copy(pEnvironment, strEnvironment,
+                pUserAttributes->Environment));
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER)
+        {
+            return STATUS_ACCESS_VIOLATION;
+        }
+
+        MA_RETURN_IF_FAIL(ObOpenObjectByPointer(
+            PsGetCurrentProcess(),
+            OBJ_KERNEL_HANDLE,
+            NULL,
+            PROCESS_ALL_ACCESS,
+            *PsProcessType,
+            KernelMode,
+            &hdlHostProcess
+        ));
+        MA_RETURN_IF_FAIL(CdpKernelConsoleAttach(hdlHostProcess, &hdlConsole));
+        MA_RETURN_IF_FAIL(CdpKernelConsoleOpenHandles(
+            hdlConsole,
+            &hdlInput,
+            &hdlOutput
+        ));
+
+        MA_PICO_SESSION_ATTRIBUTES maAttributes
+        {
+            .Size = sizeof(MA_PICO_SESSION_ATTRIBUTES),
+            .HostProcess = hdlHostProcess,
+            .Console = hdlConsole,
+            .Input = hdlInput,
+            .Output = hdlOutput,
+            .RootDirectory = hdlRootDirectory,
+            .CurrentWorkingDirectory = hdlCurrentWorkingDirectory,
+            .ProviderArgsCount = pUserAttributes->ProviderArgsCount,
+            .ProviderArgs = &strProviderArgs,
+            .ArgsCount = pUserAttributes->ArgsCount,
+            .Args = &strArgs,
+            .EnvironmentCount = pUserAttributes->EnvironmentCount,
+            .Environment = &strEnvironment
+        };
+
+        // lxmonika retains control of all its auto resources. The callee is responsible for
+        // duplicating.
+        return MaStartSession(uProviderIndex, &maAttributes);
+    }
+    default:
+    {
+        return STATUS_INVALID_PARAMETER;
+    }
+    break;
+    }
 }
 
 extern "C"
