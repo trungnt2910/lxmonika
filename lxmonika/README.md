@@ -78,10 +78,6 @@ On an elevated Command Prompt window on the test computer:
 ```bat
 bcdedit /set testsigning on
 ```
-- Copy the
-[`devcon.exe`](https://learn.microsoft.com/en-us/windows-hardware/drivers/devtest/devcon)
-tool to the test computer. It is normally located at
-`%PROGRAMFILES(x86)%\Windows Kits\10\Tools\$(WINDOWS_SDK_VERSION)\$(ARCHITECTURE)\devcon.exe`.
 - Reboot the device.
 ```bat
 shutdown /r /t 00
@@ -95,10 +91,23 @@ shutdown /r /t 00
 
 On an elevated Command Prompt window on the test computer:
 
-- Run the command below. Replace the `path\to` part with the relevant paths. `Root\lxmonika` is the
-driver's virtual device path and should stay the same for all command invocations.
+- Run the command below. Replace the `path\to` part with the relevant paths. The space behind the
+equal sign and the value is required.
 ```bat
-path\to\devcon.exe install path\to\lxmonika\lxmonika.inf Root\lxmonika
+sc create lxmonika type= kernel start= system binPath= path\to\lxmonika\lxmonika.sys
+```
+- Reboot the device.
+```bat
+shutdown /r /t 00
+```
+
+#### When you want to uninstall the driver
+
+On an elevated Command Prompt window on the test computer:
+
+- Run the command below.
+```bat
+sc delete lxmonika
 ```
 - Reboot the device.
 ```bat
