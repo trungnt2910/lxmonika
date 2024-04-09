@@ -1,5 +1,6 @@
 #pragma once
 
+#include <format>
 #include <string>
 
 #include <Windows.h>
@@ -39,7 +40,14 @@ public:
 
 class MonikaException : public Exception
 {
+private:
+    std::wstring _message;
 public:
     MonikaException(int message, HRESULT hresult = HRESULT_FROM_WIN32(ERROR_INTERNAL_ERROR))
         : Exception(hresult, UtilGetResourceString(message)) { }
+    template <typename... Args>
+    MonikaException(int message, HRESULT hresult, Args&&... args)
+        : _message(std::vformat(UtilGetResourceString(message), std::make_wformat_args(args...))),
+          Exception(hresult, _message)
+    { }
 };
