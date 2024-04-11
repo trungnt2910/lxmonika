@@ -45,17 +45,11 @@ template <typename T = std::remove_cv_t<decltype(std::ignore)>>
 class Switch : public SwitchBase
 {
 protected:
-    virtual void Validate(const T& data) const { }
-
     virtual bool Parse(int& argc, wchar_t**& argv) const
     {
-        T& parameterOutputReference = *((T*)_parameterOutput);
-
-        parameterOutputReference = std::any_cast<T>(
+        *((T*)_parameterOutput) = std::any_cast<T>(
             _parameter.Parse(argc, argv, _parameterType)
         );
-
-        Validate(parameterOutputReference);
 
         return _acceptsMoreSwitches;
     }
