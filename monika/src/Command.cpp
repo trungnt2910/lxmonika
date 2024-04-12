@@ -94,79 +94,80 @@ CommandBase::Run(
     // The caller is responsible for incrementing argv and decrementing argv.
     // The passed parameters should include only the arguments and not the name itself.
 
-    int originalArgc = argc;
-
-    if (argc > 0 && _subcommands.contains(argv[0]))
-    {
-        return _subcommands.at(argv[0])->Run(--argc, ++argv);
-    }
-
-    // Now get the switches.
-
-    bool acceptsMoreSwitches = true;
-
-    while (acceptsMoreSwitches
-        && argc > 0
-        && *argv[0] == L'-'
-        && _switches.contains(argv[0]))
-    {
-        acceptsMoreSwitches = _switches.at(argv[0])->Parse(--argc, ++argv);
-    }
-
-    // Get the rest of the input.
-
-    if (acceptsMoreSwitches)
-    {
-        acceptsMoreSwitches = _rest.Parse(argc, argv);
-    }
-
-    // Maybe some more switches after the arguments?
-
-    while (acceptsMoreSwitches
-        && argc > 0
-        && *argv[0] == L'-'
-        && _switches.contains(argv[0]))
-    {
-        acceptsMoreSwitches = _switches.at(argv[0])->Parse(--argc, ++argv);
-    }
-
-    // Invalid subcommand.
-
-    if (argc == originalArgc
-        && argc > 0
-        && *argv[0] != L'-')
-    {
-        std::wcerr << std::vformat(
-            UtilGetResourceString(MA_STRING_COMMAND_INVALID_SUBCOMMAND),
-            std::make_wformat_args(argv[0])
-        ) << std::endl;
-        return HRESULT_FROM_NT(STATUS_INVALID_PARAMETER);
-    }
-
-    if (acceptsMoreSwitches
-        && argc > 0)
-    {
-        if (*argv[0] == L'-')
-        {
-            // Invalid option.
-            std::wcerr << std::vformat(
-                UtilGetResourceString(MA_STRING_COMMAND_INVALID_OPTION),
-                std::make_wformat_args(argv[0])
-            ) << std::endl;
-            return HRESULT_FROM_NT(STATUS_INVALID_PARAMETER);
-        }
-        else
-        {
-            // Invalid argument.
-            std::wcerr << std::vformat(
-                UtilGetResourceString(MA_STRING_COMMAND_INVALID_ARGUMENT),
-                std::make_wformat_args(argv[0])
-            ) << std::endl;
-            return HRESULT_FROM_NT(STATUS_INVALID_PARAMETER);
-        }
-    }
     try
     {
+        int originalArgc = argc;
+
+        if (argc > 0 && _subcommands.contains(argv[0]))
+        {
+            return _subcommands.at(argv[0])->Run(--argc, ++argv);
+        }
+
+        // Now get the switches.
+
+        bool acceptsMoreSwitches = true;
+
+        while (acceptsMoreSwitches
+            && argc > 0
+            && *argv[0] == L'-'
+            && _switches.contains(argv[0]))
+        {
+            acceptsMoreSwitches = _switches.at(argv[0])->Parse(--argc, ++argv);
+        }
+
+        // Get the rest of the input.
+
+        if (acceptsMoreSwitches)
+        {
+            acceptsMoreSwitches = _rest.Parse(argc, argv);
+        }
+
+        // Maybe some more switches after the arguments?
+
+        while (acceptsMoreSwitches
+            && argc > 0
+            && *argv[0] == L'-'
+            && _switches.contains(argv[0]))
+        {
+            acceptsMoreSwitches = _switches.at(argv[0])->Parse(--argc, ++argv);
+        }
+
+        // Invalid subcommand.
+
+        if (argc == originalArgc
+            && argc > 0
+            && *argv[0] != L'-')
+        {
+            std::wcerr << std::vformat(
+                UtilGetResourceString(MA_STRING_COMMAND_INVALID_SUBCOMMAND),
+                std::make_wformat_args(argv[0])
+            ) << std::endl;
+            return HRESULT_FROM_NT(STATUS_INVALID_PARAMETER);
+        }
+
+        if (acceptsMoreSwitches
+            && argc > 0)
+        {
+            if (*argv[0] == L'-')
+            {
+                // Invalid option.
+                std::wcerr << std::vformat(
+                    UtilGetResourceString(MA_STRING_COMMAND_INVALID_OPTION),
+                    std::make_wformat_args(argv[0])
+                ) << std::endl;
+                return HRESULT_FROM_NT(STATUS_INVALID_PARAMETER);
+            }
+            else
+            {
+                // Invalid argument.
+                std::wcerr << std::vformat(
+                    UtilGetResourceString(MA_STRING_COMMAND_INVALID_ARGUMENT),
+                    std::make_wformat_args(argv[0])
+                ) << std::endl;
+                return HRESULT_FROM_NT(STATUS_INVALID_PARAMETER);
+            }
+        }
+
         if (_shouldPrintHelp)
         {
             PrintHelp(std::wcout);
