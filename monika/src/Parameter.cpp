@@ -1,6 +1,12 @@
 #include "Parameter.h"
 
+#include <filesystem>
+#include <fstream>
+
+#include "resource.h"
 #include "util.h"
+
+#include "Exception.h"
 
 Parameter::Parameter(
     int type
@@ -44,4 +50,102 @@ extern const Parameter& NullParameter = ([]()
     };
 
     return NullParameter();
+})();
+
+//
+// DriverPathParameter
+//
+
+extern const Parameter& DriverPathParameter = ([]()
+{
+    class DriverPathParameter : public Parameter
+    {
+    public:
+        DriverPathParameter() : Parameter(MA_STRING_PARAMETER_NAME_DRIVER_PATH) { }
+        virtual std::any Parse(int& argc, wchar_t**& argv,
+            const std::type_info& type) const
+        {
+            std::wstring_view arg;
+            bool hasValue = false;
+
+            if (argc > 0)
+            {
+                --argc;
+                arg = std::wstring_view(*argv);
+                ++argv;
+                hasValue = true;
+
+                try
+                {
+                    // Check extension.
+                    if (std::filesystem::path(arg).extension().wstring() != L".sys")
+                    {
+                        throw nullptr;
+                    }
+
+                    // Check exists and PE magic.
+                    std::ifstream fin;
+                    fin.open(arg, std::ios_base::in | std::ios_base::binary);
+                    char buffer[2] = { };
+                    fin.read(buffer, 2);
+                    if (buffer[0] != 'M' || buffer[1] != 'Z')
+                    {
+                        throw nullptr;
+                    }
+                }
+                catch (...)
+                {
+                    throw MonikaException(
+                        MA_STRING_EXCEPTION_INVALID_DRIVER_PATH,
+                        HRESULT_FROM_WIN32(ERROR_INVALID_PARAMETER),
+                        arg
+                    );
+                }
+            }
+
+            const auto ThrowIfNoValue = [&]()
+            {
+                if (!hasValue)
+                {
+                    throw MonikaException(
+                        MA_STRING_EXCEPTION_VALUE_EXPECTED,
+                        HRESULT_FROM_WIN32(ERROR_INVALID_PARAMETER),
+                        GetName()
+                    );
+                }
+            };
+
+            if (type == typeid(std::filesystem::path))
+            {
+                ThrowIfNoValue();
+                return std::filesystem::path(arg);
+            }
+            else if (type == typeid(std::wstring))
+            {
+                ThrowIfNoValue();
+                return std::wstring(arg);
+            }
+            else if (type == typeid(std::wstring_view))
+            {
+                ThrowIfNoValue();
+                return arg;
+            }
+            else if (type == typeid(std::optional<std::filesystem::path>))
+            {
+                return hasValue ? std::optional(std::filesystem::path(arg)) : std::nullopt;
+            }
+            else if (type == typeid(std::optional<std::wstring>))
+            {
+                return hasValue ? std::optional(std::wstring(arg)) : std::nullopt;
+            }
+            else if (type == typeid(std::optional<std::wstring_view>))
+            {
+                return hasValue ? std::optional(arg) : std::nullopt;
+            }
+
+            return nullptr;
+        }
+    };
+
+    return DriverPathParameter();
 })();
