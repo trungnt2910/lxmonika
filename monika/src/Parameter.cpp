@@ -21,7 +21,7 @@ Parameter::Parameter(
 
 extern const Parameter& NullParameter = ([]()
 {
-    class NullParameter : public Parameter
+    static const class NullParameter : public Parameter
     {
     public:
         NullParameter() : Parameter(L"") { }
@@ -47,9 +47,9 @@ extern const Parameter& NullParameter = ([]()
 
             return nullptr;
         }
-    };
+    } NullParameter;
 
-    return NullParameter();
+    return NullParameter;
 })();
 
 //
@@ -58,7 +58,7 @@ extern const Parameter& NullParameter = ([]()
 
 extern const Parameter& DriverPathParameter = ([]()
 {
-    class DriverPathParameter : public Parameter
+    static const class DriverPathParameter : public Parameter
     {
     public:
         DriverPathParameter() : Parameter(MA_STRING_PARAMETER_NAME_DRIVER_PATH) { }
@@ -145,7 +145,7 @@ extern const Parameter& DriverPathParameter = ([]()
 
             return nullptr;
         }
-    };
+    } DriverPathParameter;
 
-    return DriverPathParameter();
+    return DriverPathParameter;
 })();
