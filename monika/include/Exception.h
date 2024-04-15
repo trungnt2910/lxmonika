@@ -16,6 +16,9 @@ private:
 protected:
     Exception(HRESULT hresult, const std::wstring_view& message)
         : _hresult(hresult), _message(message) { }
+    Exception(HRESULT hresult)
+        : _hresult(hresult) { }
+    std::wstring_view& SetMessage(const std::wstring_view& message) { return _message = message; }
 public:
     const std::wstring_view& Message() const { return _message; }
     const HRESULT GetHresult() const { return _hresult; }
@@ -47,7 +50,9 @@ public:
         : Exception(hresult, UtilGetResourceString(message)) { }
     template <typename... Args>
     MonikaException(int message, HRESULT hresult, Args&&... args)
-        : _message(std::vformat(UtilGetResourceString(message), std::make_wformat_args(args...))),
-          Exception(hresult, _message)
-    { }
+        : Exception(hresult),
+          _message(std::vformat(UtilGetResourceString(message), std::make_wformat_args(args...)))
+    {
+        SetMessage(_message);
+    }
 };
