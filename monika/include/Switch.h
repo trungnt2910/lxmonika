@@ -67,4 +67,10 @@ public:
         : SwitchBase(parameter, typeid(T), &parameterOutput, acceptsMoreSwitches) { }
 };
 
+template <typename T>
+Switch(int, int, int, const Parameter&, T&, bool) -> Switch<T>;
+
+template <typename T>
+Switch(const Parameter&, T&, bool) -> Switch<T>;
+
 extern const Switch<>& NullSwitch;
