@@ -32,6 +32,10 @@ public:
             HRESULT_FROM_WIN32(code),
             UtilGetErrorMessage(HRESULT_FROM_WIN32(code))
         ) { }
+
+    template <typename T>
+    [[nodiscard]]
+    static T ThrowIfNull(T result) { return (result != (T)0) ? result : throw Win32Exception(); }
 };
 
 class NTException : public Win32Exception
