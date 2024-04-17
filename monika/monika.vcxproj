@@ -96,6 +96,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ClCompile Include="src\Command.cpp" />
+    <ClCompile Include="src\Commands\Install.cpp" />
     <ClCompile Include="src\Commands\Monika.cpp" />
     <ClCompile Include="src\Parameter.cpp" />
     <ClCompile Include="src\Switch.cpp" />
@@ -104,6 +105,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\Command.h" />
+    <ClInclude Include="include\Commands\Install.h" />
+    <ClInclude Include="include\constants.h" />
     <ClInclude Include="include\Exception.h" />
     <ClInclude Include="include\Commands\Monika.h" />
     <ClInclude Include="include\Parameter.h" />

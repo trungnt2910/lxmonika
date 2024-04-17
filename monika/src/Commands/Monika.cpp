@@ -6,13 +6,14 @@
 #include "util.h"
 
 Monika::Monika()
-    :   Command(
-            MA_STRING_MONIKA_COMMAND_NAME,
-            MA_STRING_MONIKA_COMMAND_DESCRIPTION,
-            NullSwitch
-        )
+  : Command(
+        MA_STRING_MONIKA_COMMAND_NAME,
+        MA_STRING_MONIKA_COMMAND_DESCRIPTION,
+        NullSwitch
+    ),
+    _installCommand(this)
 {
-    // Currently no-op.
+    AddCommand(_installCommand);
 }
 
 int
