@@ -9,7 +9,7 @@
 #include <string.h>
 #include <Windows.h>
 
-#include "Monika.h"
+#include "Commands/Monika.h"
 
 int wmain(int argc, PWCHAR argv[])
 {
