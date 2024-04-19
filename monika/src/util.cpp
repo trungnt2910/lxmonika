@@ -5,6 +5,8 @@
 #include <comdef.h>
 #include <Windows.h>
 
+#include <Exception.h>
+
 std::wstring_view
 UtilGetResourceString(
     int code
@@ -34,4 +36,18 @@ UtilGetErrorMessage(
     }
 
     return cache[code] = _com_error(code).ErrorMessage();
+}
+
+std::shared_ptr<std::remove_pointer_t<SC_HANDLE>>
+UtilGetSharedServiceHandle(
+    SC_HANDLE handle,
+    bool shouldThrow
+)
+{
+    if (shouldThrow)
+    {
+        handle = Win32Exception::ThrowIfNull(handle);
+    }
+
+    return std::shared_ptr<std::remove_pointer_t<SC_HANDLE>>(handle, CloseServiceHandle);
 }
