@@ -22,3 +22,4 @@ public:
 
 extern const Parameter& NullParameter;
 extern const Parameter& DriverPathParameter;
+extern const Parameter& StringParameter;
