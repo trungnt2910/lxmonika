@@ -19,11 +19,12 @@ Install::Install(const CommandBase* parentCommand)
   : Command(
         MA_STRING_INSTALL_COMMAND_NAME,
         MA_STRING_INSTALL_COMMAND_DESCRIPTION,
-        Switch(
-            -1, -1, MA_STRING_INSTALL_COMMAND_ARGUMENT_DESCRIPTION,
-            DriverPathParameter, _path, true
-        ),
+        _rest,
         parentCommand
+    ),
+    _rest(
+        -1, -1, MA_STRING_INSTALL_COMMAND_ARGUMENT_DESCRIPTION,
+        DriverPathParameter, _path, true
     )
 {
     // Currently no-op.
