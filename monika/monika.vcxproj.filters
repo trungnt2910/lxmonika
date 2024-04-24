@@ -39,6 +39,9 @@
     <ClCompile Include="src\Commands\Install.cpp">
       <Filter>Source Files\Commands</Filter>
     </ClCompile>
+    <ClCompile Include="src\Commands\InstallProvider.cpp">
+      <Filter>Source Files\Commands</Filter>
+    </ClCompile>
     <ClCompile Include="src\Commands\Monika.cpp">
       <Filter>Source Files\Commands</Filter>
     </ClCompile>
@@ -69,6 +72,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\Commands\Install.h">
+      <Filter>Header Files\Commands</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Commands\InstallProvider.h">
       <Filter>Header Files\Commands</Filter>
     </ClInclude>
     <ClInclude Include="include\Commands\Monika.h">

@@ -15,6 +15,8 @@
 #include "Parameter.h"
 #include "Switch.h"
 
+#include "Commands/InstallProvider.h"
+
 Install::Install(const CommandBase* parentCommand)
   : Command(
         MA_STRING_INSTALL_COMMAND_NAME,
@@ -22,12 +24,13 @@ Install::Install(const CommandBase* parentCommand)
         _rest,
         parentCommand
     ),
+    _installProviderCommand(this),
     _rest(
         -1, -1, MA_STRING_INSTALL_COMMAND_ARGUMENT_DESCRIPTION,
         DriverPathParameter, _path, true
     )
 {
-    // Currently no-op.
+    AddCommand(_installProviderCommand);
 }
 
 int
@@ -62,7 +65,7 @@ Install::Execute() const
 
         fullPath = std::filesystem::canonical(
             std::filesystem::path(executablePathString).parent_path()
-            / MA_SERVICE_DEFAULT_DRIVER_NAME,
+            / MA_SERVICE_DRIVER_NAME,
             ec
         );
 

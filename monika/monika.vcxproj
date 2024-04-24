@@ -97,6 +97,7 @@
   <ItemGroup>
     <ClCompile Include="src\Command.cpp" />
     <ClCompile Include="src\Commands\Install.cpp" />
+    <ClCompile Include="src\Commands\InstallProvider.cpp" />
     <ClCompile Include="src\Commands\Monika.cpp" />
     <ClCompile Include="src\Commands\Uninstall.cpp" />
     <ClCompile Include="src\Parameter.cpp" />
@@ -107,10 +108,11 @@
   <ItemGroup>
     <ClInclude Include="include\Command.h" />
     <ClInclude Include="include\Commands\Install.h" />
+    <ClInclude Include="include\Commands\InstallProvider.h" />
+    <ClInclude Include="include\Commands\Monika.h" />
     <ClInclude Include="include\Commands\Uninstall.h" />
     <ClInclude Include="include\constants.h" />
     <ClInclude Include="include\Exception.h" />
-    <ClInclude Include="include\Commands\Monika.h" />
     <ClInclude Include="include\Parameter.h" />
     <ClInclude Include="include\Switch.h" />
     <ClInclude Include="include\util.h" />
