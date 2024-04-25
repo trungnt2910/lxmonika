@@ -36,6 +36,18 @@ public:
     template <typename T>
     [[nodiscard]]
     static T ThrowIfNull(T result) { return (result != (T)0) ? result : throw Win32Exception(); }
+
+    static void ThrowIfFalse(BOOL result) { if (!result) throw Win32Exception(); }
+
+    static bool ThrowUnless(DWORD error)
+    {
+        DWORD code = GetLastError();
+        if (code != ERROR_SUCCESS && code != error)
+        {
+            throw Win32Exception();
+        }
+        return code != error;
+    }
 };
 
 class NTException : public Win32Exception
