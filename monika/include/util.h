@@ -25,3 +25,6 @@ std::shared_ptr<std::remove_pointer_t<SC_HANDLE>>
         SC_HANDLE handle,
         bool shouldThrow = true
     );
+
+std::wstring
+    UtilGetSystemDirectory();

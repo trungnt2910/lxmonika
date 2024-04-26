@@ -51,3 +51,29 @@ UtilGetSharedServiceHandle(
 
     return std::shared_ptr<std::remove_pointer_t<SC_HANDLE>>(handle, CloseServiceHandle);
 }
+
+std::wstring
+UtilGetSystemDirectory()
+{
+    std::wstring result;
+    result.resize(result.capacity());
+
+    while (true)
+    {
+        UINT uSize = Win32Exception::ThrowIfNull(
+            GetSystemDirectoryW(result.data(), (UINT)result.size())
+        );
+
+        if (uSize > result.size())
+        {
+            result.resize(uSize);
+        }
+        else
+        {
+            result.resize(uSize);
+            break;
+        }
+    }
+
+    return result;
+}
