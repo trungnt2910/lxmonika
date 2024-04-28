@@ -9,6 +9,7 @@
 
 #include "constants.h"
 #include "resource.h"
+#include "service.h"
 #include "util.h"
 
 #include "Exception.h"
@@ -77,30 +78,23 @@ Install::Execute() const
     }
 
     auto manager = UtilGetSharedServiceHandle(OpenSCManagerW(
-        NULL, NULL, SC_MANAGER_CREATE_SERVICE
+        NULL, NULL, SC_MANAGER_CREATE_SERVICE | SC_MANAGER_ENUMERATE_SERVICE
     ));
 
-    auto service = UtilGetSharedServiceHandle(CreateServiceW(
-        manager.get(),
+    if (SvIsLxMonikaInstalled(manager))
+    {
+        throw MonikaException(MA_STRING_EXCEPTION_LXMONIKA_ALREADY_INSTALLED);
+    }
+
+    auto service = SvInstallDriver(
+        manager,
+        SERVICE_START | DELETE,
         MA_SERVICE_NAME,
         MA_SERVICE_DISPLAY_NAME,
-        SERVICE_START | DELETE,
-        SERVICE_KERNEL_DRIVER,
-        SERVICE_SYSTEM_START,
-        SERVICE_ERROR_NORMAL,
-        // On Windows, std::filesystem::canonical removes the '??' prefix.
-        // Add it again, since the service manager needs the prefix to properly find the driver.
-        //
-        // Contrary to the docs on Microsoft, even for paths with whitespaces, we do NOT need the
-        // double quotes.
-        std::format(L"\\??\\{}", std::filesystem::canonical(fullPath).wstring())
-        .c_str(),
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        NULL
-    ));
+        UtilGetResourceString(MA_STRING_MONIKA_JUST_MONIKA),
+        fullPath,
+        std::nullopt
+    );
 
     if (!StartServiceW(
         service.get(),
