@@ -7,6 +7,7 @@
 
 #include "constants.h"
 #include "resource.h"
+#include "service.h"
 #include "util.h"
 
 #include "Exception.h"
@@ -55,42 +56,20 @@ InstallProvider::Execute() const
         NULL, NULL, SC_MANAGER_CREATE_SERVICE
     ));
 
-    auto lxmonika = UtilGetSharedServiceHandle(OpenServiceW(
-        manager.get(), MA_SERVICE_NAME, SERVICE_QUERY_STATUS
-    ), false);
-
-    if (!lxmonika)
+    if (!SvIsLxMonikaRunning(manager))
     {
         throw MonikaException(MA_STRING_EXCEPTION_LXMONIKA_NOT_INSTALLED);
     }
 
-    auto service = UtilGetSharedServiceHandle(CreateServiceW(
-        manager.get(),
-        _serviceName.empty() ? fullPath.stem().wstring().c_str() : _serviceName.c_str(),
-        _serviceDisplayName.empty() ? NULL : _serviceDisplayName.c_str(),
+    auto service = SvInstallDriver(
+        manager,
         SERVICE_START | DELETE,
-        SERVICE_KERNEL_DRIVER,
-        SERVICE_SYSTEM_START,
-        SERVICE_ERROR_NORMAL,
-        std::format(L"\\??\\{}", std::filesystem::canonical(fullPath).wstring())
-            .c_str(),
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        NULL
-    ));
-
-    SERVICE_STATUS lxmonikaStatus;
-    if (!QueryServiceStatus(lxmonika.get(), &lxmonikaStatus))
-    {
-        return HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED);
-    }
-
-    if (lxmonikaStatus.dwCurrentState != SERVICE_RUNNING)
-    {
-        return HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED);
-    }
+        _serviceName.empty() ? fullPath.stem().wstring() : _serviceName,
+        _serviceDisplayName.empty() ? std::optional<std::wstring>() : _serviceDisplayName,
+        std::nullopt,
+        fullPath,
+        std::vector<std::wstring>{ MA_SERVICE_NAME }
+    );
 
     if (!StartServiceW(service.get(), 0, NULL))
     {

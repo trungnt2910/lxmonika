@@ -29,3 +29,8 @@ bool
     SvIsLxMonikaInstalled(
         ServiceHandle manager
     );
+
+bool
+    SvIsLxMonikaRunning(
+        ServiceHandle manager
+    );

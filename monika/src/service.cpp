@@ -166,3 +166,155 @@ SvIsLxMonikaInstalled(
 
     throw Win32Exception(code);
 }
+
+bool
+SvIsLxMonikaRunning(
+    ServiceHandle manager
+)
+{
+    std::vector<char> buffer;
+
+    // 5 conditions:
+    // - lxmonika service installed.
+    // - lxmonika service or any dependent is running.
+    // - lxmonika.sys driver file exists in C:\Windows\System32\drivers.
+    // - lxmonika binary path correctly set to C:\Windows\System32\drivers\lxmonika.sys.
+    // - \Device\Reality exists.
+
+    // lxmonika service installed
+
+    auto lxmonika = UtilGetSharedServiceHandle(OpenServiceW(
+        manager.get(),
+        MA_SERVICE_NAME,
+        SERVICE_QUERY_STATUS | SERVICE_QUERY_CONFIG | SERVICE_ENUMERATE_DEPENDENTS
+    ), false);
+
+    if (!Win32Exception::ThrowUnless(ERROR_SERVICE_DOES_NOT_EXIST))
+    {
+        return false;
+    }
+
+    // lxmonika service or any dependent is running.
+
+    SERVICE_STATUS serviceStatus;
+    Win32Exception::ThrowIfFalse(QueryServiceStatus(lxmonika.get(), &serviceStatus));
+
+    if (serviceStatus.dwServiceType != SERVICE_KERNEL_DRIVER)
+    {
+        return false;
+    }
+
+    if (serviceStatus.dwCurrentState != SERVICE_RUNNING)
+    {
+        DWORD cbBytesNeeded;
+        DWORD dwServicesReturned;
+        while (true)
+        {
+            if (EnumDependentServicesW(
+                lxmonika.get(),
+                SERVICE_ACTIVE,
+                (LPENUM_SERVICE_STATUSW)buffer.data(),
+                (DWORD)buffer.size(),
+                &cbBytesNeeded,
+                &dwServicesReturned
+            ))
+            {
+                break;
+            }
+
+            Win32Exception::ThrowUnless(ERROR_MORE_DATA);
+            buffer.resize(cbBytesNeeded);
+        }
+
+        LPENUM_SERVICE_STATUSW pEnumServiceStatus = (LPENUM_SERVICE_STATUSW)buffer.data();
+
+        if (std::none_of(
+            pEnumServiceStatus,
+            pEnumServiceStatus + dwServicesReturned,
+            [](const ENUM_SERVICE_STATUSW& status)
+            {
+                return status.ServiceStatus.dwCurrentState == SERVICE_RUNNING;
+            }
+        ))
+        {
+            return false;
+        }
+    }
+
+    // lxmonika.sys driver file exists in C:\Windows\System32.
+
+    std::filesystem::path installPath = UtilGetSystemDirectory();
+    installPath /= "drivers";
+    installPath /= MA_SERVICE_DRIVER_NAME;
+
+    if (!std::filesystem::exists(installPath))
+    {
+        return false;
+    }
+
+    // - lxmonika binary path correctly set to C:\Windows\System32\drivers\lxmonika.sys.
+
+    DWORD cbBytesNeeded;
+
+    while (true)
+    {
+        if (QueryServiceConfigW(
+            lxmonika.get(),
+            (LPQUERY_SERVICE_CONFIGW)buffer.data(),
+            (DWORD)buffer.size(),
+            &cbBytesNeeded
+        ))
+        {
+            break;
+        }
+
+        Win32Exception::ThrowUnless(ERROR_INSUFFICIENT_BUFFER);
+        buffer.resize(cbBytesNeeded);
+    }
+
+    LPQUERY_SERVICE_CONFIGW pQueryServiceConfig = (LPQUERY_SERVICE_CONFIGW)buffer.data();
+
+    if (std::filesystem::canonical(installPath)
+        != std::filesystem::weakly_canonical(pQueryServiceConfig->lpBinaryPathName))
+    {
+        return false;
+    }
+
+    // \Device\Reality exists.
+
+    UNICODE_STRING strDevicePath;
+    RtlInitUnicodeString(&strDevicePath, L"\\Device\\Reality");
+
+    OBJECT_ATTRIBUTES objAttributes;
+    InitializeObjectAttributes(
+        &objAttributes,
+        &strDevicePath,
+        OBJ_CASE_INSENSITIVE,
+        NULL,
+        NULL
+    );
+
+    IO_STATUS_BLOCK ioStatus;
+
+    HANDLE hdlDevice = NULL;
+    NTSTATUS status = NtCreateFile(
+        &hdlDevice,
+        FILE_GENERIC_READ | FILE_GENERIC_WRITE,
+        &objAttributes,
+        &ioStatus,
+        NULL,
+        0,
+        FILE_SHARE_READ | FILE_SHARE_WRITE,
+        FILE_CREATE,
+        FILE_SYNCHRONOUS_IO_NONALERT,
+        NULL,
+        0
+    );
+
+    if (!NT_SUCCESS(status))
+    {
+        return false;
+    }
+
+    return true;
+}
