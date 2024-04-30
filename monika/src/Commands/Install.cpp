@@ -89,6 +89,9 @@ Install::Execute() const
     auto service = SvInstallDriver(
         manager,
         SERVICE_START | DELETE,
+        // lxmonika.sys should start before any userland process is created,
+        // since these process may (indirectly) use lxcore.sys and Pico process services.
+        SERVICE_SYSTEM_START,
         MA_SERVICE_NAME,
         MA_SERVICE_DISPLAY_NAME,
         UtilGetResourceString(MA_STRING_MONIKA_JUST_MONIKA),

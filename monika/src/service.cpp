@@ -46,6 +46,7 @@ ServiceHandle
 SvInstallDriver(
     ServiceHandle manager,
     DWORD dwDesiredAccess,
+    DWORD dwStartType,
     const std::wstring_view& serviceName,
     const std::optional<std::wstring_view>& displayName,
     const std::optional<std::wstring_view>& description,
@@ -101,7 +102,7 @@ SvInstallDriver(
                 dwDesiredAccess | DELETE |
                     (description.has_value() ? SERVICE_CHANGE_CONFIG : 0),
                 SERVICE_KERNEL_DRIVER,
-                SERVICE_SYSTEM_START,
+                dwStartType,
                 SERVICE_ERROR_NORMAL,
                 // On Windows, std::filesystem::canonical removes the '??' prefix.
                 // Add it again, since the service manager needs the prefix to properly

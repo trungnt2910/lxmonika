@@ -18,6 +18,7 @@ ServiceHandle
     SvInstallDriver(
         ServiceHandle manager,
         DWORD dwDesiredAccess,
+        DWORD dwStartType,
         const std::wstring_view& serviceName,
         const std::optional<std::wstring_view>& displayName,
         const std::optional<std::wstring_view>& description,

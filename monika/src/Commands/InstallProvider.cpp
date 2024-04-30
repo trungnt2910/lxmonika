@@ -64,6 +64,10 @@ InstallProvider::Execute() const
     auto service = SvInstallDriver(
         manager,
         SERVICE_START | DELETE,
+        // lxmonika-based providers must start AFTER lxmonika.sys.
+        // Drivers that specify SERVICE_BOOT_START or SERVICE_SYSTEM_START
+        // do not have their registered dependencies respected by the service manager.
+        SERVICE_AUTO_START,
         _serviceName.empty() ? fullPath.stem().wstring() : _serviceName,
         _serviceDisplayName.empty() ? std::optional<std::wstring>() : _serviceDisplayName,
         std::nullopt,
