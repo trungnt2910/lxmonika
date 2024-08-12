@@ -1,4 +1,3 @@
-#include <array>
 #include <cstddef>
 #include <cstdint>
 
@@ -10,14 +9,15 @@ MonixSyscall(
     Args... args
 )
 {
-    std::array<intptr_t, sizeof...(args)> argsArray = { (intptr_t)args... };
+    constexpr size_t argsCount = sizeof...(Args);
+    intptr_t argsArray[argsCount] = { (intptr_t)args... };
 
-    static_assert(argsArray.size() <= 6, "Too many arguments for a Linux syscall.");
+    static_assert(argsCount <= 6, "Too many arguments for a Linux syscall.");
 
 #define SET_REGISTER_IF_PRESENT(reg, index)         \
     do                                              \
     {                                               \
-        if constexpr (argsArray.size() > index)     \
+        if constexpr (argsCount > index)            \
         {                                           \
             reg = argsArray[index];                 \
         }                                           \
