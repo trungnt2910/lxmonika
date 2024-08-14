@@ -20,95 +20,66 @@ MonixSyscall(
 
     static_assert(argsCount <= 6, "Too many arguments for a Linux syscall.");
 
-#define SET_REGISTER_IF_PRESENT(reg, index)         \
+#define SET_REGISTER_IF_PRESENT(index)              \
     do                                              \
     {                                               \
         if constexpr (argsCount > index)            \
         {                                           \
-            reg = argsArray[index];                 \
+            reg_r##index = argsArray[index];        \
         }                                           \
     }                                               \
     while (0)
 
+#define DO_SYSCALL(op, rnum, rret, r0, r1, r2, r3, r4, r5, ...)             \
+    do                                                                      \
+    {                                                                       \
+        /* DON'T intialize these registers, otherwise the compiler */       \
+        /* will generate additional code to zero them out! */               \
+        register intptr_t reg_rnum asm(#rnum);                              \
+        register intptr_t reg_r0   asm(#r0);                                \
+        register intptr_t reg_r1   asm(#r1);                                \
+        register intptr_t reg_r2   asm(#r2);                                \
+        register intptr_t reg_r3   asm(#r3);                                \
+        register intptr_t reg_r4   asm(#r4);                                \
+        register intptr_t reg_r5   asm(#r5);                                \
+        register intptr_t reg_rret asm(#rret);                              \
+                                                                            \
+        /* The macros below expand to `if constexpr` statements. */         \
+        /* The registers will only be attached to existing arguments. */    \
+        reg_rnum = number;                                                  \
+        SET_REGISTER_IF_PRESENT(0);                                         \
+        SET_REGISTER_IF_PRESENT(1);                                         \
+        SET_REGISTER_IF_PRESENT(2);                                         \
+        SET_REGISTER_IF_PRESENT(3);                                         \
+        SET_REGISTER_IF_PRESENT(4);                                         \
+        SET_REGISTER_IF_PRESENT(5);                                         \
+                                                                            \
+        asm volatile(                                                       \
+            #op                                                             \
+            /* Outputs */                                                   \
+            : "+r"(reg_rret)                                                \
+            /* Inputs */                                                    \
+            : "r"(reg_rnum),                                                \
+              "r"(reg_r0), "r"(reg_r1), "r"(reg_r2),                        \
+              "r"(reg_r3), "r"(reg_r4), "r"(reg_r5)                         \
+            /* Clobbers */                                                  \
+            : "memory" __VA_OPT__(,) __VA_ARGS__                            \
+        );                                                                  \
+                                                                            \
+        return reg_rret;                                                    \
+    }                                                                       \
+    while (0)
 #ifdef __x86_64__
-    // DON'T intialize these registers, otherwise
-    // the compiler will generate additional code to zero them out!
-    register intptr_t rax asm("rax");
-    register intptr_t rdi asm("rdi");
-    register intptr_t rsi asm("rsi");
-    register intptr_t rdx asm("rdx");
-    register intptr_t r10 asm("r10");
-    register intptr_t r8 asm("r8");
-    register intptr_t r9 asm("r9");
-
-    // The macros below expand to `if constexpr` statements.
-    // The registers will only be attached to existing arguments.
-    rax = number;
-    SET_REGISTER_IF_PRESENT(rdi, 0);
-    SET_REGISTER_IF_PRESENT(rsi, 1);
-    SET_REGISTER_IF_PRESENT(rdx, 2);
-    SET_REGISTER_IF_PRESENT(r10, 3);
-    SET_REGISTER_IF_PRESENT(r8, 4);
-    SET_REGISTER_IF_PRESENT(r9, 5);
-
-    asm volatile(
-        "syscall"
-        : "+r"(rax)
-        : "r"(rdi), "r"(rsi), "r"(rdx), "r"(r10), "r"(r8), "r"(r9)
-        : "rcx", "r11", "memory"
-    );
-
-    return rax;
+    DO_SYSCALL(syscall, rax, rax,
+               rdi, rsi, rdx, r10, r8, r9,
+               "rcx", "r11");
 #elifdef __i386__
-    register intptr_t eax asm("eax");
-    register intptr_t ebx asm("ebx");
-    register intptr_t ecx asm("ecx");
-    register intptr_t edx asm("edx");
-    register intptr_t esi asm("esi");
-    register intptr_t edi asm("edi");
-    register intptr_t ebp asm("ebp");
-
-    eax = number;
-    SET_REGISTER_IF_PRESENT(ebx, 0);
-    SET_REGISTER_IF_PRESENT(ecx, 1);
-    SET_REGISTER_IF_PRESENT(edx, 2);
-    SET_REGISTER_IF_PRESENT(esi, 3);
-    SET_REGISTER_IF_PRESENT(edi, 4);
-    SET_REGISTER_IF_PRESENT(ebp, 5);
-
-    asm volatile(
-        "int $0x80"
-        : "+a"(eax)
-        : "b"(ebx), "c"(ecx), "d"(edx), "S"(esi), "D"(edi), "g"(ebp)
-        : "memory"
-    );
-
-    return eax;
+    DO_SYSCALL(int $0x80, eax, eax,
+               ebx, ecx, edx, esi, edi, ebp);
 #elifdef __aarch64__
-    register intptr_t x8 asm("x8");
-    register intptr_t x0 asm("x0");
-    register intptr_t x1 asm("x1");
-    register intptr_t x2 asm("x2");
-    register intptr_t x3 asm("x3");
-    register intptr_t x4 asm("x4");
-    register intptr_t x5 asm("x5");
-
-    x8 = number;
-    SET_REGISTER_IF_PRESENT(x0, 0);
-    SET_REGISTER_IF_PRESENT(x1, 1);
-    SET_REGISTER_IF_PRESENT(x2, 2);
-    SET_REGISTER_IF_PRESENT(x3, 3);
-    SET_REGISTER_IF_PRESENT(x4, 4);
-    SET_REGISTER_IF_PRESENT(x5, 5);
-
-    asm volatile(
-        "svc #0"
-        : "+r"(x0)
-        : "r"(x8), "r"(x0), "r"(x1), "r"(x2), "r"(x3), "r"(x4), "r"(x5)
-        : "memory"
-    );
-
-    return x0;
+    DO_SYSCALL(svc #0, x8, x0,
+               x0, x1, x2, x3, x4, x5,
+               "cc");
 #elifdef __arm__
     // This code only supports arm thumb code.
     // Without thumb mode, r7 is reserved as the frame pointer and using it for the syscall may
@@ -117,33 +88,14 @@ MonixSyscall(
     // Since Windows on ARM only supports thumb mode
     // (https://learn.microsoft.com/en-us/cpp/build/overview-of-arm-abi-conventions), this should
     // not be a problem.
-    register intptr_t r7 asm("r7");
-    register intptr_t r0 asm("r0");
-    register intptr_t r1 asm("r1");
-    register intptr_t r2 asm("r2");
-    register intptr_t r3 asm("r3");
-    register intptr_t r4 asm("r4");
-    register intptr_t r5 asm("r5");
-
-    r7 = number;
-    SET_REGISTER_IF_PRESENT(r0, 0);
-    SET_REGISTER_IF_PRESENT(r1, 1);
-    SET_REGISTER_IF_PRESENT(r2, 2);
-    SET_REGISTER_IF_PRESENT(r3, 3);
-    SET_REGISTER_IF_PRESENT(r4, 4);
-    SET_REGISTER_IF_PRESENT(r5, 5);
-
-    asm volatile(
-        "swi #0"
-        : "+r"(r0)
-        : "r"(r7), "r"(r0), "r"(r1), "r"(r2), "r"(r3), "r"(r4), "r"(r5)
-        : "memory"
-    );
-
-    return r0;
+    DO_SYSCALL(swi #0, r7, r0,
+               r0, r1, r2, r3, r4, r5);
 #else
 #error Write the syscall code for this architecture!
 #endif
+
+#undef SET_REGISTER_IF_PRESENT
+#undef DO_SYSCALL
 
 }
 
