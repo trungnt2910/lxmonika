@@ -6,6 +6,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <span>
 #include <string>
 #include <optional>
 #include <vector>
@@ -34,4 +35,10 @@ bool
 bool
     SvIsLxMonikaRunning(
         ServiceHandle manager
+    );
+
+std::span<const ENUM_SERVICE_STATUSW>
+    SvGetLxMonikaDependentServices(
+        ServiceHandle manager,
+        std::vector<char>& buffer
     );

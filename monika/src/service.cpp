@@ -187,7 +187,7 @@ SvIsLxMonikaRunning(
     auto lxmonika = UtilGetSharedServiceHandle(OpenServiceW(
         manager.get(),
         MA_SERVICE_NAME,
-        SERVICE_QUERY_STATUS | SERVICE_QUERY_CONFIG | SERVICE_ENUMERATE_DEPENDENTS
+        SERVICE_QUERY_STATUS | SERVICE_QUERY_CONFIG
     ), false);
 
     if (!Win32Exception::ThrowUnless(ERROR_SERVICE_DOES_NOT_EXIST))
@@ -207,31 +207,16 @@ SvIsLxMonikaRunning(
 
     if (serviceStatus.dwCurrentState != SERVICE_RUNNING)
     {
-        DWORD cbBytesNeeded;
-        DWORD dwServicesReturned;
-        while (true)
-        {
-            if (EnumDependentServicesW(
-                lxmonika.get(),
-                SERVICE_ACTIVE,
-                (LPENUM_SERVICE_STATUSW)buffer.data(),
-                (DWORD)buffer.size(),
-                &cbBytesNeeded,
-                &dwServicesReturned
-            ))
-            {
-                break;
-            }
-
-            Win32Exception::ThrowUnless(ERROR_MORE_DATA);
-            buffer.resize(cbBytesNeeded);
-        }
-
-        LPENUM_SERVICE_STATUSW pEnumServiceStatus = (LPENUM_SERVICE_STATUSW)buffer.data();
+        std::vector<char> buffer;
+        std::span<const ENUM_SERVICE_STATUSW> spanEnumSerivceStatus =
+            SvGetLxMonikaDependentServices(
+                manager,
+                buffer
+            );
 
         if (std::none_of(
-            pEnumServiceStatus,
-            pEnumServiceStatus + dwServicesReturned,
+            spanEnumSerivceStatus.begin(),
+            spanEnumSerivceStatus.end(),
             [](const ENUM_SERVICE_STATUSW& status)
             {
                 return status.ServiceStatus.dwCurrentState == SERVICE_RUNNING;
@@ -318,4 +303,42 @@ SvIsLxMonikaRunning(
     }
 
     return true;
+}
+
+std::span<const ENUM_SERVICE_STATUSW>
+SvGetLxMonikaDependentServices(
+    ServiceHandle manager,
+    std::vector<char>& buffer
+)
+{
+    auto lxmonika = UtilGetSharedServiceHandle(OpenServiceW(
+        manager.get(),
+        MA_SERVICE_NAME,
+        SERVICE_ENUMERATE_DEPENDENTS
+    ));
+
+    DWORD cbBytesNeeded;
+    DWORD dwServicesReturned;
+    while (true)
+    {
+        if (EnumDependentServicesW(
+            lxmonika.get(),
+            SERVICE_ACTIVE,
+            (LPENUM_SERVICE_STATUSW)buffer.data(),
+            (DWORD)buffer.size(),
+            &cbBytesNeeded,
+            &dwServicesReturned
+        ))
+        {
+            break;
+        }
+
+        Win32Exception::ThrowUnless(ERROR_MORE_DATA);
+        buffer.resize(cbBytesNeeded);
+    }
+
+    return std::span<const ENUM_SERVICE_STATUSW>(
+        (LPENUM_SERVICE_STATUSW)buffer.data(),
+        dwServicesReturned
+    );
 }
