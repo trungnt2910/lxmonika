@@ -4,6 +4,7 @@
 #include <fstream>
 
 #include "resource.h"
+#include "service.h"
 #include "util.h"
 
 #include "Exception.h"
@@ -14,6 +15,120 @@ Parameter::Parameter(
 {
     // Currently no-op.
 }
+
+//
+// AbstractStringParameter
+//
+
+// While this class works exactly the same way as normal StringParameter,
+// we also want others to inherit it as well. If we define StringParameter here,
+// when other classes in this file inherit "StringParameter", MSVC will produce an
+// internal compiler error, possibly due to having the same name as the exported
+// constant, "extern const Parameter& StringParameter;".
+// Therefore, we create an "AbstractStringParameter" here, then define our
+// invisible StringParameter class later.
+
+class AbstractStringParameter : public Parameter
+{
+public:
+    virtual std::any Parse(int& argc, wchar_t**& argv,
+        const std::type_info& type) const override final
+    {
+        std::optional<std::wstring_view> arg;
+
+        if (argc > 0)
+        {
+            --argc;
+            arg = std::wstring_view(*argv);
+            try
+            {
+                if (!Validate(arg.value()))
+                {
+                    throw nullptr;
+                }
+            }
+            catch (Exception&)
+            {
+                throw;
+            }
+            catch (...)
+            {
+                throw Win32Exception(ERROR_INVALID_PARAMETER);
+            }
+            ++argv;
+        }
+
+        return Convert(arg, type);
+    }
+protected:
+    AbstractStringParameter(int type) : Parameter(type) { }
+    virtual bool Validate(const std::wstring_view& arg) const
+    {
+        return true;
+    }
+    const std::wstring_view& EnsureHasValue(
+        const std::optional<std::wstring_view>& arg) const
+    {
+        if (!arg.has_value())
+        {
+            throw MonikaException(
+                MA_STRING_EXCEPTION_VALUE_EXPECTED,
+                HRESULT_FROM_WIN32(ERROR_INVALID_PARAMETER),
+                GetName()
+            );
+        }
+        return arg.value();
+    }
+    virtual std::any Convert(const std::optional<std::wstring_view>& arg,
+        const std::type_info& type) const
+    {
+        if (type == typeid(std::string))
+        {
+            const std::wstring_view& value = EnsureHasValue(arg);
+            std::string result;
+            result.resize(value.size());
+            std::transform(value.begin(), value.end(), result.begin(),
+                [](wchar_t wc) { return (char)wc; });
+            return result;
+        }
+        else if (type == typeid(std::wstring))
+        {
+            const std::wstring_view& value = EnsureHasValue(arg);
+            return std::wstring(value);
+        }
+        else if (type == typeid(std::wstring_view))
+        {
+            const std::wstring_view& value = EnsureHasValue(arg);
+            return value;
+        }
+        else if (type == typeid(std::optional<std::string>))
+        {
+            if (arg.has_value())
+            {
+                std::string result;
+                result.resize(arg.value().size());
+                std::transform(arg.value().begin(), arg.value().end(), result.begin(),
+                    [](wchar_t wc) { return (char)wc; });
+                return std::optional(result);
+            }
+            else
+            {
+                return (std::optional<std::wstring>)std::nullopt;
+            }
+        }
+        else if (type == typeid(std::optional<std::wstring>))
+        {
+            return arg.has_value() ?
+                std::optional(std::wstring(arg.value())) : std::nullopt;
+        }
+        else if (type == typeid(std::optional<std::wstring_view>))
+        {
+            return arg.has_value() ?
+                std::optional(arg) : std::nullopt;
+        }
+        return nullptr;
+    }
+};
 
 //
 // NullParameter
@@ -38,7 +153,7 @@ extern const Parameter& NullParameter = ([]()
             }
             else if (type == typeid(std::wstring))
             {
-                return std::wstring(L"");
+                return std::wstring();
             }
             else if (type == typeid(std::wstring_view))
             {
@@ -53,97 +168,79 @@ extern const Parameter& NullParameter = ([]()
 })();
 
 //
+// StringParameter
+//
+
+extern const Parameter& StringParameter = ([]()
+{
+    static const class StringParameter : public AbstractStringParameter
+    {
+    public:
+        StringParameter() : AbstractStringParameter(MA_STRING_PARAMETER_NAME_STRING) { }
+    } StringParameter;
+
+    return StringParameter;
+})();
+
+//
 // DriverPathParameter
 //
 
 extern const Parameter& DriverPathParameter = ([]()
 {
-    static const class DriverPathParameter : public Parameter
+    static const class DriverPathParameter : public AbstractStringParameter
     {
     public:
-        DriverPathParameter() : Parameter(MA_STRING_PARAMETER_NAME_DRIVER_PATH) { }
-        virtual std::any Parse(int& argc, wchar_t**& argv,
-            const std::type_info& type) const
+        DriverPathParameter() : AbstractStringParameter(MA_STRING_PARAMETER_NAME_DRIVER_PATH) { }
+    protected:
+        virtual bool Validate(const std::wstring_view& arg) const override
         {
-            std::wstring_view arg;
-            bool hasValue = false;
-
-            if (argc > 0)
+            try
             {
-                --argc;
-                arg = std::wstring_view(*argv);
-                ++argv;
-                hasValue = true;
-
-                try
+                // Check extension.
+                if (std::filesystem::path(arg).extension().wstring() != L".sys")
                 {
-                    // Check extension.
-                    if (std::filesystem::path(arg).extension().wstring() != L".sys")
-                    {
-                        throw nullptr;
-                    }
-
-                    // Check exists and PE magic.
-                    std::ifstream fin;
-                    fin.open(arg, std::ios_base::in | std::ios_base::binary);
-                    char buffer[2] = { };
-                    fin.read(buffer, 2);
-                    if (buffer[0] != 'M' || buffer[1] != 'Z')
-                    {
-                        throw nullptr;
-                    }
+                    throw nullptr;
                 }
-                catch (...)
+
+                // Check exists and PE magic.
+                std::ifstream fin;
+                fin.open(arg, std::ios_base::in | std::ios_base::binary);
+                char buffer[2] = { };
+                fin.read(buffer, 2);
+                if (buffer[0] != 'M' || buffer[1] != 'Z')
                 {
-                    throw MonikaException(
-                        MA_STRING_EXCEPTION_INVALID_DRIVER_PATH,
-                        HRESULT_FROM_WIN32(ERROR_INVALID_PARAMETER),
-                        arg
-                    );
+                    throw nullptr;
                 }
             }
-
-            const auto ThrowIfNoValue = [&]()
+            catch (...)
             {
-                if (!hasValue)
-                {
-                    throw MonikaException(
-                        MA_STRING_EXCEPTION_VALUE_EXPECTED,
-                        HRESULT_FROM_WIN32(ERROR_INVALID_PARAMETER),
-                        GetName()
-                    );
-                }
-            };
+                throw MonikaException(
+                    MA_STRING_EXCEPTION_INVALID_DRIVER_PATH,
+                    HRESULT_FROM_WIN32(ERROR_INVALID_PARAMETER),
+                    arg
+                );
+            }
 
+            return AbstractStringParameter::Validate(arg);
+        }
+        virtual std::any Convert(const std::optional<std::wstring_view>& arg,
+            const std::type_info& type) const override
+        {
             if (type == typeid(std::filesystem::path))
             {
-                ThrowIfNoValue();
-                return std::filesystem::path(arg);
-            }
-            else if (type == typeid(std::wstring))
-            {
-                ThrowIfNoValue();
-                return std::wstring(arg);
-            }
-            else if (type == typeid(std::wstring_view))
-            {
-                ThrowIfNoValue();
-                return arg;
+                const std::wstring_view& value = EnsureHasValue(arg);
+                return std::filesystem::path(value);
             }
             else if (type == typeid(std::optional<std::filesystem::path>))
             {
-                return hasValue ? std::optional(std::filesystem::path(arg)) : std::nullopt;
+                return arg.has_value() ?
+                    std::optional(std::filesystem::path(arg.value())) : std::nullopt;
             }
-            else if (type == typeid(std::optional<std::wstring>))
+            else
             {
-                return hasValue ? std::optional(std::wstring(arg)) : std::nullopt;
+                return AbstractStringParameter::Convert(arg, type);
             }
-            else if (type == typeid(std::optional<std::wstring_view>))
-            {
-                return hasValue ? std::optional(arg) : std::nullopt;
-            }
-
-            return nullptr;
         }
     } DriverPathParameter;
 
@@ -151,87 +248,62 @@ extern const Parameter& DriverPathParameter = ([]()
 })();
 
 //
-// StringParameter
+// ServiceNameParameter
 //
 
-extern const Parameter& StringParameter = ([]()
+extern const Parameter& ServiceNameParameter = ([]()
 {
-    static const class StringParameter : public Parameter
+    static const class ServiceNameParameter : public AbstractStringParameter
     {
     public:
-        StringParameter() : Parameter(MA_STRING_PARAMETER_NAME_STRING) { }
-        virtual std::any Parse(int& argc, wchar_t**& argv,
-            const std::type_info& type) const
+        ServiceNameParameter() : AbstractStringParameter(MA_STRING_PARAMETER_NAME_SERVICE_NAME) { }
+    protected:
+        virtual bool Validate(const std::wstring_view& arg) const override
         {
-            std::wstring_view arg;
-            bool hasValue = false;
-
-            if (argc > 0)
+            try
             {
-                --argc;
-                arg = std::wstring_view(*argv);
-                ++argv;
-                hasValue = true;
-            }
+                auto manager = UtilGetSharedServiceHandle(OpenSCManagerW(
+                    NULL, NULL, SC_MANAGER_CREATE_SERVICE | SC_MANAGER_ENUMERATE_SERVICE
+                ));
 
-            const auto ThrowIfNoValue = [&]()
-            {
-                if (!hasValue)
+                std::vector<char> buffer;
+                std::span<const ENUM_SERVICE_STATUSW> spanEnumSerivceStatus =
+                    SvGetLxMonikaDependentServices(manager, buffer);
+
+                if (std::none_of(
+                    spanEnumSerivceStatus.begin(),
+                    spanEnumSerivceStatus.end(),
+                    [&](const ENUM_SERVICE_STATUSW& status)
+                    {
+                        return _wcsicmp(status.lpDisplayName, arg.data()) == 0;
+                    }
+                ))
                 {
-                    throw MonikaException(
-                        MA_STRING_EXCEPTION_VALUE_EXPECTED,
-                        HRESULT_FROM_WIN32(ERROR_INVALID_PARAMETER),
-                        GetName()
-                    );
+                    throw nullptr;
                 }
-            };
 
-            if (type == typeid(std::string))
-            {
-                ThrowIfNoValue();
-                std::string result;
-                result.resize(arg.size());
-                std::transform(arg.begin(), arg.end(), result.begin(),
-                    [](wchar_t wc) { return (char)wc; });
-                return result;
+                return true;
             }
-            else if (type == typeid(std::wstring))
+            catch (Exception&)
             {
-                ThrowIfNoValue();
-                return std::wstring(arg);
+                // Another component is throwing an exception.
+                throw;
             }
-            else if (type == typeid(std::wstring_view))
+            catch (...)
             {
-                ThrowIfNoValue();
-                return arg;
-            }
-            else if (type == typeid(std::optional<std::string>))
-            {
-                if (hasValue)
-                {
-                    std::string result;
-                    result.resize(arg.size());
-                    std::transform(arg.begin(), arg.end(), result.begin(),
-                        [](wchar_t wc) { return (char)wc; });
-                    return std::optional(result);
-                }
-                else
-                {
-                    return (std::optional<std::wstring>)std::nullopt;
-                }
-            }
-            else if (type == typeid(std::optional<std::wstring>))
-            {
-                return hasValue ? std::optional(std::wstring(arg)) : std::nullopt;
-            }
-            else if (type == typeid(std::optional<std::wstring_view>))
-            {
-                return hasValue ? std::optional(arg) : std::nullopt;
+                // We got some generic exception that we don't know how to handle,
+                // or we have a nullptr here due to the check failed.
+                // Fail it as a generic error for this category.
+                throw MonikaException(
+                    MA_STRING_EXCEPTION_UNKNOWN_SERVICE,
+                    HRESULT_FROM_WIN32(ERROR_INVALID_PARAMETER),
+                    arg
+                );
             }
 
-            return nullptr;
+            return AbstractStringParameter::Validate(arg);
         }
-    } StringParameter;
+    } ServiceNameParameter;
 
-    return StringParameter;
+    return ServiceNameParameter;
 })();

@@ -64,14 +64,16 @@ BEGIN
                             "lxmonika is already installed. To install a new version, please run 'monika uninstall' first."
     MA_STRING_EXCEPTION_LXMONIKA_DEPENDENT_STILL_INSTALLED 
                             "A provider or other service dependent on lxmonika is installed. Please uninstall them and try again."
+    MA_STRING_EXCEPTION_UNKNOWN_SERVICE 
+                            "'{}' is not a registered lxmonika provider."
     MA_STRING_COMMAND_HELP_USAGE "Usage"
     MA_STRING_COMMAND_HELP_ARGUMENTS "Arguments"
     MA_STRING_COMMAND_HELP_COMMANDS "Commands"
-    MA_STRING_COMMAND_HELP_OPTIONS "Options"
 END
 
 STRINGTABLE
 BEGIN
+    MA_STRING_COMMAND_HELP_OPTIONS "Options"
     MA_STRING_COMMAND_HELP_PLACEHOLDER_COMMAND "command"
     MA_STRING_COMMAND_HELP_PLACEHOLDER_OPTIONS "options"
     MA_STRING_COMMAND_HELP_COPYRIGHT "Copyright (C) {}{} {}"
@@ -83,16 +85,17 @@ BEGIN
     MA_STRING_COMMAND_INVALID_OPTION "Unknown option: '{}'."
     MA_STRING_COMMAND_INVALID_ARGUMENT "Invalid argument: '{}'."
     MA_STRING_PARAMETER_NAME_DRIVER_PATH "DriverPath"
+    MA_STRING_PARAMETER_NAME_SERVICE_NAME "ServiceName"
     MA_STRING_PARAMETER_NAME_STRING "String"
     MA_STRING_MONIKA_COMMAND_NAME "monika"
     MA_STRING_MONIKA_COMMAND_DESCRIPTION "Unified host for lxmonika"
     MA_STRING_MONIKA_JUST_MONIKA "Just Monika?"
-    MA_STRING_INSTALL_COMMAND_NAME "install"
-    MA_STRING_INSTALL_COMMAND_DESCRIPTION "Install lxmonika or a provider."
 END
 
 STRINGTABLE
 BEGIN
+    MA_STRING_INSTALL_COMMAND_NAME "install"
+    MA_STRING_INSTALL_COMMAND_DESCRIPTION "Install lxmonika or a provider."
     MA_STRING_INSTALL_COMMAND_ARGUMENT_DESCRIPTION 
                             "A path to lxmonika. If not specified, the command will look for 'lxmonika.sys' at the executable file's location."
     MA_STRING_INSTALL_PROVIDER_COMMAND_NAME "provider"
@@ -142,14 +145,16 @@ BEGIN
                             "lxmonika đã được cài đặt trước đó. Để cài đặt phiên bản khác, vui lòng chạy 'monika uninstall' rồi thử lại."
     MA_STRING_EXCEPTION_LXMONIKA_DEPENDENT_STILL_INSTALLED 
                             "Một trình cung cấp hay dịch vụ khác phụ thuộc vào lxmonika đã được cài đặt. Vui lòng gỡ chúng rồi thử lại."
+    MA_STRING_EXCEPTION_UNKNOWN_SERVICE 
+                            "'{}' không phải là trình cung cấp lxmonika hợp lệ."
     MA_STRING_COMMAND_HELP_USAGE "Cách sử dụng"
     MA_STRING_COMMAND_HELP_ARGUMENTS "Tham số"
     MA_STRING_COMMAND_HELP_COMMANDS "Câu lệnh"
-    MA_STRING_COMMAND_HELP_OPTIONS "Lựa chọn"
 END
 
 STRINGTABLE
 BEGIN
+    MA_STRING_COMMAND_HELP_OPTIONS "Lựa chọn"
     MA_STRING_COMMAND_HELP_PLACEHOLDER_COMMAND "câu lệnh"
     MA_STRING_COMMAND_HELP_PLACEHOLDER_OPTIONS "lựa chọn"
     MA_STRING_COMMAND_HELP_COPYRIGHT "Bản quyền (C) thuộc {}{} {}"
@@ -161,17 +166,18 @@ BEGIN
     MA_STRING_COMMAND_INVALID_OPTION "Lựa chọn không xác định: '{}'."
     MA_STRING_COMMAND_INVALID_ARGUMENT "Tham số không hợp lệ: '{}'."
     MA_STRING_PARAMETER_NAME_DRIVER_PATH "DriverPath"
+    MA_STRING_PARAMETER_NAME_SERVICE_NAME "ServiceName"
     MA_STRING_PARAMETER_NAME_STRING "String"
     MA_STRING_MONIKA_COMMAND_NAME "monika"
     MA_STRING_MONIKA_COMMAND_DESCRIPTION "Trình nền thống nhất cho lxmonika"
     MA_STRING_MONIKA_JUST_MONIKA "Chỉ Monika thôi ư?"
-    MA_STRING_INSTALL_COMMAND_NAME "install"
-    MA_STRING_INSTALL_COMMAND_DESCRIPTION 
-                            "Cài đặt lxmonika hoặc một trình cung cấp."
 END
 
 STRINGTABLE
 BEGIN
+    MA_STRING_INSTALL_COMMAND_NAME "install"
+    MA_STRING_INSTALL_COMMAND_DESCRIPTION 
+                            "Cài đặt lxmonika hoặc một trình cung cấp."
     MA_STRING_INSTALL_COMMAND_ARGUMENT_DESCRIPTION 
                             "Một đường dẫn đến lxmonika. Nếu không được cung cấp, câu lệnh sẽ tìm 'lxmonika.sys' tại vị trí tệp chương trình."
     MA_STRING_INSTALL_PROVIDER_COMMAND_NAME "provider"
