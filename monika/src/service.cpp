@@ -142,6 +142,49 @@ SvInstallDriver(
 }
 
 bool
+SvUninstallDriver(
+    ServiceHandle manager,
+    const std::wstring& serviceName
+)
+{
+    auto service = UtilGetSharedServiceHandle(OpenServiceW(
+        manager.get(), serviceName.c_str(), SERVICE_QUERY_CONFIG | SERVICE_STOP | DELETE
+    ));
+
+    std::filesystem::path installPath;
+    {
+        std::vector<char> buffer;
+        LPQUERY_SERVICE_CONFIG pServiceConfig = SvQueryServiceConfig(service, buffer);
+        installPath = std::filesystem::canonical(pServiceConfig->lpBinaryPathName);
+    }
+
+    Win32Exception::ThrowIfFalse(DeleteService(service.get()));
+
+    SERVICE_STATUS serviceStatus{ .dwCurrentState = 0 };
+    ControlService(service.get(), SERVICE_CONTROL_STOP, &serviceStatus);
+
+    if (serviceStatus.dwCurrentState == SERVICE_STOPPED)
+    {
+        // The service has stopped, we can delete the driver now.
+        if (DeleteFileW(installPath.wstring().c_str()))
+        {
+            // Everything going on well.
+            return true;
+        }
+    }
+
+    // Otherwise, we use this API to try deleting the driver on reboot.
+    Win32Exception::ThrowIfFalse(MoveFileExW(
+        installPath.wstring().c_str(),
+        NULL,
+        MOVEFILE_DELAY_UNTIL_REBOOT
+    ));
+
+    SetLastError(ERROR_SUCCESS_REBOOT_REQUIRED);
+    return false;
+}
+
+bool
 SvIsLxMonikaInstalled(
     ServiceHandle manager
 )
@@ -240,25 +283,7 @@ SvIsLxMonikaRunning(
 
     // - lxmonika binary path correctly set to C:\Windows\System32\drivers\lxmonika.sys.
 
-    DWORD cbBytesNeeded;
-
-    while (true)
-    {
-        if (QueryServiceConfigW(
-            lxmonika.get(),
-            (LPQUERY_SERVICE_CONFIGW)buffer.data(),
-            (DWORD)buffer.size(),
-            &cbBytesNeeded
-        ))
-        {
-            break;
-        }
-
-        Win32Exception::ThrowUnless(ERROR_INSUFFICIENT_BUFFER);
-        buffer.resize(cbBytesNeeded);
-    }
-
-    LPQUERY_SERVICE_CONFIGW pQueryServiceConfig = (LPQUERY_SERVICE_CONFIGW)buffer.data();
+    LPQUERY_SERVICE_CONFIGW pQueryServiceConfig = SvQueryServiceConfig(lxmonika, buffer);
 
     if (std::filesystem::canonical(installPath)
         != std::filesystem::weakly_canonical(pQueryServiceConfig->lpBinaryPathName))
@@ -341,4 +366,31 @@ SvGetLxMonikaDependentServices(
         (LPENUM_SERVICE_STATUSW)buffer.data(),
         dwServicesReturned
     );
+}
+
+const LPQUERY_SERVICE_CONFIG
+SvQueryServiceConfig(
+    ServiceHandle service,
+    std::vector<char>& buffer
+)
+{
+    DWORD cbBytesNeeded;
+
+    while (true)
+    {
+        if (QueryServiceConfigW(
+            service.get(),
+            (LPQUERY_SERVICE_CONFIGW)buffer.data(),
+            (DWORD)buffer.size(),
+            &cbBytesNeeded
+        ))
+        {
+            break;
+        }
+
+        Win32Exception::ThrowUnless(ERROR_INSUFFICIENT_BUFFER);
+        buffer.resize(cbBytesNeeded);
+    }
+
+    return (LPQUERY_SERVICE_CONFIGW)buffer.data();
 }

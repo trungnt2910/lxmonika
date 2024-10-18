@@ -28,6 +28,12 @@ ServiceHandle
     );
 
 bool
+    SvUninstallDriver(
+        ServiceHandle manager,
+        const std::wstring& serviceName
+    );
+
+bool
     SvIsLxMonikaInstalled(
         ServiceHandle manager
     );
@@ -40,5 +46,11 @@ bool
 std::span<const ENUM_SERVICE_STATUSW>
     SvGetLxMonikaDependentServices(
         ServiceHandle manager,
+        std::vector<char>& buffer
+    );
+
+const LPQUERY_SERVICE_CONFIG
+    SvQueryServiceConfig(
+        ServiceHandle service,
         std::vector<char>& buffer
     );
