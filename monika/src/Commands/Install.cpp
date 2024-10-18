@@ -94,7 +94,7 @@ Install::Execute() const
         SERVICE_SYSTEM_START,
         MA_SERVICE_NAME,
         MA_SERVICE_DISPLAY_NAME,
-        UtilGetResourceString(MA_STRING_MONIKA_JUST_MONIKA),
+        std::wstring(UtilGetResourceString(MA_STRING_MONIKA_JUST_MONIKA)),
         fullPath,
         std::nullopt
     );

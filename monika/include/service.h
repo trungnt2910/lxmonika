@@ -20,9 +20,9 @@ ServiceHandle
         ServiceHandle manager,
         DWORD dwDesiredAccess,
         DWORD dwStartType,
-        const std::wstring_view& serviceName,
-        const std::optional<std::wstring_view>& displayName,
-        const std::optional<std::wstring_view>& description,
+        const std::wstring& serviceName,
+        const std::optional<std::wstring>& displayName,
+        const std::optional<std::wstring>& description,
         const std::filesystem::path& binaryPath,
         const std::optional<std::vector<std::wstring>>& dependencies
     );
