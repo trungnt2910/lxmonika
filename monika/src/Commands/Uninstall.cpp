@@ -14,11 +14,11 @@ Uninstall::Uninstall(const CommandBase* parentCommand)
         MA_STRING_UNINSTALL_COMMAND_DESCRIPTION,
         NullSwitch,
         parentCommand
-    )
+    ),
+    _uninstallProviderCommand(this)
 {
-    // Currently no-op.
+    AddCommand(_uninstallProviderCommand);
 }
-
 
 int
 Uninstall::Execute() const
