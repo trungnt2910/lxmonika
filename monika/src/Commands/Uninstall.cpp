@@ -27,10 +27,6 @@ Uninstall::Execute() const
         NULL, NULL, SC_MANAGER_CREATE_SERVICE
     ));
 
-    auto service = UtilGetSharedServiceHandle(OpenServiceW(
-        manager.get(), MA_SERVICE_NAME, SERVICE_STOP | DELETE
-    ));
-
     // fail if any service is using lxmonika.
     std::vector<char> buffer;
     if (SvGetLxMonikaDependentServices(
@@ -44,39 +40,7 @@ Uninstall::Execute() const
         );
     }
 
-    Win32Exception::ThrowIfFalse(DeleteService(service.get()));
-
-    SERVICE_STATUS serviceStatus{ .dwCurrentState = 0 };
-    ControlService(service.get(), SERVICE_CONTROL_STOP, &serviceStatus);
-
-    std::filesystem::path installPath = std::filesystem::canonical(
-        std::filesystem::path(UtilGetSystemDirectory()) / "drivers" / MA_SERVICE_DRIVER_NAME
-    );
-
-    if (serviceStatus.dwCurrentState != SERVICE_STOPPED)
-    {
-        // delay delete lxmonika.
-        Win32Exception::ThrowIfFalse(MoveFileExW(
-            installPath.wstring().c_str(),
-            NULL,
-            MOVEFILE_DELAY_UNTIL_REBOOT
-        ));
-
-        return HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED);
-    }
-
-    // delete lxmonika
-    if (!DeleteFileW(installPath.wstring().c_str()))
-    {
-        // if fail, delay delete lxmonika.sys.
-        Win32Exception::ThrowIfFalse(MoveFileExW(
-            installPath.wstring().c_str(),
-            NULL,
-            MOVEFILE_DELAY_UNTIL_REBOOT
-        ));
-
-        return HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED);
-    }
+    Win32Exception::ThrowIfFalse(SvUninstallDriver(manager, MA_SERVICE_NAME));
 
     return 0;
 }
