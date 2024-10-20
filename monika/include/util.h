@@ -26,5 +26,11 @@ std::shared_ptr<std::remove_pointer_t<SC_HANDLE>>
         bool shouldThrow = true
     );
 
+std::shared_ptr<std::remove_pointer_t<HANDLE>>
+    UtilGetSharedWin32Handle(
+        HANDLE hdlObject,
+        bool shouldThrow = true
+    );
+
 std::wstring
     UtilGetSystemDirectory();

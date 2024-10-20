@@ -39,6 +39,11 @@ public:
 
     static void ThrowIfFalse(BOOL result) { if (!result) throw Win32Exception(); }
 
+    static HANDLE ThrowIfInvalid(HANDLE result)
+    {
+        return (result != INVALID_HANDLE_VALUE) ? result : throw Win32Exception();
+    }
+
     static bool ThrowUnless(DWORD error)
     {
         DWORD code = GetLastError();

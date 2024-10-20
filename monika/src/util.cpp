@@ -52,6 +52,20 @@ UtilGetSharedServiceHandle(
     return std::shared_ptr<std::remove_pointer_t<SC_HANDLE>>(handle, CloseServiceHandle);
 }
 
+std::shared_ptr<std::remove_pointer_t<HANDLE>>
+UtilGetSharedWin32Handle(
+    HANDLE hdlObject,
+    bool shouldThrow
+)
+{
+    if (shouldThrow)
+    {
+        hdlObject = Win32Exception::ThrowIfInvalid(hdlObject);
+    }
+
+    return std::shared_ptr<std::remove_pointer_t<HANDLE>>(hdlObject, CloseHandle);
+}
+
 std::wstring
 UtilGetSystemDirectory()
 {
