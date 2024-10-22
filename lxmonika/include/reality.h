@@ -14,8 +14,12 @@
 // TODO: Unify the device type with RL_DEVICE_CODE instead of using FILE_DEVICE_UNKNOWN.
 #define RL_IOCTL_CODE(Function) \
     CTL_CODE(FILE_DEVICE_UNKNOWN, 0x800 | (Function), METHOD_BUFFERED, FILE_ANY_ACCESS)
+
+#define RL_DEVICE_NAME L"\\Device\\Reality"
 #else
 #define RL_IOCTL_CODE(Function) (Function)
+
+#define RL_DEVICE_NAME "/dev/reality"
 #endif
 
 enum RlIoctlFunctions

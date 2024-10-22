@@ -6,7 +6,7 @@
 #include "AutoResource.h"
 #include "Logger.h"
 
-CONST UNICODE_STRING RlDeviceName = RTL_CONSTANT_STRING(L"\\Device\\Reality");
+CONST UNICODE_STRING RlDeviceName = RTL_CONSTANT_STRING(RL_DEVICE_NAME);
 static PDEVICE_OBJECT RlDeviceObject = NULL;
 
 //

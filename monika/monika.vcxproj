@@ -108,6 +108,7 @@
     <ClCompile Include="src\util.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\lxmonika\reality.h" />
     <ClInclude Include="include\Command.h" />
     <ClInclude Include="include\Commands\Install.h" />
     <ClInclude Include="include\Commands\InstallProvider.h" />

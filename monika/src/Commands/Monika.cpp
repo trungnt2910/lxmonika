@@ -2,6 +2,11 @@
 
 #include <iostream>
 
+#include <Windows.h>
+#include <winternl.h>
+
+#include <lxmonika/reality.h>
+
 #include "resource.h"
 #include "service.h"
 #include "util.h"
@@ -46,7 +51,7 @@ Monika::Execute() const
         }
 
         auto file = UtilGetSharedWin32Handle(CreateFileW(
-            L"\\\\?\\GLOBALROOT\\Device\\Reality",
+            L"\\\\?\\GLOBALROOT" RL_DEVICE_NAME,
             GENERIC_READ,
             FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
             NULL,

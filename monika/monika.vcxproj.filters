@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Header Files\lxmonika">
+      <UniqueIdentifier>{33e009c3-0705-4624-b43b-e42b54875f02}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Header Files\Commands">
       <UniqueIdentifier>{abc0882e-7b47-43f3-9647-c34d39974ac2}</UniqueIdentifier>
     </Filter>
@@ -56,6 +59,9 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\lxmonika\reality.h">
+      <Filter>Header Files\lxmonika</Filter>
+    </ClInclude>
     <ClInclude Include="include\Command.h">
       <Filter>Header Files</Filter>
     </ClInclude>
