@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <vector>
 
 #include "resource.h"
 #include "service.h"
@@ -131,6 +132,34 @@ protected:
 };
 
 //
+// AbstractPathParameter
+//
+
+class AbstractPathParameter : public AbstractStringParameter
+{
+protected:
+    AbstractPathParameter(int type) : AbstractStringParameter(type) { }
+    virtual std::any Convert(const std::optional<std::wstring_view>& arg,
+        const std::type_info& type) const override
+    {
+        if (type == typeid(std::filesystem::path))
+        {
+            const std::wstring_view& value = EnsureHasValue(arg);
+            return std::filesystem::path(value);
+        }
+        else if (type == typeid(std::optional<std::filesystem::path>))
+        {
+            return arg.has_value() ?
+                std::optional(std::filesystem::path(arg.value())) : std::nullopt;
+        }
+        else
+        {
+            return AbstractStringParameter::Convert(arg, type);
+        }
+    }
+};
+
+//
 // NullParameter
 //
 
@@ -168,6 +197,63 @@ extern const Parameter& NullParameter = ([]()
 })();
 
 //
+// ArgumentsParameter
+//
+
+extern const Parameter& ArgumentsParameter = ([]()
+{
+    static const class ArgumentsParameter : public Parameter
+    {
+    public:
+        ArgumentsParameter() : Parameter(MA_STRING_PARAMETER_NAME_ARGUMENTS) { }
+        virtual std::any Parse(int& argc, wchar_t**& argv,
+            const std::type_info& type) const override
+        {
+            std::vector<const wchar_t*> vectorChosenArgs;
+
+            while (argc > 0
+                && wcscmp(argv[0], L"--") != 0)
+            {
+                vectorChosenArgs.push_back(argv[0]);
+                --argc;
+                ++argv;
+            }
+
+            const auto Convert = [&]<typename Container>()
+            {
+                Container containerResult;
+                containerResult.reserve(vectorChosenArgs.size());
+                std::transform(
+                    vectorChosenArgs.begin(),
+                    vectorChosenArgs.end(),
+                    std::back_inserter(containerResult),
+                    [](const wchar_t* pStr) { return Container::value_type(pStr); }
+                );
+                return containerResult;
+            };
+
+            if (type == typeid(std::vector<const wchar_t*>))
+            {
+                return vectorChosenArgs;
+            }
+            else if (type == typeid(std::vector<std::wstring_view>))
+            {
+                return Convert
+                    .template operator()<std::vector<std::wstring_view>>();
+            }
+            else if (type == typeid(std::vector<std::wstring>))
+            {
+                return Convert
+                    .template operator()<std::vector<std::wstring>>();
+            }
+            return nullptr;
+        }
+    } ArgumentsParameter;
+
+    return ArgumentsParameter;
+})();
+
+//
 // StringParameter
 //
 
@@ -188,10 +274,10 @@ extern const Parameter& StringParameter = ([]()
 
 extern const Parameter& DriverPathParameter = ([]()
 {
-    static const class DriverPathParameter : public AbstractStringParameter
+    static const class DriverPathParameter : public AbstractPathParameter
     {
     public:
-        DriverPathParameter() : AbstractStringParameter(MA_STRING_PARAMETER_NAME_DRIVER_PATH) { }
+        DriverPathParameter() : AbstractPathParameter(MA_STRING_PARAMETER_NAME_DRIVER_PATH) { }
     protected:
         virtual bool Validate(const std::wstring_view& arg) const override
         {
@@ -222,29 +308,26 @@ extern const Parameter& DriverPathParameter = ([]()
                 );
             }
 
-            return AbstractStringParameter::Validate(arg);
-        }
-        virtual std::any Convert(const std::optional<std::wstring_view>& arg,
-            const std::type_info& type) const override
-        {
-            if (type == typeid(std::filesystem::path))
-            {
-                const std::wstring_view& value = EnsureHasValue(arg);
-                return std::filesystem::path(value);
-            }
-            else if (type == typeid(std::optional<std::filesystem::path>))
-            {
-                return arg.has_value() ?
-                    std::optional(std::filesystem::path(arg.value())) : std::nullopt;
-            }
-            else
-            {
-                return AbstractStringParameter::Convert(arg, type);
-            }
+            return AbstractPathParameter::Validate(arg);
         }
     } DriverPathParameter;
 
     return DriverPathParameter;
+})();
+
+//
+// PathParameter
+//
+
+extern const Parameter& PathParameter = ([]()
+{
+    static const class PathParameter : public AbstractPathParameter
+    {
+    public:
+        PathParameter() : AbstractPathParameter(MA_STRING_PARAMETER_NAME_PATH) { }
+    } PathParameter;
+
+    return PathParameter;
 })();
 
 //

@@ -21,6 +21,8 @@ public:
 };
 
 extern const Parameter& NullParameter;
+extern const Parameter& ArgumentsParameter;
 extern const Parameter& DriverPathParameter;
+extern const Parameter& PathParameter;
 extern const Parameter& ServiceNameParameter;
 extern const Parameter& StringParameter;
