@@ -33,7 +33,7 @@ class AbstractStringParameter : public Parameter
 {
 public:
     virtual std::any Parse(int& argc, wchar_t**& argv,
-        const std::type_info& type) const override final
+        const std::type_info& type, bool more) const override final
     {
         std::optional<std::wstring_view> arg;
 
@@ -170,7 +170,7 @@ extern const Parameter& NullParameter = ([]()
     public:
         NullParameter() : Parameter(L"") { }
         virtual std::any Parse(int& argc, wchar_t**& argv,
-            const std::type_info& type) const
+            const std::type_info& type, bool more) const
         {
             if (type == typeid(std::ignore))
             {
@@ -207,13 +207,20 @@ extern const Parameter& ArgumentsParameter = ([]()
     public:
         ArgumentsParameter() : Parameter(MA_STRING_PARAMETER_NAME_ARGUMENTS) { }
         virtual std::any Parse(int& argc, wchar_t**& argv,
-            const std::type_info& type) const override
+            const std::type_info& type, bool more) const override
         {
             std::vector<const wchar_t*> vectorChosenArgs;
 
-            while (argc > 0
-                && wcscmp(argv[0], L"--") != 0)
+            while (argc > 0)
             {
+                if (more && wcscmp(argv[0], L"--") == 0)
+                {
+                    // "--" marks the end of the current argument list.
+                    // Bail out, unless we don't accept any more arguments,
+                    // in which case we might want to take everything.
+                    break;
+                }
+
                 vectorChosenArgs.push_back(argv[0]);
                 --argc;
                 ++argv;

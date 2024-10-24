@@ -48,7 +48,7 @@ protected:
     virtual bool Parse(int& argc, wchar_t**& argv) const
     {
         *((T*)_parameterOutput) = std::any_cast<T>(
-            _parameter.Parse(argc, argv, _parameterType)
+            _parameter.Parse(argc, argv, _parameterType, _acceptsMoreSwitches)
         );
 
         return _acceptsMoreSwitches;

@@ -13,7 +13,7 @@ protected:
     Parameter(std::wstring_view name) : _name(name) { }
 public:
     virtual std::any Parse(int& argc, wchar_t**& argv,
-        const std::type_info& type) const = 0;
+        const std::type_info& type, bool more) const = 0;
 
     const std::wstring_view& GetName() const { return _name; }
 
