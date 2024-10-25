@@ -4,6 +4,7 @@
 //
 // Utility functions.
 
+#include <filesystem>
 #include <memory>
 #include <string_view>
 
@@ -34,3 +35,8 @@ std::shared_ptr<std::remove_pointer_t<HANDLE>>
 
 std::wstring
     UtilGetSystemDirectory();
+
+std::wstring
+    UtilWin32ToNtPath(
+        const std::filesystem::path& win32Path
+    );

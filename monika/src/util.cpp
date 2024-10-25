@@ -91,3 +91,65 @@ UtilGetSystemDirectory()
 
     return result;
 }
+
+std::wstring
+UtilWin32ToNtPath(
+    const std::filesystem::path& win32Path
+)
+{
+    auto handle = UtilGetSharedWin32Handle(CreateFileW(
+        win32Path.wstring().c_str(),
+        0,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        NULL,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL,
+        NULL
+    ), false);
+
+    if (handle.get() == INVALID_HANDLE_VALUE)
+    {
+        handle = UtilGetSharedWin32Handle(CreateFileW(
+            win32Path.wstring().c_str(),
+            0,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            NULL,
+            OPEN_EXISTING,
+            FILE_FLAG_BACKUP_SEMANTICS, // Required for obtaining a directory handle.
+            NULL
+        ));
+    }
+
+    DWORD dwRequiredSize = Win32Exception::ThrowIfNull(GetFinalPathNameByHandleW(
+        handle.get(),
+        NULL,
+        0,
+        VOLUME_NAME_NT
+    ));
+
+    std::wstring result;
+    result.resize(dwRequiredSize);
+
+    while (true)
+    {
+        dwRequiredSize = Win32Exception::ThrowIfNull(GetFinalPathNameByHandleW(
+            handle.get(),
+            result.data(),
+            (DWORD)result.size(),
+            VOLUME_NAME_NT
+        ));
+
+        if (dwRequiredSize > result.size())
+        {
+            result.resize(dwRequiredSize);
+            continue;
+        }
+        else
+        {
+            result.resize(dwRequiredSize);
+            break;
+        }
+    }
+
+    return result;
+}
