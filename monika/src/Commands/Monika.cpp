@@ -19,6 +19,7 @@ Monika::Monika()
         MA_STRING_MONIKA_COMMAND_DESCRIPTION,
         NullSwitch
     ),
+    _execCommand(this),
     _installCommand(this),
     _uninstallCommand(this),
     _infoSwitch(
@@ -30,6 +31,7 @@ Monika::Monika()
         false
     )
 {
+    AddCommand(_execCommand);
     AddCommand(_installCommand);
     AddCommand(_uninstallCommand);
 

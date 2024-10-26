@@ -96,6 +96,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ClCompile Include="src\Command.cpp" />
+    <ClCompile Include="src\Commands\Exec.cpp" />
     <ClCompile Include="src\Commands\Install.cpp" />
     <ClCompile Include="src\Commands\InstallProvider.cpp" />
     <ClCompile Include="src\Commands\Monika.cpp" />
@@ -110,6 +111,7 @@
   <ItemGroup>
     <ClInclude Include="include\lxmonika\reality.h" />
     <ClInclude Include="include\Command.h" />
+    <ClInclude Include="include\Commands\Exec.h" />
     <ClInclude Include="include\Commands\Install.h" />
     <ClInclude Include="include\Commands\InstallProvider.h" />
     <ClInclude Include="include\Commands\Monika.h" />
