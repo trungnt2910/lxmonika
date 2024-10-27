@@ -245,7 +245,7 @@ RlWin32DeviceControl(
 
     NTSTATUS status = RlpFileIoctl(
         pFile,
-        METHOD_FROM_CTL_CODE(0x800 ^ pIrpStack->Parameters.DeviceIoControl.IoControlCode),
+        0x800 ^ IoGetFunctionCodeFromCtlCode(pIrpStack->Parameters.DeviceIoControl.IoControlCode),
         pIrp->AssociatedIrp.SystemBuffer
     );
 
