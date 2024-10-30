@@ -1,0 +1,58 @@
+<Project ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <UsingTask TaskName="MonikaAppendDetails" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <ItemList ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
+      <AddQuotes ParameterType="System.Boolean" Required="true" />
+      <OutputItemList ParameterType="Microsoft.Build.Framework.ITaskItem[]" Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System.Diagnostics" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+          const string metadataName = "PreprocessorDefinitions";
+          string toAppend = "";
+          void Append(string varName, string value)
+          {
+            toAppend += AddQuotes ? $";{varName}=\"{value}\"" : $";{varName}={value}";
+          }
+          void Run(string varName, string command)
+          {
+            var p = new Process();
+            p.StartInfo = new ProcessStartInfo("git", command);
+            p.StartInfo.RedirectStandardOutput = true;
+            p.StartInfo.UseShellExecute = false;
+            p.Start();
+            p.WaitForExit();
+            Append(varName, p.StandardOutput.ReadToEnd().Trim());
+          }
+          Run("MONIKA_BUILD_NUMBER", "rev-list --count master");
+          Run("MONIKA_BUILD_TAG", "describe --broken --dirty --all");
+          Run("MONIKA_BUILD_HASH", "rev-parse --short HEAD");
+          Run("MONIKA_BUILD_ORIGIN", "remote get-url origin");
+          foreach (var item in ItemList)
+          {
+            var cur = item.GetMetadata(metadataName);
+            item.SetMetadata(metadataName, $"{toAppend};{cur}");
+          }
+          OutputItemList = ItemList;
+        ]]></Code>
+    </Task>
+  </UsingTask>
+  <Target Name="MonikaAppendDetailsToClCompileItems" BeforeTargets="Build;CL;BeforeClCompile">
+    <ItemGroup>
+      <ClCompileCopy Include="@(ClCompile)" />
+      <ClCompile Remove="@(ClCompile)" />
+      <ResourceCompileCopy Include="@(ResourceCompile)" />
+      <ResourceCompile Remove="@(ResourceCompile)" />
+    </ItemGroup>
+    <MonikaAppendDetails ItemList="@(ClCompileCopy)" AddQuotes="true">
+      <Output ItemName="ClCompile" TaskParameter="OutputItemList" />
+    </MonikaAppendDetails>
+    <MonikaAppendDetails ItemList="@(ResourceCompileCopy)" AddQuotes="false">
+      <Output ItemName="ResourceCompile" TaskParameter="OutputItemList" />
+    </MonikaAppendDetails>
+    <ItemGroup>
+      <ClCompileCopy Remove="@(ClCompileCopy)" />
+      <ResourceCompileCopy Remove="@(ResourceCompileCopy)" />
+    </ItemGroup>
+  </Target>
+</Project>

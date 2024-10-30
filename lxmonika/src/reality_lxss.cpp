@@ -56,7 +56,6 @@ typedef PLX_FILE VFS_FILE_ALLOCATE(
 );
 typedef VFS_FILE_ALLOCATE* PVFS_FILE_ALLOCATE;
 
-static PLX_INITIALIZE                   LxInitialize = NULL;
 static PLX_DEV_MISC_REGISTER            LxpDevMiscRegister = NULL;
 static PLX_UTIL_TRANSLATE_STATUS        LxpUtilTranslateStatus = NULL;
 static PVFS_DEVICE_MINOR_ALLOCATE       VfsDeviceMinorAllocate = NULL;
@@ -108,7 +107,6 @@ RlpInitializeLxssDevice(
         return status;
     }
 
-    MA_TRY_RESOLVE_SYMBOL(LxInitialize);
     MA_TRY_RESOLVE_SYMBOL(LxpDevMiscRegister);
     MA_TRY_RESOLVE_SYMBOL(LxpUtilTranslateStatus);
     MA_TRY_RESOLVE_SYMBOL(VfsDeviceMinorAllocate);

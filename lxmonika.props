@@ -1,0 +1,6 @@
+<Project ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="Monika">
+    <MaTargetName Condition="'$(MaTargetName)'==''">lxmonika</MaTargetName>
+    <MaBuildAuthor Condition="'$(MaBuildAuthor)'==''">Trung Nguyen</MaBuildAuthor>
+  </PropertyGroup>
+</Project>

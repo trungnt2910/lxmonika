@@ -28,6 +28,11 @@
 #pragma warning(disable: 4200)           /* zero-sized array in struct/union */
 #pragma warning(disable: 4201)           /* nameless struct/union */
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 typedef INT64 OFF_T, *POFF_T;
 typedef _Success_(return >= 0) INT LXSTATUS;
 
@@ -514,3 +519,18 @@ typedef struct _LX_CALL_CONTEXT {
     LX_CALL_CONTEXT_FLAGS Flags;
     UINT32 Reserved2;
 } LX_CALL_CONTEXT, *PLX_CALL_CONTEXT;
+
+#ifdef MONIKA_IN_DRIVER
+__declspec(dllimport)
+#else
+__declspec(dllexport)
+#endif
+NTSTATUS
+LxInitialize(
+    _In_ PDRIVER_OBJECT DriverObject,
+    _In_ PLX_SUBSYSTEM Subsystem
+);
+
+#ifdef __cplusplus
+}
+#endif
