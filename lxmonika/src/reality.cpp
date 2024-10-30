@@ -396,7 +396,8 @@ RlpFileIoctl(
             KernelMode,
             &hdlHostProcess
         ));
-        MA_RETURN_IF_FAIL(CdpKernelConsoleAttach(hdlHostProcess, &hdlConsole));
+
+        MA_RETURN_IF_FAIL(CdpKernelConsoleAttach(PsGetCurrentProcessId(), &hdlConsole));
         MA_RETURN_IF_FAIL(CdpKernelConsoleOpenHandles(
             hdlConsole,
             &hdlInput,
