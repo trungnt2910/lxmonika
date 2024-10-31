@@ -88,6 +88,7 @@ static LX_FILE_SEEK                             RlLxssFileSeek;
         if (!NT_SUCCESS(status))                                                                \
         {                                                                                       \
             Logger::LogError("Failed to resolve " #name);                                       \
+            return status;                                                                      \
         }                                                                                       \
     } while (false)
 
