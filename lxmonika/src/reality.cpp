@@ -251,6 +251,8 @@ RlpFileIoctl(
         OBJECT_ATTRIBUTES objectAttributes;
         IO_STATUS_BLOCK ioStatus;
 
+        // Declare handles and their cleaners.
+
         HANDLE hdlHostProcess = NULL;
         HANDLE hdlConsole = NULL;
         HANDLE hdlInput = NULL;
@@ -265,24 +267,42 @@ RlpFileIoctl(
         AUTO_RESOURCE(hdlRootDirectory, ZwClose);
         AUTO_RESOURCE(hdlCurrentWorkingDirectory, ZwClose);
 
-        PWSTR pRootDirectory = NULL;
-        PWSTR pCurrentWorkingDirectory = NULL;
-        PWSTR pProviderArgs = NULL;
-        PWSTR pArgs = NULL;
-        PWSTR pEnvironment = NULL;
-
-        constexpr auto Free = [](auto p) { ExFreePoolWithTag(p, MA_REALITY_TAG); };
-        AUTO_RESOURCE(pRootDirectory, Free);
-        AUTO_RESOURCE(pCurrentWorkingDirectory, Free);
-        AUTO_RESOURCE(pProviderArgs, Free);
-        AUTO_RESOURCE(pArgs, Free);
-        AUTO_RESOURCE(pEnvironment, Free);
+        // Declare strings and their cleaners.
 
         UNICODE_STRING strRootDirectory = { 0 };
         UNICODE_STRING strCurrentWorkingDirectory = { 0 };
-        UNICODE_STRING strProviderArgs = { 0 };
-        UNICODE_STRING strArgs = { 0 };
-        UNICODE_STRING strEnvironment = { 0 };
+
+        // Make some pointers, since AUTO_RESOURCE only works with pointers.
+        PUNICODE_STRING pStrRootDirectory = &strRootDirectory;
+        PUNICODE_STRING pStrCurrentWorkingDirectory = &strCurrentWorkingDirectory;
+
+        static constexpr auto FreeString = [](auto pStr)
+        {
+            if (pStr->Buffer != NULL)
+            {
+                ExFreePoolWithTag(pStr->Buffer, MA_REALITY_TAG);
+            }
+        };
+        AUTO_RESOURCE(pStrRootDirectory, FreeString);
+        AUTO_RESOURCE(pStrCurrentWorkingDirectory, FreeString);
+
+        struct _MA_UNICODE_STRING_LIST
+        {
+            PUNICODE_STRING Strings = NULL;
+            SIZE_T Length = 0;
+
+            ~_MA_UNICODE_STRING_LIST()
+            {
+                if (Strings != NULL)
+                {
+                    for (SIZE_T i = Length - 1; i != (SIZE_T)-1; --i)
+                    {
+                        FreeString(&Strings[i]);
+                    }
+                    ExFreePoolWithTag(Strings, MA_REALITY_TAG);
+                }
+            }
+        } strListProviderArgs, strListArgs, strListEnvironment;
 
         SIZE_T uProviderIndex;
 
@@ -290,7 +310,7 @@ RlpFileIoctl(
         {
             if (pUserAttributes->Size != sizeof(RL_PICO_SESSION_ATTRIBUTES))
             {
-                return STATUS_INVALID_PARAMETER;
+                return STATUS_INFO_LENGTH_MISMATCH;
             }
 
             if (pUserAttributes->ProviderIndex < MaPicoProviderMaxCount)
@@ -352,35 +372,61 @@ RlpFileIoctl(
             ));
 
             // While the ioctl is blocking, other threads may still modify the passes strings as
-            // they please. Sanitize and keep our own coyp of these strings before we exit the
+            // they please. Sanitize and keep our own copy of these strings before we exit the
             // __try block.
 
-            const auto Copy = [](PWSTR& dst, UNICODE_STRING& dstString, PUNICODE_STRING& src)
+            constexpr auto Copy = [](UNICODE_STRING& dstString, PUNICODE_STRING src)
             {
-                dst = (PWSTR)ExAllocatePoolZero(PagedPool,
+                PWSTR dst = (PWSTR)ExAllocatePoolZero(PagedPool,
                     (src->Length + 1) * sizeof(WCHAR), MA_REALITY_TAG);
                 if (dst == NULL)
                 {
                     return STATUS_NO_MEMORY;
                 }
+                AUTO_RESOURCE(dst, [](auto p) { ExFreePoolWithTag(p, MA_REALITY_TAG); });
+
                 // YOLO: We're in a __try/__except block.
                 memcpy(dst, src->Buffer, src->Length * sizeof(WCHAR));
                 dstString.Buffer = dst;
                 dstString.Length = src->Length;
                 dstString.MaximumLength = src->Length;
+                dst = NULL;
+
                 return STATUS_SUCCESS;
             };
 
-            MA_RETURN_IF_FAIL(Copy(pRootDirectory, strRootDirectory,
-                pUserAttributes->RootDirectory));
-            MA_RETURN_IF_FAIL(Copy(pCurrentWorkingDirectory, strCurrentWorkingDirectory,
+            MA_RETURN_IF_FAIL(Copy(strRootDirectory, pUserAttributes->RootDirectory));
+            MA_RETURN_IF_FAIL(Copy(strCurrentWorkingDirectory,
                 pUserAttributes->CurrentWorkingDirectory));
-            MA_RETURN_IF_FAIL(Copy(pProviderArgs, strProviderArgs,
-                pUserAttributes->ProviderArgs));
-            MA_RETURN_IF_FAIL(Copy(pArgs, strArgs,
-                pUserAttributes->Args));
-            MA_RETURN_IF_FAIL(Copy(pEnvironment, strEnvironment,
-                pUserAttributes->Environment));
+
+            constexpr auto CopyList = [](
+                _MA_UNICODE_STRING_LIST& dstStringList,
+                PUNICODE_STRING src,
+                SIZE_T srcCount
+            )
+            {
+                dstStringList.Strings = (PUNICODE_STRING)ExAllocatePoolZero(PagedPool,
+                    srcCount * sizeof(UNICODE_STRING), MA_REALITY_TAG);
+                if (dstStringList.Strings == NULL)
+                {
+                    return STATUS_NO_MEMORY;
+                }
+                dstStringList.Length = srcCount;
+
+                for (SIZE_T i = 0; i < srcCount; ++i)
+                {
+                    MA_RETURN_IF_FAIL(Copy(dstStringList.Strings[i], &src[i]));
+                }
+
+                return STATUS_SUCCESS;
+            };
+
+            MA_RETURN_IF_FAIL(CopyList(strListProviderArgs,
+                pUserAttributes->ProviderArgs, pUserAttributes->ProviderArgsCount));
+            MA_RETURN_IF_FAIL(CopyList(strListArgs,
+                pUserAttributes->Args, pUserAttributes->ArgsCount));
+            MA_RETURN_IF_FAIL(CopyList(strListEnvironment,
+                pUserAttributes->Environment, pUserAttributes->EnvironmentCount));
         }
         __except (EXCEPTION_EXECUTE_HANDLER)
         {
@@ -414,11 +460,11 @@ RlpFileIoctl(
             .RootDirectory = hdlRootDirectory,
             .CurrentWorkingDirectory = hdlCurrentWorkingDirectory,
             .ProviderArgsCount = pUserAttributes->ProviderArgsCount,
-            .ProviderArgs = &strProviderArgs,
+            .ProviderArgs = strListProviderArgs.Strings,
             .ArgsCount = pUserAttributes->ArgsCount,
-            .Args = &strArgs,
+            .Args = strListArgs.Strings,
             .EnvironmentCount = pUserAttributes->EnvironmentCount,
-            .Environment = &strEnvironment
+            .Environment = strListEnvironment.Strings
         };
 
         // lxmonika retains control of all its auto resources. The callee is responsible for
