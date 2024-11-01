@@ -50,7 +50,8 @@ DriverEntry(
         .GetAllocatedProviderName = MxGetAllocatedProviderName,
         .StartSession = MxStartSession,
         .GetConsole = MxGetConsole,
-        .AbiVersion = NTDDI_WIN10_RS1
+        .AbiVersion = min(NTDDI_VERSION, NTDDI_WIN10_RS4)
+            /* Uses RS4 ABI CreateProcess function. */
     };
 
     MxAdditionalRoutines.Size = sizeof(MA_PICO_ROUTINES);
