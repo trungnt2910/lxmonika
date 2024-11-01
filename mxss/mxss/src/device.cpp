@@ -141,6 +141,7 @@ MxControlDeviceIoctl(
                 &pInfo->ExecutablePath,
                 PsGetCurrentProcess(),
                 PsGetCurrentProcess(),
+                NULL,
                 &pNewProcess
             );
 

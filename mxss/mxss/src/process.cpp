@@ -38,6 +38,7 @@ MxProcessExecute(
     _In_ PUNICODE_STRING pExecutablePath,
     _In_ PEPROCESS pParentProcess,
     _In_ PEPROCESS pHostProcess,
+    _In_opt_ HANDLE hdlCwd,
     _Out_ PMX_PROCESS* pPMxProcess
 )
 {
@@ -55,7 +56,7 @@ MxProcessExecute(
         &objAttributes,
         pExecutablePath,
         OBJ_CASE_INSENSITIVE,
-        NULL,
+        hdlCwd,
         NULL
     );
 

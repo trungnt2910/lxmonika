@@ -48,6 +48,7 @@ DriverEntry(
     {
         .Size = sizeof(MA_PICO_PROVIDER_ROUTINES),
         .GetAllocatedProviderName = MxGetAllocatedProviderName,
+        .StartSession = MxStartSession,
         .GetConsole = MxGetConsole
     };
 

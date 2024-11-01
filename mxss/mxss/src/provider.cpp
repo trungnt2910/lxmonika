@@ -192,6 +192,48 @@ MxGetAllocatedProviderName(
 
 extern "C"
 NTSTATUS
+MxStartSession(
+    _In_ PMA_PICO_SESSION_ATTRIBUTES Attributes
+)
+{
+    PEPROCESS pHostProcess = NULL;
+    MX_RETURN_IF_FAIL(ObReferenceObjectByHandle(
+        Attributes->HostProcess,
+        PROCESS_ALL_ACCESS,
+        *PsProcessType,
+        KernelMode,
+        (PVOID*)&pHostProcess,
+        NULL
+    ));
+    AUTO_RESOURCE(pHostProcess, [](auto p) { ObDereferenceObject(p); });
+
+    PMX_PROCESS pNewProcess;
+    MX_RETURN_IF_FAIL(MxProcessExecute(
+        &Attributes->Args[0],
+        pHostProcess,
+        pHostProcess,
+        Attributes->CurrentWorkingDirectory,
+        &pNewProcess
+    ));
+    AUTO_RESOURCE(pNewProcess, MxProcessFree);
+
+    MX_RETURN_IF_FAIL(KeWaitForSingleObject(
+        pNewProcess->Thread,
+        Executive,
+        KernelMode,
+        FALSE,
+        NULL
+    ));
+
+    NTSTATUS statusExecute = pNewProcess->ExitStatus;
+    MxProcessFree(pNewProcess);
+    pNewProcess = NULL;
+
+    return statusExecute;
+}
+
+extern "C"
+NTSTATUS
 MxGetConsole(
     _In_ PEPROCESS Process,
     _Out_opt_ PHANDLE Console,

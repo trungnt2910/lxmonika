@@ -59,6 +59,11 @@ NTSTATUS
     );
 
 NTSTATUS
+    MxStartSession(
+        _In_ PMA_PICO_SESSION_ATTRIBUTES Attributes
+    );
+
+NTSTATUS
     MxGetConsole(
         _In_ PEPROCESS Process,
         _Out_opt_ PHANDLE Console,
