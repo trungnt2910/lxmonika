@@ -284,10 +284,28 @@ MaRegisterPicoProviderEx(
     }
 
     DWORD dwAbiVersion = 0;
-    if (AdditionalProviderRoutines != NULL)
+    if (AdditionalProviderRoutines != NULL
+        && AdditionalProviderRoutines->Size >=
+            (FIELD_OFFSET(MA_PICO_PROVIDER_ROUTINES, AbiVersion)
+                + sizeof(MA_PICO_PROVIDER_ROUTINES::AbiVersion)))
     {
         // Respect any ABI claims by lxmonika-aware providers.
         dwAbiVersion = AdditionalProviderRoutines->AbiVersion;
+        // Only if they are valid.
+        //
+        // Windows 8.1 is the first known version to have anything Pico-related.
+        //
+        // OSVER has not increased above 0x0A000000 since the first release of Windows NT 10.0.
+        // If the reported value is greater than that, it's likely to be a pointer.
+        // We will be a bit generous and go up to 0x0C000000, which rules out everything with
+        // the most significant bit set (usually kernel mode pointers in 32-bit OSes).
+        if (dwAbiVersion < NTDDI_WINBLUE || dwAbiVersion > 0x0C000000)
+        {
+            Logger::LogWarning("Provider is reporting an invalid ABI version: ",
+                (PVOID)AdditionalProviderRoutines->AbiVersion);
+
+            return STATUS_INVALID_PARAMETER;
+        }
     }
     if (dwAbiVersion == 0)
     {
