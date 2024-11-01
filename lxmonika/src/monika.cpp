@@ -11,7 +11,7 @@
 
 SIZE_T MapSystemProviderRoutinesSize = sizeof(PS_PICO_PROVIDER_ROUTINES);
 SIZE_T MapSystemPicoRoutinesSize = sizeof(PS_PICO_ROUTINES);
-ULONG MapSystemAbiVersion = NTDDI_WIN10_RS1;
+ULONG MapSystemAbiVersion = NTDDI_WIN10_RS4;
 BOOLEAN MapSystemPicoHasSizeChecks = TRUE;
 BOOLEAN MapTooLate = FALSE;
 
@@ -293,8 +293,8 @@ MaRegisterPicoProviderEx(
     {
         // The additional routines were NULL or did not have an ABI version.
         MA_RETURN_IF_FAIL(PicoSppDetermineAbiVersion(
-            ProviderRoutines->Size,
-            PicoRoutines->Size,
+            ProviderRoutines,
+            PicoRoutines,
             &dwAbiVersion
         ));
     }
@@ -348,7 +348,7 @@ MaRegisterPicoProviderEx(
 
     // Keep the potentially larger size, hoping that some drivers
     // might know that they are outdated.
-    if (dwAbiVersion >= NTDDI_WIN10_RS1)
+    if (dwAbiVersion >= NTDDI_WIN10_RS4)
     {
         memcpy(PicoRoutines, &MapRoutines[uProviderIndex], PicoRoutines->Size);
     }
