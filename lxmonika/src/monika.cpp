@@ -366,9 +366,20 @@ MaRegisterPicoProviderEx(
 
     // Keep the potentially larger size, hoping that some drivers
     // might know that they are outdated.
-    if (dwAbiVersion >= NTDDI_WIN10_RS4)
+    if (dwAbiVersion >= NTDDI_WIN10_RS2)
     {
+        // This is the ABI for RS4.
         memcpy(PicoRoutines, &MapRoutines[uProviderIndex], PicoRoutines->Size);
+        // RS3 or lower still uses the CreateProcess callback from TH1.
+        if (dwAbiVersion < NTDDI_WIN10_RS4)
+        {
+            if (PicoRoutines->Size >=
+                (FIELD_OFFSET(PS_PICO_ROUTINES, CreateProcess)
+                    + sizeof(PS_PICO_ROUTINES::CreateProcess)))
+            {
+                PicoRoutines->CreateProcess = MapRoutinesTh1[uProviderIndex].CreateProcess;
+            }
+        }
     }
     else // NTDDI_WIN10
     {
