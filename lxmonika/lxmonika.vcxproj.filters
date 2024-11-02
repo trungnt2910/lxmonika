@@ -45,6 +45,9 @@
     <ClCompile Include="src\module.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\monika_cng.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="src\monika_context.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
