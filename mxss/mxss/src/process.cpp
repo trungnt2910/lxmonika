@@ -100,15 +100,15 @@ MxProcessExecute(
         .Context = pMxProcess
     };
 
-    PS_PICO_PROCESS_CREATE_CONTEXT psPicoProcessCreateContext
+    PS_PICO_CREATE_INFO psPicoCreateInfo
     {
-        .ImageFile = pMxProcess->MainExecutable,
-        .ImageName = pExecutablePath
+        .FileObject = pMxProcess->MainExecutable,
+        .ImageFileName = pExecutablePath
     };
 
     HANDLE hdlProcess = NULL;
     MX_RETURN_IF_FAIL(MxRoutines.CreateProcess(&psPicoProcessAttributes,
-        &psPicoProcessCreateContext, &hdlProcess));
+        &psPicoCreateInfo, &hdlProcess));
     AUTO_RESOURCE(hdlProcess, ZwClose);
 
     PEPROCESS pProcess = NULL;
@@ -183,7 +183,7 @@ MxProcessExecute(
 
     HANDLE hdlThread = NULL;
     MX_RETURN_IF_FAIL(MxRoutines.CreateThread(&psPicoThreadAttributes,
-        &psPicoProcessCreateContext, &hdlThread));
+        &psPicoCreateInfo, &hdlThread));
     AUTO_RESOURCE(hdlThread, ZwClose);
 
     // One more reference that NT holds.
@@ -572,15 +572,15 @@ MxProcessFork(
         .Flags = PS_PICO_CREATE_PROCESS_CLONE_PARENT | PS_PICO_CREATE_PROCESS_INHERIT_HANDLES
     };
 
-    PS_PICO_PROCESS_CREATE_CONTEXT psPicoProcessCreateContext
+    PS_PICO_CREATE_INFO psPicoCreateInfo
     {
-        .ImageFile = pMxParentProcess->MainExecutable,
-        .ImageName = &pObNameInfo->Name
+        .FileObject = pMxParentProcess->MainExecutable,
+        .ImageFileName = &pObNameInfo->Name
     };
 
     HANDLE hdlProcess = NULL;
     MX_RETURN_IF_FAIL(MxRoutines.CreateProcess(
-        &psPicoProcessAttributes, &psPicoProcessCreateContext, &hdlProcess));
+        &psPicoProcessAttributes, &psPicoCreateInfo, &hdlProcess));
     AUTO_RESOURCE(hdlProcess, ZwClose);
 
     PEPROCESS pProcess = NULL;
@@ -630,7 +630,7 @@ MxProcessFork(
 
     HANDLE hdlThread = NULL;
     MX_RETURN_IF_FAIL(MxRoutines.CreateThread(&psPicoThreadAttributes,
-        &psPicoProcessCreateContext, &hdlThread));
+        &psPicoCreateInfo, &hdlThread));
     AUTO_RESOURCE(hdlThread, ZwClose);
 
     MxThreadReference(pMxThread);

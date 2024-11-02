@@ -166,7 +166,7 @@ NTSTATUS
 MapCreateProcess(
     _In_ DWORD ProviderIndex,
     _In_ PPS_PICO_PROCESS_ATTRIBUTES ProcessAttributes,
-    _In_opt_ PPS_PICO_PROCESS_CREATE_CONTEXT ProcessCreateContext,
+    _In_opt_ PPS_PICO_CREATE_INFO CreateInfo,
     _Outptr_ PHANDLE ProcessHandle
 )
 {
@@ -184,7 +184,7 @@ MapCreateProcess(
     ProcessAttributes->Context = pContext;
 
     NTSTATUS status = MapOriginalRoutines.CreateProcess(
-        ProcessAttributes, ProcessCreateContext, ProcessHandle);
+        ProcessAttributes, CreateInfo, ProcessHandle);
 
     ProcessAttributes->Context = pContext->Context;
 
@@ -201,7 +201,7 @@ NTSTATUS
 MapCreateThread(
     _In_ DWORD ProviderIndex,
     _In_ PPS_PICO_THREAD_ATTRIBUTES ThreadAttributes,
-    _In_opt_ PPS_PICO_PROCESS_CREATE_CONTEXT ProcessCreateContext,
+    _In_opt_ PPS_PICO_CREATE_INFO CreateInfo,
     _Outptr_ PHANDLE ThreadHandle
 )
 {
@@ -246,7 +246,7 @@ MapCreateThread(
     ThreadAttributes->Context = pContext;
 
     NTSTATUS status = MapOriginalRoutines.CreateThread(
-        ThreadAttributes, ProcessCreateContext, ThreadHandle);
+        ThreadAttributes, CreateInfo, ThreadHandle);
 
     ThreadAttributes->Context = pContext->Context;
 
@@ -422,22 +422,22 @@ MapResumeThread(
     NTSTATUS                                                                                    \
         MaPicoCreateProcess##index(                                                             \
             _In_ PPS_PICO_PROCESS_ATTRIBUTES ProcessAttributes,                                 \
-            _In_opt_ PPS_PICO_PROCESS_CREATE_CONTEXT ProcessCreateContext,                      \
+            _In_opt_ PPS_PICO_CREATE_INFO CreateInfo,                                           \
             _Outptr_ PHANDLE ProcessHandle                                                      \
         )                                                                                       \
     {                                                                                           \
-        return MapCreateProcess(index, ProcessAttributes, ProcessCreateContext, ProcessHandle); \
+        return MapCreateProcess(index, ProcessAttributes, CreateInfo, ProcessHandle);           \
     }                                                                                           \
                                                                                                 \
     extern "C"                                                                                  \
     NTSTATUS                                                                                    \
         MaPicoCreateThread##index(                                                              \
             _In_ PPS_PICO_THREAD_ATTRIBUTES ThreadAttributes,                                   \
-            _In_opt_ PPS_PICO_PROCESS_CREATE_CONTEXT ProcessCreateContext,                      \
+            _In_opt_ PPS_PICO_CREATE_INFO CreateInfo,                                           \
             _Outptr_ PHANDLE ThreadHandle                                                       \
         )                                                                                       \
     {                                                                                           \
-        return MapCreateThread(index, ThreadAttributes, ProcessCreateContext, ThreadHandle);    \
+        return MapCreateThread(index, ThreadAttributes, CreateInfo, ThreadHandle);              \
     }                                                                                           \
                                                                                                 \
     extern "C"                                                                                  \
