@@ -260,17 +260,16 @@ MapCreateProcess(
     {
         MapRanAbiCheck = TRUE;
 
-        Logger::LogTrace("Running ABI check before initial dispatch.");
+        Logger::LogTrace("Running ABI check before initial CreateProcess dispatch.");
 
         // It would be nice if we could run this during initialization.
         // However, starting processes when the system has not finished initializing
         // is not a fun thing to do and has caused BSODs during testing.
         // Instead, we wait until everything is ready and a provider starts requesting
         // Pico processes.
-        // We are not doing anything similar for the threads, since one would need
-        // a working Pico process to create a Pico thread (theoretically).
-        // By the time the thread callbacks are called, we should have established
-        // our version.
+        //
+        // For threads, the ABI change occurred at RS2 instead of RS4.
+        // Fortunately, we can detect RS2 through parameter struct sizes alone.
 
         // Still use the RS4 callback.
         PS_PICO_CREATE_INFO psTempInfo = CreateInfo != NULL ?
@@ -286,7 +285,7 @@ MapCreateProcess(
             if (hdlProcess == NULL)
             {
                 Logger::LogTrace("Call succeeded but output parameter is wrong.");
-                Logger::LogTrace("Old ABI detected.", (PVOID)status);
+                Logger::LogTrace("Old ABI detected.");
 
                 // This is actually RS3 or lower.
                 // The handle is in psTempInfo.
@@ -315,12 +314,12 @@ MapCreateProcess(
             if (!NT_SUCCESS(status))
             {
                 Logger::LogTrace("TH1 variant also failed, status=", (PVOID)status);
-                Logger::LogTrace("Invalidating ABI check results.", (PVOID)status);
+                Logger::LogTrace("Invalidating ABI check results.");
                 MapRanAbiCheck = FALSE;
             }
             else
             {
-                Logger::LogTrace("Old ABI detected.", (PVOID)status);
+                Logger::LogTrace("Old ABI detected.");
             }
         }
     }
@@ -466,9 +465,9 @@ MapCreateThread(
     NTSTATUS status;
     HANDLE hdlThread = NULL;
 
-    if (MA_SYSTEM_AT_LEAST(NTDDI_WIN10_RS4))
+    if (MA_SYSTEM_AT_LEAST(NTDDI_WIN10_RS2))
     {
-        status = ((PS_PICO_CREATE_THREAD_RS4*)MapOriginalRoutines.CreateThread)(
+        status = ((PS_PICO_CREATE_THREAD_RS2*)MapOriginalRoutines.CreateThread)(
             ThreadAttributes, CreateInfo, &hdlThread);
     }
     else // TH1
