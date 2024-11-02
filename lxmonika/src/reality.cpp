@@ -4,6 +4,7 @@
 #include <ntstrsafe.h>
 
 #include "condrv.h"
+#include "device.h"
 #include "lxerrno.h"
 #include "lxss.h"
 #include "module.h"
@@ -14,6 +15,12 @@
 #include "Locker.h"
 #include "Logger.h"
 #include "PoolAllocator.h"
+
+//
+// Data
+//
+
+static PDEVICE_SET RlDeviceSet = NULL;
 
 //
 // Utility forward declarations
@@ -35,7 +42,7 @@ NTSTATUS
 extern "C"
 NTSTATUS
 RlpInitializeDevices(
-    _In_ PDRIVER_OBJECT DriverObject
+    _Inout_ PDRIVER_OBJECT DriverObject
 )
 {
     NTSTATUS status;
@@ -58,6 +65,9 @@ RlpInitializeDevices(
         // Non-fatal.
     }
 
+    // Register the newly added device(s) for proper dispatching.
+    MA_RETURN_IF_FAIL(DevpRegisterDeviceSet(DriverObject, &RlDeviceSet));
+
     return STATUS_SUCCESS;
 }
 
@@ -65,6 +75,11 @@ extern "C"
 VOID
 RlpCleanupDevices()
 {
+    if (RlDeviceSet != NULL)
+    {
+        DevpUnregisterDeviceSet(RlDeviceSet);
+    }
+
     RlpCleanupLxssDevice();
     RlpCleanupWin32Device();
 }

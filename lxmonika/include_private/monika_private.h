@@ -30,7 +30,7 @@ VOID
 
 NTSTATUS
     MapLxssInitialize(
-        _In_ PDRIVER_OBJECT DriverObject
+        _Inout_ PDRIVER_OBJECT DriverObject
     );
 
 NTSTATUS
