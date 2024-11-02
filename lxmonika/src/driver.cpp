@@ -27,6 +27,19 @@ DriverEntry(
 
     MA_RETURN_IF_FAIL(DevpInit(DriverObject));
 
+    // If we are "borrowing" a service from CNG, initialize it as soon as possible.
+    constexpr UNICODE_STRING strDriverCng = RTL_CONSTANT_STRING(L"\\Driver\\CNG");
+    if (RtlEqualUnicodeString(&DriverObject->DriverName, &strDriverCng, TRUE))
+    {
+        status = MapCngInitialize(DriverObject, RegistryPath);
+
+        if (!NT_SUCCESS(status))
+        {
+            Logger::LogError("Failed to initialize CNG, status=", (PVOID)status);
+            return status;
+        }
+    }
+
     // According to Microsoft naming conventions:
     // Ma           => MonikA
     // p            => Private function
@@ -36,6 +49,8 @@ DriverEntry(
 
     if (!NT_SUCCESS(status))
     {
+        MapCngCleanup();
+
         Logger::LogError("Failed to initialize lxmonika, status=", (PVOID)status);
         return status;
     }
@@ -69,6 +84,7 @@ DriverEntry(
     {
         MapLxssCleanup();
         MapCleanup();
+        MapCngCleanup();
 
         // The reality device (at least the Win32 one) is required for userland hosts to launch
         // Pico processes.
@@ -94,4 +110,6 @@ DriverUnload(
     MapLxssCleanup();
 
     MapCleanup();
+
+    MapCngCleanup();
 }
