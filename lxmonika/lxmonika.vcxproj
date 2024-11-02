@@ -98,7 +98,7 @@
     </ResourceCompile>
     <Link>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories);$(SolutionDir)\lxstub\$(OutDir)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>%(AdditionalDependencies);Wdmsec.lib;LXCORE.lib</AdditionalDependencies>
+      <AdditionalDependencies>%(AdditionalDependencies);Wdmsec.lib;Cng.lib;LXCORE.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -113,6 +113,7 @@
     <ClCompile Include="src\driver.cpp" />
     <ClCompile Include="src\module.cpp" />
     <ClCompile Include="src\monika.cpp" />
+    <ClCompile Include="src\monika_cng.cpp" />
     <ClCompile Include="src\monika_context.cpp" />
     <ClCompile Include="src\monika_dispatcher.cpp" />
     <ClCompile Include="src\monika_lxss.cpp" />

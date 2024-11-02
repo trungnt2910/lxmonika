@@ -25,6 +25,19 @@ VOID
     MapCleanup();
 
 //
+// Monika CNG integration
+//
+
+NTSTATUS
+    MapCngInitialize(
+        _Inout_ PDRIVER_OBJECT DriverObject,
+        _In_ PUNICODE_STRING RegistryPath
+    );
+
+VOID
+    MapCngCleanup();
+
+//
 // Monika LXSS hooks
 //
 
