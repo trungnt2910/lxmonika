@@ -4,6 +4,7 @@
 
 #include "Logger.h"
 
+#include "device.h"
 #include "module.h"
 #include "monika.h"
 #include "picosupport.h"
@@ -23,6 +24,8 @@ DriverEntry(
     NTSTATUS status;
 
     Logger::LogInfo("Hello World from lxmonika!");
+
+    MA_RETURN_IF_FAIL(DevpInit(DriverObject));
 
     // According to Microsoft naming conventions:
     // Ma           => MonikA

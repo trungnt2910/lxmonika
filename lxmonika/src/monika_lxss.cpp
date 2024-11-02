@@ -2,6 +2,7 @@
 
 #include <ntifs.h>
 
+#include "device.h"
 #include "lxss.h"
 #include "module.h"
 
@@ -48,7 +49,7 @@ static PPS_PICO_PROVIDER_SYSTEM_CALL_DISPATCH MaLxssOriginalDispatchSystemCall =
 extern "C"
 NTSTATUS
 MapLxssInitialize(
-    _In_ PDRIVER_OBJECT DriverObject
+    _Inout_ PDRIVER_OBJECT DriverObject
 )
 {
     // Optional step: Register WSL as a lxmonika client to simplify Pico process routines handling.
@@ -93,6 +94,13 @@ MapLxssInitialize(
         MapLxssRegistering = TRUE;
         MA_RETURN_IF_FAIL(LxInitialize(DriverObject, &lxSubsystem));
         MapLxssRegistering = FALSE;
+
+        // It's likely that some new devices have been registered.
+        // Handle them.
+        // We do not need to unload those during cleanup, since MapLxssCleanup
+        // does not delete any device object, so operations on them are still
+        // very possible.
+        MA_RETURN_IF_FAIL(DevpRegisterDeviceSet(DriverObject, NULL));
 
         if (MapLxssProviderIndex != (SIZE_T)-1)
         {

@@ -17,7 +17,7 @@ extern "C"
 
 NTSTATUS
     RlpInitializeDevices(
-        _In_ PDRIVER_OBJECT DriverObject
+        _Inout_ PDRIVER_OBJECT DriverObject
     );
 
 VOID
@@ -25,7 +25,7 @@ VOID
 
 NTSTATUS
     RlpInitializeLxssDevice(
-        _In_ PDRIVER_OBJECT DriverObject
+        _Inout_ PDRIVER_OBJECT DriverObject
     );
 
 VOID
@@ -33,7 +33,7 @@ VOID
 
 NTSTATUS
     RlpInitializeWin32Device(
-        _In_ PDRIVER_OBJECT DriverObject
+        _Inout_ PDRIVER_OBJECT DriverObject
     );
 
 VOID

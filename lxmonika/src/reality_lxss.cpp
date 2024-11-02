@@ -95,7 +95,7 @@ static LX_FILE_SEEK                             RlLxssFileSeek;
 extern "C"
 NTSTATUS
 RlpInitializeLxssDevice(
-    _In_ PDRIVER_OBJECT DriverObject
+    _Inout_ PDRIVER_OBJECT DriverObject
 )
 {
     NTSTATUS status;
