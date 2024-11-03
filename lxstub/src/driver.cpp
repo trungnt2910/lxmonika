@@ -31,17 +31,17 @@ LxInitialize(
     DbgPrintEx(
         DPFLTR_IHVDRIVER_ID,
         DPFLTR_ERROR_LEVEL,
-        "THIS IS A STUB! IT SHOULD ONLY BE USED IN THE BUILD SYSTEM!"
+        "THIS IS A STUB! IT SHOULD ONLY BE USED IN THE BUILD SYSTEM!\n"
     );
     DbgPrintEx(
         DPFLTR_IHVDRIVER_ID,
         DPFLTR_ERROR_LEVEL,
-        "Please install the appropriate LXCORE.SYS from LXSS or AoW."
+        "Please install the appropriate LXCORE.SYS from LXSS or AoW.\n"
     );
     DbgPrintEx(
         DPFLTR_IHVDRIVER_ID,
         DPFLTR_ERROR_LEVEL,
-        MONIKA_BUILD_NUMBER
+        MONIKA_BUILD_NUMBER "\n"
     );
 
     // Make sure that we import this function.
