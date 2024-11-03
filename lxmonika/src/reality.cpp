@@ -630,11 +630,11 @@ RlFileUpdateInformation(
     }
 
     Write(_snprintf(pFile->Data + pFile->Length, uSizeLeft + 1,
-        "MaProvidersCnt:\t%zu", MapProvidersCount
+        "MaProvidersCnt:\t%Iu", MapProvidersCount
     ));
 
     Write(_snprintf(pFile->Data + pFile->Length, uSizeLeft + 1,
-        "MaProvidersMax:\t%zu", (SIZE_T)MaPicoProviderMaxCount
+        "MaProvidersMax:\t%Iu", (SIZE_T)MaPicoProviderMaxCount
     ));
 
     Write(_snprintf(pFile->Data + pFile->Length, uSizeLeft + 1,
