@@ -452,6 +452,16 @@ typedef struct _PS_PICO_PROVIDER_ROUTINES {
                                    0x3FF)
 #endif
 
+#if (NTDDI_VERSION >= NTDDI_THRESHOLD)
+_IRQL_requires_max_(PASSIVE_LEVEL)
+NTKERNELAPI
+NTSTATUS
+PsRegisterPicoProvider(
+    _In_ PPS_PICO_PROVIDER_ROUTINES ProviderRoutines,
+    _Inout_ PPS_PICO_ROUTINES PicoRoutines
+);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

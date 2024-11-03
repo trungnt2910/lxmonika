@@ -10,6 +10,12 @@
 // Monika data
 //
 
+SIZE_T MapSystemProviderRoutinesSize = sizeof(PS_PICO_PROVIDER_ROUTINES);
+SIZE_T MapSystemPicoRoutinesSize = sizeof(PS_PICO_ROUTINES);
+DWORD MapSystemAbiVersion = NTDDI_WIN10_RS1;
+BOOLEAN MapSystemPicoHasSizeChecks = TRUE;
+BOOLEAN MapTooLate = FALSE;
+
 PS_PICO_PROVIDER_ROUTINES MapOriginalProviderRoutines;
 PS_PICO_ROUTINES MapOriginalRoutines;
 
@@ -45,50 +51,119 @@ MapInitialize()
 
     NTSTATUS status;
 
-    PPS_PICO_ROUTINES pRoutines = NULL;
-    PPS_PICO_PROVIDER_ROUTINES pProviderRoutines = NULL;
-
-    status = PicoSppLocateRoutines(&pRoutines);
-
-    Logger::LogTrace("PicoSppLocateRoutines status=", (void*)status);
-
-    if (!NT_SUCCESS(status))
-    {
-        goto fail;
-    }
-
-    memcpy(&MapOriginalRoutines, pRoutines, sizeof(MapOriginalRoutines));
-
-    if (pRoutines->Size != sizeof(MapOriginalRoutines))
-    {
-        Logger::LogWarning("Expected size ", sizeof(MapOriginalRoutines),
-            " for struct PS_PICO_ROUTINES, but got ", pRoutines->Size);
-        Logger::LogWarning("Please update the pico struct definitions.");
-    }
-
-    status = PicoSppLocateProviderRoutines(&pProviderRoutines);
-
-    Logger::LogTrace("PicoSppLocateProviderRoutines status=", (void*)status);
+    status = PicoSppDetermineAbiStatus(
+        &MapSystemProviderRoutinesSize,
+        &MapSystemPicoRoutinesSize,
+        &MapSystemAbiVersion,
+        &MapSystemPicoHasSizeChecks,
+        &MapTooLate
+    );
 
     if (!NT_SUCCESS(status))
     {
         goto fail;
     }
 
-    memcpy(&MapOriginalProviderRoutines, pProviderRoutines, sizeof(MapOriginalProviderRoutines));
+    if (!MapTooLate)
+    {
+        // We are loaded as a core driver and have the ability to register ourselves as a Pico
+        // provider.
 
-    Logger::LogTrace("Backed up original provider routines.");
+        MapOriginalProviderRoutines = PS_PICO_PROVIDER_ROUTINES
+        {
+            .Size = MapSystemProviderRoutinesSize,
+            .DispatchSystemCall = MapSystemCallDispatch,
+            .ExitThread = MapThreadExit,
+            .ExitProcess = MapProcessExit,
+            .DispatchException = MapDispatchException,
+            .TerminateProcess = MapTerminateProcess,
+            .WalkUserStack = MapWalkUserStack,
+            .ProtectedRanges = NULL,
+            // TODO: Implement this callback.
+            // We can store the ImageFileName in MA_CONTEXT for newer drivers.
+            .GetAllocatedProcessImageName = NULL,
 
-    // All known versions of the struct contains valid pointers
-    // for these members, so this should be safe.
-    pProviderRoutines->DispatchSystemCall = MapSystemCallDispatch;
-    pProviderRoutines->ExitThread = MapThreadExit;
-    pProviderRoutines->ExitProcess = MapProcessExit;
-    pProviderRoutines->DispatchException = MapDispatchException;
-    pProviderRoutines->TerminateProcess = MapTerminateProcess;
-    pProviderRoutines->WalkUserStack = MapWalkUserStack;
+            // Request full access. We will duplicate the handles before returning to consumers.
+            .OpenProcess = PROCESS_ALL_ACCESS,
+            .OpenThread = THREAD_ALL_ACCESS,
 
-    Logger::LogTrace("Successfully patched provider routines.");
+            // Not a good option, but there are no better ones.
+            .SubsystemInformationType = SubsystemInformationTypeWSL
+        };
+
+        MapOriginalRoutines = PS_PICO_ROUTINES
+        {
+            .Size = MapSystemPicoRoutinesSize
+
+            // All other members set to 0 / NULL.
+            // They will be left untouched if the system supports fewer routines.
+        };
+
+        if (MapSystemPicoHasSizeChecks)
+        {
+            status = PsRegisterPicoProvider(&MapOriginalProviderRoutines, &MapOriginalRoutines);
+        }
+        else // No size check, skip the first Size field.
+        {
+            status = PsRegisterPicoProvider(
+                (PPS_PICO_PROVIDER_ROUTINES)&MapOriginalProviderRoutines.DispatchSystemCall,
+                (PPS_PICO_ROUTINES)&MapOriginalRoutines.CreateProcess
+            );
+        }
+
+        if (!NT_SUCCESS(status))
+        {
+            Logger::LogError("Unexpected failure when registering lxmonika: ", (PVOID)status);
+            goto fail;
+        }
+    }
+    else
+    {
+        PPS_PICO_ROUTINES pRoutines = NULL;
+        PPS_PICO_PROVIDER_ROUTINES pProviderRoutines = NULL;
+
+        status = PicoSppLocateRoutines(&pRoutines);
+
+        Logger::LogTrace("PicoSppLocateRoutines status=", (void*)status);
+
+        if (!NT_SUCCESS(status))
+        {
+            goto fail;
+        }
+
+        MapOriginalRoutines = *pRoutines;
+
+        if (pRoutines->Size != sizeof(MapOriginalRoutines))
+        {
+            Logger::LogWarning("Expected size ", sizeof(MapOriginalRoutines),
+                " for struct PS_PICO_ROUTINES, but got ", pRoutines->Size);
+            Logger::LogWarning("Please update the pico struct definitions.");
+        }
+
+        status = PicoSppLocateProviderRoutines(&pProviderRoutines);
+
+        Logger::LogTrace("PicoSppLocateProviderRoutines status=", (void*)status);
+
+        if (!NT_SUCCESS(status))
+        {
+            goto fail;
+        }
+
+        MapOriginalProviderRoutines = *pProviderRoutines;
+
+        Logger::LogTrace("Backed up original provider routines.");
+
+        // All known versions of the struct contains valid pointers
+        // for these members, so this should be safe.
+        pProviderRoutines->DispatchSystemCall = MapSystemCallDispatch;
+        pProviderRoutines->ExitThread = MapThreadExit;
+        pProviderRoutines->ExitProcess = MapProcessExit;
+        pProviderRoutines->DispatchException = MapDispatchException;
+        pProviderRoutines->TerminateProcess = MapTerminateProcess;
+        pProviderRoutines->WalkUserStack = MapWalkUserStack;
+
+        Logger::LogTrace("Successfully patched provider routines.");
+    }
 
     // Initialize pico routines
 #define MONIKA_PROVIDER(index)                                              \
@@ -166,21 +241,25 @@ MapCleanup()
 {
     if (InterlockedCompareExchange(&MaInitialized, FALSE, TRUE))
     {
-        PPS_PICO_PROVIDER_ROUTINES pRoutines = NULL;
-        if (NT_SUCCESS(PicoSppLocateProviderRoutines(&pRoutines)))
+        if (MapTooLate)
         {
-            *pRoutines = MapOriginalProviderRoutines;
-        }
-        if (MapPatchedLxss)
-        {
-            PPS_PICO_ROUTINES pLxpRoutines = NULL;
-            HANDLE hdlLxCore;
-            if (NT_SUCCESS(MdlpFindModuleByName("lxcore.sys", &hdlLxCore, NULL))
-                && NT_SUCCESS(MdlpGetProcAddress(hdlLxCore, "LxpRoutines", (PVOID*)&pLxpRoutines)))
+            PPS_PICO_PROVIDER_ROUTINES pRoutines = NULL;
+            if (NT_SUCCESS(PicoSppLocateProviderRoutines(&pRoutines)))
             {
-                *pLxpRoutines = MapOriginalRoutines;
+                *pRoutines = MapOriginalProviderRoutines;
             }
-            MapPatchedLxss = FALSE;
+            if (MapPatchedLxss)
+            {
+                PPS_PICO_ROUTINES pLxpRoutines = NULL;
+                HANDLE hdlLxCore;
+                if (NT_SUCCESS(MdlpFindModuleByName("lxcore.sys", &hdlLxCore, NULL))
+                    && NT_SUCCESS(MdlpGetProcAddress(hdlLxCore, "LxpRoutines",
+                        (PVOID*)&pLxpRoutines)))
+                {
+                    *pLxpRoutines = MapOriginalRoutines;
+                }
+                MapPatchedLxss = FALSE;
+            }
         }
     }
 }

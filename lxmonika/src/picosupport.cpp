@@ -5,6 +5,7 @@
 
 #include "module.h"
 
+#include "AutoResource.h"
 #include "Logger.h"
 
 static PPS_PICO_PROVIDER_ROUTINES PspPicoProviderRoutines = NULL;
@@ -433,4 +434,298 @@ PicoSppGetOffsets(
     Logger::LogInfo("See https://github.com/trungnt2910/PspPicoProviderRoutinesOffsetGen");
 
     return STATUS_NOT_FOUND;
+}
+
+extern "C"
+NTSTATUS
+PicoSppDetermineAbiStatus(
+    _Out_ PSIZE_T pProviderRoutinesSize,
+    _Out_ PSIZE_T pPicoRoutinesSize,
+    _Out_ DWORD* pAbiVersion,
+    _Out_ PBOOLEAN pHasSizeChecks,
+    _Out_ PBOOLEAN pTooLate
+)
+{
+    NTSTATUS status;
+
+    PS_PICO_PROVIDER_ROUTINES psTestProviderRoutines
+    {
+        .Size = 0
+    };
+    PS_PICO_ROUTINES psTestRoutines
+    {
+        .Size = 0
+    };
+
+    // Test pages for triggering exceptions.
+    // Using MM_BAD_POINTER will only trigger BSODs.
+    PVOID pTestPages = NULL;
+    SIZE_T szTestPagesSize = sizeof(PS_PICO_PROVIDER_ROUTINES) + PAGE_SIZE;
+
+    status = ZwAllocateVirtualMemory(
+        ZwCurrentProcess(),
+        &pTestPages,
+        0,
+        &szTestPagesSize,
+        MEM_RESERVE,
+        PAGE_NOACCESS
+    );
+    if (!NT_SUCCESS(status))
+    {
+        Logger::LogError("Failed to reserve virtual memory for testing.");
+        return status;
+    }
+
+    AUTO_RESOURCE(pTestPages,
+        [](auto p)
+        {
+            SIZE_T szZero = 0;
+            ZwFreeVirtualMemory(ZwCurrentProcess(), &p, &szZero, MEM_RELEASE);
+        }
+    );
+
+    // Check if PsRegisterPicoProvider is a stub.
+    __try
+    {
+        status = PsRegisterPicoProvider(
+            (PPS_PICO_PROVIDER_ROUTINES)pTestPages,
+            (PPS_PICO_ROUTINES)pTestPages
+        );
+
+        // On TH2, the function ignores both parameters and returns a STATUS_TOO_LATE.
+        // The access violation should not happen.
+
+        // This also happens when we're "too late" in some older builds without size checks,
+        // but we cannot do much more in those cases either. We do not have offset databases
+        // for these early builds, and lxcore did not export the LxpRoutines symbol at that time.
+
+        *pProviderRoutinesSize = (SIZE_T)-1;
+        *pPicoRoutinesSize = (SIZE_T)-1;
+        *pAbiVersion = NTDDI_WIN10_TH2;
+        *pHasSizeChecks = FALSE;
+        *pTooLate = TRUE;
+
+        return STATUS_NOT_SUPPORTED;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        // Expected to reach here.
+    }
+
+    status = PsRegisterPicoProvider(&psTestProviderRoutines, &psTestRoutines);
+
+    if (NT_SUCCESS(status))
+    {
+        // Ancient builds of Windows (before 10128) where the size checks are not done.
+        *pAbiVersion = NTDDI_WIN10;
+        *pHasSizeChecks = FALSE;
+
+        // If it's actually too late, it has already been caught in the block above.
+        *pTooLate = FALSE;
+
+        SIZE_T szTestPagesWritableSize = sizeof(PS_PICO_PROVIDER_ROUTINES);
+        status = ZwAllocateVirtualMemory(
+            ZwCurrentProcess(),
+            &pTestPages,
+            0,
+            &szTestPagesWritableSize,
+            MEM_COMMIT,
+            PAGE_READWRITE
+        );
+        if (!NT_SUCCESS(status))
+        {
+            Logger::LogError("Failed to commit virtual memory for testing.");
+            return status;
+        }
+
+        BOOLEAN found = FALSE;
+
+        for (SIZE_T szTestSize = 0;
+            szTestSize <= sizeof(PS_PICO_PROVIDER_ROUTINES);
+            szTestSize += sizeof(PVOID))
+        {
+            PVOID pStartAddress = (PCHAR)pTestPages + szTestPagesWritableSize - szTestSize;
+
+            __try
+            {
+                // zero out this struct since we will use the results later.
+                memset(&psTestRoutines, 0, sizeof(psTestRoutines));
+
+                status = PsRegisterPicoProvider(
+                    (PPS_PICO_PROVIDER_ROUTINES)pStartAddress,
+                    &psTestRoutines
+                );
+            }
+            __except (EXCEPTION_EXECUTE_HANDLER)
+            {
+                // szTestSize is too small. The system would try to read into uncommitted memory.
+                continue;
+            }
+
+            *pProviderRoutinesSize = szTestSize;
+
+            if (!NT_SUCCESS(status))
+            {
+                Logger::LogWarning("Unexpected error code: ", (PVOID)status);
+            }
+
+            break;
+        }
+
+        if (!found)
+        {
+            Logger::LogError("The system Pico provider routines size is larger than expected.");
+            Logger::LogError("This cannot happen since this should be an older Windows build.");
+            Logger::LogError("Maybe there's a bug in lxmonika?");
+            return STATUS_INFO_LENGTH_MISMATCH;
+        }
+
+        // The routines' size is the number of non-null fields times the size of a pointer
+        // (since all the fields are pointers).
+        PVOID* pBegin = (PVOID*)&psTestRoutines;
+        PVOID* pEnd = (PVOID*)(((PCHAR)&psTestRoutines) + sizeof(PS_PICO_ROUTINES));
+
+        while (pEnd != pBegin && pEnd[-1] == NULL)
+        {
+            --pEnd;
+        }
+
+        *pPicoRoutinesSize = (pEnd - pBegin) * sizeof(PVOID);
+
+        return STATUS_SUCCESS;
+    }
+    else if (status == STATUS_INFO_LENGTH_MISMATCH)
+    {
+        // The size checks are done. Exploit that to determine the sizes.
+        *pHasSizeChecks = TRUE;
+
+        BOOLEAN found = FALSE;
+
+        // Decrease the first struct size until the system starts to read the second struct.
+        for (SIZE_T szTestSize = sizeof(PS_PICO_PROVIDER_ROUTINES);
+            szTestSize > 0;
+            szTestSize -= sizeof(PVOID))
+        {
+            __try
+            {
+                psTestProviderRoutines.Size = szTestSize;
+                status = PsRegisterPicoProvider(
+                    &psTestProviderRoutines,
+                    (PPS_PICO_ROUTINES)pTestPages
+                );
+            }
+            __except (EXCEPTION_EXECUTE_HANDLER)
+            {
+                // Access violation occurred, we have the correct size.
+                *pProviderRoutinesSize = szTestSize;
+                found = TRUE;
+                break;
+            }
+        }
+
+        if (!found)
+        {
+            // We might be on a newer Windows version, where the first struct is larger?
+            Logger::LogError("The system Pico provider routines size is larger than expected.");
+            Logger::LogError("Probably this copy of lxmonika is outdated.");
+
+            return STATUS_INFO_LENGTH_MISMATCH;
+        }
+
+        // Set these masks to avoid failing parameter checks.
+        psTestProviderRoutines.OpenProcess = PROCESS_ALL_ACCESS;
+        psTestProviderRoutines.OpenThread = THREAD_ALL_ACCESS;
+
+        found = FALSE;
+
+        // Decrease the second struct size until we pass the checks.
+        for (SIZE_T szTestSize = sizeof(PS_PICO_ROUTINES);
+            szTestSize > 0;
+            szTestSize -= sizeof(PVOID))
+        {
+            psTestRoutines.Size = szTestSize;
+            status = PsRegisterPicoProvider(&psTestProviderRoutines, &psTestRoutines);
+
+            if (status != STATUS_INFO_LENGTH_MISMATCH)
+            {
+                // We got the correct size.
+                *pPicoRoutinesSize = szTestSize;
+                found = TRUE;
+
+                Logger::LogTrace(
+                    "The correct sizes are: ", *pProviderRoutinesSize, ", ", *pPicoRoutinesSize);
+                Logger::LogTrace("The return status is: ", (PVOID)status);
+
+                if (!NT_SUCCESS(status))
+                {
+                    if (status != STATUS_TOO_LATE)
+                    {
+                        Logger::LogWarning("Got an unexpected error code: ", (PVOID)status);
+                    }
+                    *pTooLate = TRUE;
+                }
+                else
+                {
+                    *pTooLate = FALSE;
+                }
+
+                break;
+            }
+        }
+
+        if (!found)
+        {
+            // We might be on a newer Windows version, where the second struct is larger?
+            Logger::LogError("The system Pico routines size is larger than expected.");
+            Logger::LogError("Probably this copy of lxmonika is outdated.");
+
+            return STATUS_INFO_LENGTH_MISMATCH;
+        }
+
+        return PicoSppDetermineAbiVersion(
+            *pProviderRoutinesSize,
+            *pPicoRoutinesSize,
+            pAbiVersion
+        );
+    }
+    else
+    {
+        // Some other fail status but not related to our Pico structures?
+        DbgBreakPoint();
+        return STATUS_NOT_SUPPORTED;
+    }
+}
+
+extern "C"
+NTSTATUS
+PicoSppDetermineAbiVersion(
+    _In_ SIZE_T szProviderRoutines,
+    _In_ SIZE_T szPicoRoutines,
+    _Out_ DWORD* pAbiVersion
+)
+{
+    if (szProviderRoutines > sizeof(PS_PICO_PROVIDER_ROUTINES)
+        || szPicoRoutines > sizeof(PS_PICO_ROUTINES))
+    {
+        // A driver designed for a newer Windows version?
+        return STATUS_NOT_SUPPORTED;
+    }
+
+    // TODO: There is a gap between build 14347
+    // (the first build to introduce the additional members)
+    // and the actual build where the functions have their signatures changed
+    // (somewhere before 14393 - the RS1 release).
+    //
+    // These are very rare Insider builds that lxmonika will probably never run on.
+
+    if (szProviderRoutines > FIELD_OFFSET(PS_PICO_PROVIDER_ROUTINES, OpenProcess))
+    {
+        *pAbiVersion = NTDDI_WIN10_RS1;
+    }
+    else
+    {
+        *pAbiVersion = NTDDI_WIN10;
+    }
+
+    return STATUS_SUCCESS;
 }
