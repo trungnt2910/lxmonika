@@ -277,17 +277,25 @@ DevpRegisterDeviceSet(
         *pDeviceSet = pCurrentSet;
     }
 
-    // Store the current set of major functions.
-    for (SIZE_T i = 0; i <= IRP_MJ_MAXIMUM_FUNCTION; ++i)
+    if (pCurrentSet != NULL)
     {
-        pCurrentSet->MajorFunctions[i] = pDriverObject->MajorFunction[i];
-
-        // The driver has not modified this specific callback.
-        // Probably it does not support this request type.
-        if (pCurrentSet->MajorFunctions[i] == DevMajorFunctions[i])
+        // We have detected and inserted at least one new device.
+        // Store the current set of major functions.
+        for (SIZE_T i = 0; i <= IRP_MJ_MAXIMUM_FUNCTION; ++i)
         {
-            pCurrentSet->MajorFunctions[i] = DevBlankMajorFunctions[i];
+            pCurrentSet->MajorFunctions[i] = pDriverObject->MajorFunction[i];
+
+            // The driver has not modified this specific callback.
+            // Probably it does not support this request type.
+            if (pCurrentSet->MajorFunctions[i] == DevMajorFunctions[i])
+            {
+                pCurrentSet->MajorFunctions[i] = DevBlankMajorFunctions[i];
+            }
         }
+    }
+    else
+    {
+        Logger::LogTrace("No new device detected. Ignoring empty device set.");
     }
 
     // Restore the managed major functions.
