@@ -200,11 +200,16 @@ CommandBase::PrintHelp(
 
     if (_parentCommand == nullptr)
     {
+        // Dirty hack after C++20 P2905R2.
+        // TODO: C++26: Use std::runtime_format
+        PCWSTR pCopyrightEndYear = strcmp(MONIKA_BUILD_YEAR, "2024") == 0 ?
+            L"" : L"-" WIDEN(MONIKA_BUILD_YEAR);
+
         os << std::vformat(
             UtilGetResourceString(MA_STRING_COMMAND_HELP_COPYRIGHT),
             std::make_wformat_args(
                 L"2024",
-                strcmp(MONIKA_BUILD_YEAR, "2024") == 0 ? L"" : L"-" WIDEN(MONIKA_BUILD_YEAR),
+                pCopyrightEndYear,
                 WIDEN(MONIKA_BUILD_AUTHOR)
             )
         ) << L"\n";
@@ -335,17 +340,18 @@ CommandBase::PrintHelp(
     // Run 'monika [command] --help' for more information on a command.
     if (_parentCommand == nullptr && !_subcommands.empty())
     {
+        // TODO: C++26: Use std::runtime_format
+        std::wstring wstrMonikaCommandHelp = std::format(
+            L"{} [{}] {}",
+            _name,
+            UtilGetResourceString(MA_STRING_COMMAND_HELP_PLACEHOLDER_COMMAND),
+            UtilGetResourceString(MA_STRING_COMMAND_SWITCH_HELP_NAME)
+        );
+
         os << L"\n";
         os << std::vformat(
             UtilGetResourceString(MA_STRING_COMMAND_HELP_HINT_SUBCOMMAND),
-            std::make_wformat_args(
-                std::format(
-                    L"{} [{}] {}",
-                    _name,
-                    UtilGetResourceString(MA_STRING_COMMAND_HELP_PLACEHOLDER_COMMAND),
-                    UtilGetResourceString(MA_STRING_COMMAND_SWITCH_HELP_NAME)
-                )
-            )
+            std::make_wformat_args(wstrMonikaCommandHelp)
         ) << L"\n";
     }
 
