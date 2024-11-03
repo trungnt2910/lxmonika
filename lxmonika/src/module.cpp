@@ -608,8 +608,9 @@ MdlpPatchTrampoline(
             // jmp eax
             0xFF, 0xE0
 #elif defined(_M_ARM)
-            // ldr pc, [pc, #-0x4]
-            0x04, 0xF0, 0x1F, 0xE5,
+            // ldr pc, [pc, #-0x0]  -> Windows ARM32 uses Thumb mode.
+            //                         pc points 1 instructions ahead.
+            0x5F, 0xF8, 0x00, 0xF0,
             // .addr
             0x00, 0x00, 0x00, 0x00
 #else
@@ -624,6 +625,13 @@ MdlpPatchTrampoline(
 #elif defined(_M_IX86)
         memcpy(chShellCode + 1, &pHook, sizeof(PVOID));
 #elif defined(_M_ARM)
+        // All Thumb function pointers have least significant bit set to 1.
+        // For the MEMORY ADDRESS to copy to, clear this bit.
+        pOriginal = (PVOID)(((SIZE_T)pOriginal) & ~1);
+
+        // For the JUMP TARGET (pHook), however,
+        // we need to keep this bit to indicate thumb mode.
+
         memcpy(chShellCode + 4, &pHook, sizeof(PVOID));
 #else
 #error Put Address into Trampoline!
@@ -634,6 +642,10 @@ MdlpPatchTrampoline(
     }
     else // pHook == NULL, unhooking
     {
+#if defined(_M_ARM)
+        pOriginal = (PVOID)(((SIZE_T)pOriginal) & ~1);
+#endif
+
         MA_RETURN_IF_FAIL(MdlpGodMemcpy(pOriginal, pBytes, MDL_TRAMPOLINE_SIZE));
     }
 
