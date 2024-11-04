@@ -28,6 +28,11 @@
     </Inf>
   </ItemGroup>
   <ItemGroup>
+    <ResourceCompile Include="lxmonika.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
     <ClCompile Include="src\condrv.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

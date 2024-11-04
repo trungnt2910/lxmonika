@@ -18,6 +18,10 @@
       <Platform>ARM64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <PropertyGroup Label="Monika">
+    <MaTargetName Condition="'$(MaTargetName)'==''">lxmonika</MaTargetName>
+    <MaBuildAuthor Condition="'$(MaBuildAuthor)'==''">Trung Nguyen</MaBuildAuthor>
+  </PropertyGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{99FD011E-8895-4733-B996-29DFDEB68719}</ProjectGuid>
     <TemplateGuid>{1bc93793-694f-48fe-9372-81e2b05556fd}</TemplateGuid>
@@ -27,6 +31,7 @@
     <Platform Condition="'$(Platform)' == ''">x64</Platform>
     <RootNamespace>lxmonika</RootNamespace>
     <WindowsTargetPlatformVersion>$(LatestTargetPlatformVersion)</WindowsTargetPlatformVersion>
+    <TargetName>$(MaTargetName)</TargetName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
@@ -99,10 +104,16 @@
       <PreprocessorDefinitions>MONIKA_IN_DRIVER=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions>MONIKA_TIMESTAMP="$([System.DateTime]::UtcNow.ToString(ddd MMM dd HH:mm:ss UTC yyyy))";%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions>MONIKA_BUILD_YEAR="$([System.DateTime]::UtcNow.ToString(yyyy))";%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <PreprocessorDefinitions>MONIKA_BUILD_AUTHOR="Trung Nguyen";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MONIKA_BUILD_AUTHOR="$(MaBuildAuthor)";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MONIKA_BUILD_NAME="$(MaTargetName)";%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>include;include_private;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>MONIKA_BUILD_YEAR=$([System.DateTime]::UtcNow.ToString(yyyy));%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MONIKA_BUILD_AUTHOR=$(MaBuildAuthor);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MONIKA_BUILD_NAME=$(MaTargetName);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies);Wdmsec.lib</AdditionalDependencies>
     </Link>
@@ -157,12 +168,16 @@
   <ItemGroup>
     <None Include="README.md" />
   </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="lxmonika.rc" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
   <UsingTask TaskName="MonikaAppendDetails" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
     <ParameterGroup>
       <ItemList ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
+      <AddQuotes ParameterType="System.Boolean" Required="true" />
       <OutputItemList ParameterType="Microsoft.Build.Framework.ITaskItem[]" Output="true" />
     </ParameterGroup>
     <Task>
@@ -172,7 +187,7 @@
           string toAppend = "";
           void Append(string varName, string value)
           {
-            toAppend += $";{varName}=\"{value}\"";
+            toAppend += AddQuotes ? $";{varName}=\"{value}\"" : $";{varName}={value}";
           }
           void Run(string varName, string command)
           {
@@ -201,12 +216,18 @@
     <ItemGroup>
       <ClCompileCopy Include="@(ClCompile)" />
       <ClCompile Remove="@(ClCompile)" />
+      <ResourceCompileCopy Include="@(ResourceCompile)" />
+      <ResourceCompile Remove="@(ResourceCompile)" />
     </ItemGroup>
-    <MonikaAppendDetails ItemList="@(ClCompileCopy)">
+    <MonikaAppendDetails ItemList="@(ClCompileCopy)" AddQuotes="true">
       <Output ItemName="ClCompile" TaskParameter="OutputItemList" />
+    </MonikaAppendDetails>
+    <MonikaAppendDetails ItemList="@(ResourceCompileCopy)" AddQuotes="false">
+      <Output ItemName="ResourceCompile" TaskParameter="OutputItemList" />
     </MonikaAppendDetails>
     <ItemGroup>
       <ClCompileCopy Remove="@(ClCompileCopy)" />
+      <ResourceCompileCopy Remove="@(ResourceCompileCopy)" />
     </ItemGroup>
   </Target>
 </Project>
