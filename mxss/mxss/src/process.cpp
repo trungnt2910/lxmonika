@@ -505,13 +505,14 @@ MxProcessMapMainExecutable(
         }
 
         SIZE_T uNumberOfBytesToProtect = pMemorySize;
+        ULONG ulOldProtection = 0;
 
         MX_RETURN_IF_FAIL(ZwProtectVirtualMemory(
             hdlProcess,
             &pMapBase,
             &uNumberOfBytesToProtect,
             ElfProtectionToWindows(pProgramHeaders[i].p_flags),
-            NULL
+            &ulOldProtection
         ));
 
         if (uNumberOfBytesToProtect != pMemorySize)

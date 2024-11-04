@@ -20,7 +20,7 @@ NTSYSAPI NTAPI
         _Inout_ PVOID* BaseAddress,
         _Inout_ PSIZE_T NumberOfBytesToProtect,
         _In_ ULONG NewAccessProtection,
-        _Out_opt_ PULONG OldAccessProtection
+        _Out_ PULONG OldAccessProtection
     );
 
 #define MEM_DOS_LIM 0x40000000
