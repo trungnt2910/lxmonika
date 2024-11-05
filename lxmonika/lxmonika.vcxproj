@@ -88,7 +88,7 @@
       <!-- Work around compile errors in ntstrsafe.h -->
       <PreprocessorDefinitions>%(PreprocessorDefinitions);NTSTRSAFE_NO_UNICODE_STRING_FUNCTIONS</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>include;include_private;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <DisableSpecificWarnings>4471;4748;5040;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4471;4748;5040;5257;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <ResourceCompile>
@@ -153,6 +153,7 @@
     <ClInclude Include="include\reality.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="lxmonika.wprp" />
     <None Include="README.md" />
   </ItemGroup>
   <ItemGroup>
