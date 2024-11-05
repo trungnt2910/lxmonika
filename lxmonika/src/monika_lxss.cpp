@@ -92,8 +92,9 @@ MapLxssInitialize(
         LX_SUBSYSTEM lxSubsystem = { };
 
         MapLxssRegistering = TRUE;
-        MA_RETURN_IF_FAIL(LxInitialize(DriverObject, &lxSubsystem));
+        NTSTATUS statusLxInitialize = LxInitialize(DriverObject, &lxSubsystem);
         MapLxssRegistering = FALSE;
+        MA_RETURN_IF_FAIL(statusLxInitialize);
 
         // It's likely that some new devices have been registered.
         // Handle them.
