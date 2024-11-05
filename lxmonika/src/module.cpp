@@ -649,5 +649,15 @@ MdlpPatchTrampoline(
         MA_RETURN_IF_FAIL(MdlpGodMemcpy(pOriginal, pBytes, MDL_TRAMPOLINE_SIZE));
     }
 
+    NTSTATUS statusFlush = ZwFlushInstructionCache(
+        ZwCurrentProcess(), pOriginal, MDL_TRAMPOLINE_SIZE
+    );
+
+    if (!NT_SUCCESS(statusFlush))
+    {
+        Logger::LogWarning("Failed to flush instruction cache, status=", (PVOID)statusFlush);
+        Logger::LogWarning("The trampoline may not work.");
+    }
+
     return STATUS_SUCCESS;
 }
