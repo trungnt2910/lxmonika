@@ -147,8 +147,6 @@ DevpInsertDevice(
         return status;
     }
 
-    Logger::LogTrace("Device object ", pDeviceObject, " not found in any existing set.");
-
     PDEVICE_SET pNewSet = NULL;
     AUTO_RESOURCE(pNewSet, [](auto p) { ExFreePoolWithTag(p, DEV_POOL_TAG); });
 
@@ -156,9 +154,6 @@ DevpInsertDevice(
 
     if (pSet == NULL)
     {
-
-        Logger::LogTrace("Allocating a new device set for device object ", pDeviceObject, ".");
-
         // No preferred set yet, allocate a new one.
         pNewSet = (PDEVICE_SET)ExAllocatePool2(PagedPool, sizeof(DEVICE_SET), DEV_POOL_TAG);
         if (pNewSet == NULL)
@@ -170,10 +165,6 @@ DevpInsertDevice(
 
         // Don't write to the output parameter yet, wait until we succeed.
         pSet = pNewSet;
-    }
-    else
-    {
-        Logger::LogTrace("Using the current device set.");
     }
 
     PDEVICE_ENTRY pNewEntry = (PDEVICE_ENTRY)
@@ -187,17 +178,40 @@ DevpInsertDevice(
     pNewEntry->DeviceObject = pDeviceObject;
     InsertTailList(&pSet->DeviceList.ListEntry, &pNewEntry->ListEntry);
 
+    // Optional logging
+    ULONG ulDeviceNameLength = 0;
+    ObQueryNameString(pDeviceObject, NULL, 0, &ulDeviceNameLength);
+    POBJECT_NAME_INFORMATION pDeviceName =
+        (POBJECT_NAME_INFORMATION)ExAllocatePool2(PagedPool, ulDeviceNameLength, DEV_POOL_TAG);
+    if (pDeviceName != NULL)
+    {
+        AUTO_RESOURCE(pDeviceName, [](auto p) { ExFreePoolWithTag(p, DEV_POOL_TAG); });
+        if (NT_SUCCESS(ObQueryNameString(
+            pDeviceObject,
+            pDeviceName,
+            ulDeviceNameLength,
+            &ulDeviceNameLength
+        )))
+        {
+            Logger::LogTrace(
+                "Registered new device \"", &pDeviceName->Name,
+                "\" to set ", pSet, "."
+            );
+        }
+    }
+
     // We are succeeding. Release the auto resources.
     pNewEntry = NULL;
     if (pNewSet != NULL)
     {
+        Logger::LogTrace("Registered new device set: ", pNewSet, ".");
+
         // Only do this if we actually did allocate a new set.
         InsertTailList(&DevDeviceSetList.ListEntry, &pNewSet->ListEntry);
         if (pCurrentSet != NULL)
         {
             *pCurrentSet = pNewSet;
         }
-        Logger::LogTrace("Inserted new device set to the global list.");
         pNewSet = NULL;
     }
 
@@ -268,7 +282,6 @@ DevpRegisterDeviceSet(
         pDeviceObject != NULL;
         pDeviceObject = pDeviceObject->NextDevice)
     {
-        Logger::LogTrace("Inserting device object ", pDeviceObject, ".");
         MA_RETURN_IF_FAIL(DevpInsertDevice(pDeviceObject, &pCurrentSet));
     }
 
@@ -292,10 +305,6 @@ DevpRegisterDeviceSet(
                 pCurrentSet->MajorFunctions[i] = DevBlankMajorFunctions[i];
             }
         }
-    }
-    else
-    {
-        Logger::LogTrace("No new device detected. Ignoring empty device set.");
     }
 
     // Restore the managed major functions.
