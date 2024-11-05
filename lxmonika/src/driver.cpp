@@ -24,6 +24,7 @@ DriverEntry(
     NTSTATUS status;
 
     Logger::LogInfo("Hello World from lxmonika!");
+    Logger::LogInfo("lxmonika is running as \"", &DriverObject->DriverName, "\".");
 
     MA_RETURN_IF_FAIL(DevpInit(DriverObject));
 
