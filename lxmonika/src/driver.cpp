@@ -10,7 +10,10 @@
 #include "picosupport.h"
 #include "reality.h"
 
+#include "AutoResource.h"
+
 PDRIVER_OBJECT DriverGlobalObject;
+LONG DriverInitialized = FALSE;
 
 extern "C"
 NTSTATUS
@@ -23,8 +26,25 @@ DriverEntry(
 
     NTSTATUS status;
 
-    Logger::LogInfo("Hello World from lxmonika!");
-    Logger::LogInfo("lxmonika is running as \"", &DriverObject->DriverName, "\".");
+    // On systems where lxmonika "borrows" a core service then still registers itself to allow
+    // other Pico providers to declare "lxmonika" as a dependency, this driver entry point may
+    // be called twice: Once in early boot as a "Core" driver, the second time as a normal Boot
+    // driver.
+    // Make sure that all the initialization routines are only run once.
+    if (InterlockedCompareExchange(&DriverInitialized, TRUE, FALSE) == FALSE)
+    {
+        Logger::LogInfo("Hello World from lxmonika!");
+        Logger::LogInfo("lxmonika is running as \"", &DriverObject->DriverName, "\".");
+    }
+    else
+    {
+        Logger::LogTrace("Ignoring reload attempt as \"", &DriverObject->DriverName, "\".");
+        return STATUS_SUCCESS;
+    }
+
+    // Clear the initialized flag if any of the following code fails.
+    PLONG pDriverInitializedFlagGuard = &DriverInitialized;
+    AUTO_RESOURCE(pDriverInitializedFlagGuard, [](auto p) { *p = FALSE; });
 
     MA_RETURN_IF_FAIL(DevpInit(DriverObject));
 
@@ -94,6 +114,9 @@ DriverEntry(
     }
 
     DriverObject->DriverUnload = DriverUnload;
+
+    // The driver has successfully loaded, release the guard.
+    pDriverInitializedFlagGuard = NULL;
 
     return STATUS_SUCCESS;
 }
