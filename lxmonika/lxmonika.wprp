@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WindowsPerformanceRecorder Version="1.0" Author="Trung Nguyen"
+  Copyright="Trung Nguyen" Company="Trung Nguyen">
+  <Profiles>
+    <EventCollector Id="EventCollector_LxMonika"
+      Name="LxMonikaCollector">
+      <BufferSize Value="64" />
+      <Buffers Value="4" />
+    </EventCollector>
+
+    <EventProvider Id="EventProvider_LxMonika"
+      Name="4d6f6e69-6b61-4029-1052-65616c697479" NonPagedMemory="true" />
+    <Profile Id="LxMonika.Verbose.File"
+      Name="LxMonika" Description="LxMonika"
+      LoggingMode="File" DetailLevel="Verbose">
+      <Collectors>
+        <EventCollectorId Value="EventCollector_LxMonika">
+          <EventProviders>
+            <EventProviderId Value="EventProvider_LxMonika" />
+          </EventProviders>
+        </EventCollectorId>
+      </Collectors>
+    </Profile>
+
+    <Profile Id="LxMonika.Light.File"
+      Name="LxMonika"
+      Description="LxMonika"
+      Base="LxMonika.Verbose.File"
+      LoggingMode="File"
+      DetailLevel="Light" />
+
+    <Profile Id="LxMonika.Verbose.Memory"
+      Name="LxMonika"
+      Description="LxMonika"
+      Base="LxMonika.Verbose.File"
+      LoggingMode="Memory"
+      DetailLevel="Verbose" />
+
+    <Profile Id="LxMonika.Light.Memory"
+      Name="LxMonika"
+      Description="LxMonika"
+      Base="LxMonika.Verbose.File"
+      LoggingMode="Memory"
+      DetailLevel="Light" />
+  </Profiles>
+</WindowsPerformanceRecorder>

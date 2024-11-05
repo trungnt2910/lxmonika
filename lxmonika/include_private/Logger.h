@@ -20,9 +20,6 @@ enum class LogLevel
 class Logger
 {
 private:
-    static LONG _Initialized;
-    static FAST_MUTEX _Mutex;
-
     template <typename TFirst, typename... TRest>
     static void _Print(TFirst first, TRest... args)
     {
@@ -45,6 +42,10 @@ private:
     static void _Print(PCSTR pcStr);
     static void _Print(PUCHAR pcuStr);
 
+    static void _Print(PWSTR pwStr);
+
+    static void _Print(PUNICODE_STRING puStr);
+
     static void _Print(PVOID p);
     template <typename T>
     static void _Print(T* ptr) { _Print((PVOID)ptr); }
@@ -53,6 +54,8 @@ private:
 
     static void _Lock();
     static void _Unlock();
+
+    static void _Flush();
 public:
     static bool _Log(LogLevel level, const char* file, int line, const char* function);
 
@@ -75,7 +78,8 @@ public:
             }
 
             _Print(args...);
-            _Print("\n");
+
+            _Flush();
 
             _Unlock();
             return true;
