@@ -33,5 +33,5 @@ public:
 };
 
 #define AUTO_RESOURCE(t, f)                                                                     \
-    const auto t##__Free = [](decltype(t) t) { return (void)((f)(t)); };                        \
+    const auto t##__Free = [&](decltype(t) t) { return (void)((f)(t)); };                       \
     auto t##__AutoResource = AutoResource<decltype(t), decltype(t##__Free)>(t, t##__Free);
