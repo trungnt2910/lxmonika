@@ -89,8 +89,9 @@ typedef struct _SYSTEM_BIGPOOL_INFORMATION {
     SYSTEM_BIGPOOL_ENTRY    AllocatedInfo[ANYSIZE_ARRAY];
 } SYSTEM_BIGPOOL_INFORMATION, *PSYSTEM_BIGPOOL_INFORMATION;
 
-__declspec(dllimport)
+NTSYSAPI
 NTSTATUS
+NTAPI
     ZwQuerySection(
         _In_        HANDLE SectionHandle,
         _In_        SECTION_INFORMATION_CLASS InformationClass,
@@ -99,8 +100,9 @@ NTSTATUS
         _Out_opt_   PULONG ResultLength
     );
 
-__declspec(dllimport)
+NTSYSAPI
 NTSTATUS
+NTAPI
     ZwQuerySystemInformation(
         _In_        SYSTEM_INFORMATION_CLASS SystemInformationClass,
         _In_        PVOID SystemInformation,
@@ -108,17 +110,20 @@ NTSTATUS
         _Out_       PULONG ReturnLength
     );
 
-__declspec(dllimport)
-PEPROCESS
-    PsGetThreadProcess(
-        _In_        PETHREAD Thread
+NTSYSAPI
+NTSTATUS
+NTAPI
+    ZwFlushInstructionCache(
+        _In_        HANDLE ProcessHandle,
+        _In_opt_    PVOID  BaseAddress,
+        _In_        SIZE_T Length
     );
 
-__declspec(dllimport)
-NTSTATUS
-    PsLookupProcessByProcessId(
-        _In_        HANDLE ProcessId,
-        _Out_       PEPROCESS* Process
+NTSYSAPI
+PEPROCESS
+NTAPI
+    PsGetThreadProcess(
+        _In_        PETHREAD Thread
     );
 
 #ifdef __cplusplus
