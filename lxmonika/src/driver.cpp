@@ -39,6 +39,7 @@ DriverEntry(
     else
     {
         Logger::LogTrace("Ignoring reload attempt as \"", &DriverObject->DriverName, "\".");
+        DriverObject->DriverUnload = DriverUnload;
         return STATUS_SUCCESS;
     }
 
@@ -113,7 +114,12 @@ DriverEntry(
         return status;
     }
 
+    // TODO: Disallow unloading altogether for the main driver object?
+    // Especially when we're running as something like CNG.
     DriverObject->DriverUnload = DriverUnload;
+
+    // Keep the object that we're attaching all our devices and stuff to.
+    DriverGlobalObject = DriverObject;
 
     // The driver has successfully loaded, release the guard.
     pDriverInitializedFlagGuard = NULL;
@@ -127,13 +133,27 @@ DriverUnload(
     _In_ PDRIVER_OBJECT DriverObject
 )
 {
-    UNREFERENCED_PARAMETER(DriverObject);
+    Logger::LogInfo("Unloading \"", &DriverObject->DriverName, "\".");
 
-    RlpCleanupDevices();
+    if (DriverObject == DriverGlobalObject)
+    {
+        Logger::LogTrace("Cleaning up \"", &DriverObject->DriverName, "\".");
 
-    MapLxssCleanup();
+        RlpCleanupDevices();
 
-    MapCleanup();
+        MapLxssCleanup();
 
-    MapCngCleanup();
+        MapCleanup();
+
+        MapCngCleanup();
+
+        DriverGlobalObject = NULL;
+        DriverInitialized = FALSE;
+    }
+    else
+    {
+        Logger::LogTrace(
+            "No cleanup required for extra driver object \"", &DriverObject->DriverName, "\"."
+        );
+    }
 }
