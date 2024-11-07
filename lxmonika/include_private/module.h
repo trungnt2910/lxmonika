@@ -52,6 +52,31 @@ NTSTATUS
         _Inout_opt_ PSIZE_T puSize
     );
 
+// MdlpPatchImport
+//
+// Patches the target PE module's Import Address Table.
+NTSTATUS
+    MdlpPatchImport(
+        _In_ HANDLE hModule,
+        _In_ PCSTR pImportImageName,
+        _In_ PCSTR pImportName,
+        _Inout_ PVOID* pImportValue
+    );
+
+NTSTATUS
+    MdlpPatchTrampoline(
+        _In_ PVOID pOriginal,
+        _In_opt_ PVOID pHook,
+        _Inout_ PCHAR pBytes,
+        _In_ SIZE_T szBytes
+    );
+
+#if defined(_M_X64)
+#define MDL_TRAMPOLINE_SIZE     12
+#else
+#error Define Trampoline size!
+#endif
+
 #ifdef __cplusplus
 }
 #endif

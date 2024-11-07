@@ -1,9 +1,11 @@
 #include "module.h"
 
+#include "monika.h"
 #include "pe.h"
 #include "os.h"
 #include "winresource.h"
 
+#include "AutoResource.h"
 #include "Logger.h"
 #include "PoolAllocator.h"
 
@@ -385,4 +387,202 @@ MdlpGetProductVersion(
     // No languages available?
     Logger::LogError("Cannot find leaf");
     return STATUS_RESOURCE_LANG_NOT_FOUND;
+}
+
+static
+NTSTATUS
+MdlpGodMemcpy(
+    _Out_ PVOID pDst,
+    _In_ PVOID pSrc,
+    _In_ SIZE_T szCount
+)
+{
+    PMDL pMdl = IoAllocateMdl((PCHAR)pDst, (ULONG)szCount, FALSE, FALSE, NULL);
+    if (pMdl == NULL)
+    {
+        return STATUS_ACCESS_VIOLATION;
+    }
+    AUTO_RESOURCE(pMdl, IoFreeMdl);
+
+    PMDL pLockedMdl = NULL;
+    AUTO_RESOURCE(pLockedMdl, MmUnlockPages);
+
+    PVOID pWritableDst = NULL;
+    AUTO_RESOURCE(pWritableDst, [&](auto p)
+    {
+        MmUnmapLockedPages(p, pLockedMdl);
+    });
+
+    __try
+    {
+        MmProbeAndLockPages(pMdl, KernelMode, IoReadAccess);
+        // Allow the AUTO_RESOURCE to work.
+        pLockedMdl = pMdl;
+
+        pMdl->MdlFlags |= MDL_MAPPING_CAN_FAIL;
+
+        pWritableDst = MmMapLockedPagesSpecifyCache(
+            pMdl,
+            KernelMode,
+            MmNonCached,
+            NULL,
+            FALSE,
+            HighPagePriority
+        );
+
+        MmProtectMdlSystemAddress(pMdl, PAGE_READWRITE);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        return GetExceptionCode();
+    }
+
+    if (pWritableDst == NULL)
+    {
+        return STATUS_ACCESS_VIOLATION;
+    }
+
+    memcpy(pWritableDst, pSrc, szCount);
+
+    return STATUS_SUCCESS;
+}
+
+extern "C"
+NTSTATUS
+MdlpPatchImport(
+    _In_ HANDLE hModule,
+    _In_ PCSTR pImportImageName,
+    _In_ PCSTR pImportName,
+    _Inout_ PVOID* pImportValue
+)
+{
+    if (hModule == NULL || pImportName == NULL || pImportValue == NULL)
+    {
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    PCHAR pStart = (PCHAR)hModule;
+
+    PIMAGE_DOS_HEADER pDosHeader = (PIMAGE_DOS_HEADER)pStart;
+    PIMAGE_NT_HEADERS pPeHeader = (PIMAGE_NT_HEADERS)(pStart + pDosHeader->e_lfanew);
+
+    PCHAR pImportDirectoryStart = (pStart +
+        pPeHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
+    PCHAR pImportDirectoryEnd = (pImportDirectoryStart +
+        pPeHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size);
+    PIMAGE_IMPORT_DESCRIPTOR pImportDescriptors =
+        (PIMAGE_IMPORT_DESCRIPTOR)pImportDirectoryStart;
+
+    for (SIZE_T i = 0;
+        pImportDirectoryStart + sizeof(PIMAGE_IMPORT_DESCRIPTOR) <= pImportDirectoryEnd;
+        ++i)
+    {
+        PIMAGE_IMPORT_DESCRIPTOR pCurrent = pImportDescriptors + i;
+        if (pCurrent->Characteristics == 0)
+        {
+            // Terminating descriptor.
+            break;
+        }
+
+        PCHAR pDllName = pStart + pCurrent->Name;
+        Logger::LogTrace("Processing import descriptor for ", pDllName);
+
+        if (pImportImageName != NULL && _stricmp(pDllName, pImportImageName) != 0)
+        {
+            Logger::LogTrace("Skipping since this image has not been requested.");
+            continue;
+        }
+
+        PIMAGE_THUNK_DATA pThunkRef = (PIMAGE_THUNK_DATA)(pStart + pCurrent->OriginalFirstThunk);
+        PSIZE_T pFuncRef = (PSIZE_T)(pStart + pCurrent->FirstThunk);
+
+        while (pThunkRef != NULL)
+        {
+            if (IMAGE_SNAP_BY_ORDINAL(pThunkRef->Ordinal))
+            {
+                Logger::LogTrace("This symbol is imported by ordinal.");
+                continue;
+            }
+
+            PIMAGE_IMPORT_BY_NAME pHintNameEntry =
+                (PIMAGE_IMPORT_BY_NAME)(pStart + pThunkRef->AddressOfData);
+
+            if (strcmp(pHintNameEntry->Name, pImportName) == 0)
+            {
+                Logger::LogTrace("Found import entry for symbol: ", pHintNameEntry->Name);
+
+                // IATs are generally write-protected so we need the God Memcpy for this.
+                PVOID pOldValue = (PVOID)*pFuncRef;
+                MA_RETURN_IF_FAIL(MdlpGodMemcpy(pFuncRef, pImportValue, sizeof(PVOID)));
+                *pImportValue = pOldValue;
+
+                Logger::LogTrace("Patched entry. Original value was ", pOldValue);
+                return STATUS_SUCCESS;
+            }
+
+            ++pThunkRef;
+            ++pFuncRef;
+        }
+    }
+
+    return STATUS_NOT_FOUND;
+}
+
+extern "C"
+NTSTATUS
+MdlpPatchTrampoline(
+    _In_ PVOID pOriginal,
+    _In_opt_ PVOID pHook,
+    _Inout_ PCHAR pBytes,
+    _In_ SIZE_T szBytes
+)
+{
+    // TODO: Where should we put this function?
+    //
+    // It's a bit odd to have it here in module.cpp, since the function does not work directly with
+    // PE modules unlike its friends here.
+    //
+    // It might make sense to have this and MdlpGodMemcpy as `MaUtil*`, but definitely don't mark
+    // these dangerous functions as MONIKA_EXPORT.
+
+    if (pOriginal == NULL || pBytes == NULL)
+    {
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    if (szBytes != MDL_TRAMPOLINE_SIZE)
+    {
+        return STATUS_INFO_LENGTH_MISMATCH;
+    }
+
+    // Hooking
+    if (pHook != NULL)
+    {
+        UCHAR chShellCode[MDL_TRAMPOLINE_SIZE] =
+        {
+#if defined(_M_X64)
+            // movabs rax, [addr]
+            0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            // jmp rax
+            0xff, 0xe0
+#else
+#error Define Trampoline!
+#endif
+        };
+
+#if defined(_M_X64)
+        memcpy(chShellCode + 2, &pHook, sizeof(PVOID));
+#else
+#error Put Address into Trampoline!
+#endif
+
+        memcpy(pBytes, pOriginal, MDL_TRAMPOLINE_SIZE);
+        MA_RETURN_IF_FAIL(MdlpGodMemcpy(pOriginal, &chShellCode, MDL_TRAMPOLINE_SIZE));
+    }
+    else // pHook == NULL, unhooking
+    {
+        MA_RETURN_IF_FAIL(MdlpGodMemcpy(pOriginal, pBytes, MDL_TRAMPOLINE_SIZE));
+    }
+
+    return STATUS_SUCCESS;
 }

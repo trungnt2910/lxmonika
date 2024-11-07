@@ -1371,7 +1371,7 @@ typedef struct _IMAGE_THUNK_DATA64 {
         ULONGLONG Function;         // PDWORD
         ULONGLONG Ordinal;
         ULONGLONG AddressOfData;    // PIMAGE_IMPORT_BY_NAME
-    } u1;
+    } DUMMYUNIONNAME;
 } IMAGE_THUNK_DATA64;
 typedef IMAGE_THUNK_DATA64* PIMAGE_THUNK_DATA64;
 
@@ -1384,7 +1384,7 @@ typedef struct _IMAGE_THUNK_DATA32 {
         DWORD Function;             // PDWORD
         DWORD Ordinal;
         DWORD AddressOfData;        // PIMAGE_IMPORT_BY_NAME
-    } u1;
+    } DUMMYUNIONNAME;
 } IMAGE_THUNK_DATA32;
 typedef IMAGE_THUNK_DATA32* PIMAGE_THUNK_DATA32;
 
