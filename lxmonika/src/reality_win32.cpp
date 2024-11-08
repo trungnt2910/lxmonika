@@ -20,6 +20,13 @@ static DRIVER_DISPATCH RlWin32DeviceWrite;
 static DRIVER_DISPATCH RlWin32DeviceControl;
 static DRIVER_DISPATCH RlWin32DeviceSetInformation;
 
+static PDRIVER_DISPATCH RlNextDeviceCreate          = NULL;
+static PDRIVER_DISPATCH RlNextDeviceClose           = NULL;
+static PDRIVER_DISPATCH RlNextDeviceRead            = NULL;
+static PDRIVER_DISPATCH RlNextDeviceWrite           = NULL;
+static PDRIVER_DISPATCH RlNextDeviceControl         = NULL;
+static PDRIVER_DISPATCH RlNextDeviceSetInformation  = NULL;
+
 //
 // Lifetime functions
 // Not thread-safe, but this should be fine since they are only called by DriverEntry/DriverUnload.
@@ -38,13 +45,28 @@ RlpInitializeWin32Device(
         return STATUS_SUCCESS;
     }
 
+    // The DriverObject might already have major functions registered,
+    // since we are sharing it with lxss.
+
+    RlNextDeviceCreate = DriverObject->MajorFunction[IRP_MJ_CREATE];
     DriverObject->MajorFunction[IRP_MJ_CREATE] = RlWin32DeviceCreate;
+
+
+    RlNextDeviceClose = DriverObject->MajorFunction[IRP_MJ_CLOSE];
     DriverObject->MajorFunction[IRP_MJ_CLOSE] = RlWin32DeviceClose;
+
+    RlNextDeviceRead = DriverObject->MajorFunction[IRP_MJ_READ];
     DriverObject->MajorFunction[IRP_MJ_READ] = RlWin32DeviceRead;
+
+    RlNextDeviceWrite = DriverObject->MajorFunction[IRP_MJ_WRITE];
     DriverObject->MajorFunction[IRP_MJ_WRITE] = RlWin32DeviceWrite;
+
     // ioctl
+    RlNextDeviceControl = DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL];
     DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = RlWin32DeviceControl;
+
     // seek
+    RlNextDeviceSetInformation = DriverObject->MajorFunction[IRP_MJ_SET_INFORMATION];
     DriverObject->MajorFunction[IRP_MJ_SET_INFORMATION] = RlWin32DeviceSetInformation;
 
     NTSTATUS status;
@@ -106,6 +128,20 @@ RlWin32CompleteRequest(
     return status;
 }
 
+#define RL_TRY_DISPATCH_TO_NEXT(Function)                                                       \
+    do                                                                                          \
+    {                                                                                           \
+        if (pDeviceObject != RlDeviceObject)                                                    \
+        {                                                                                       \
+            if (RlNextDevice##Function != NULL)                                                 \
+            {                                                                                   \
+                return RlNextDevice##Function(pDeviceObject, pIrp);                             \
+            }                                                                                   \
+            return STATUS_NOT_SUPPORTED;                                                        \
+        }                                                                                       \
+    }                                                                                           \
+    while (0)
+
 static
 NTSTATUS
 RlWin32DeviceCreate(
@@ -115,7 +151,7 @@ RlWin32DeviceCreate(
 {
     Logger::LogTrace();
 
-    UNREFERENCED_PARAMETER(pDeviceObject);
+    RL_TRY_DISPATCH_TO_NEXT(Create);
 
     NTSTATUS status = STATUS_SUCCESS;
 
@@ -149,7 +185,7 @@ RlWin32DeviceClose(
 {
     Logger::LogTrace();
 
-    UNREFERENCED_PARAMETER(pDeviceObject);
+    RL_TRY_DISPATCH_TO_NEXT(Close);
 
     PIO_STACK_LOCATION pIrpStack = IoGetCurrentIrpStackLocation(pIrp);
     ExFreePoolWithTag(pIrpStack->FileObject->FsContext, MA_REALITY_TAG);
@@ -166,7 +202,7 @@ RlWin32DeviceRead(
 {
     Logger::LogTrace();
 
-    UNREFERENCED_PARAMETER(pDeviceObject);
+    RL_TRY_DISPATCH_TO_NEXT(Read);
 
     PIO_STACK_LOCATION pIrpStack = IoGetCurrentIrpStackLocation(pIrp);
     PRL_FILE pFile = (PRL_FILE)pIrpStack->FileObject->FsContext;
@@ -193,7 +229,7 @@ RlWin32DeviceWrite(
 {
     Logger::LogTrace();
 
-    UNREFERENCED_PARAMETER(pDeviceObject);
+    RL_TRY_DISPATCH_TO_NEXT(Write);
 
     PIO_STACK_LOCATION pIrpStack = IoGetCurrentIrpStackLocation(pIrp);
     PRL_FILE pFile = (PRL_FILE)pIrpStack->FileObject->FsContext;
@@ -231,7 +267,7 @@ RlWin32DeviceControl(
 {
     Logger::LogTrace();
 
-    UNREFERENCED_PARAMETER(pDeviceObject);
+    RL_TRY_DISPATCH_TO_NEXT(Control);
 
     PIO_STACK_LOCATION pIrpStack = IoGetCurrentIrpStackLocation(pIrp);
     PRL_FILE pFile = (PRL_FILE)pIrpStack->FileObject->FsContext;
@@ -261,7 +297,7 @@ RlWin32DeviceSetInformation(
 {
     Logger::LogTrace();
 
-    UNREFERENCED_PARAMETER(pDeviceObject);
+    RL_TRY_DISPATCH_TO_NEXT(SetInformation);
 
     PIO_STACK_LOCATION pIrpStack = IoGetCurrentIrpStackLocation(pIrp);
     PRL_FILE pFile = (PRL_FILE)pIrpStack->FileObject->FsContext;
