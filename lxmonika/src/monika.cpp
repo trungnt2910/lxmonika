@@ -3,6 +3,7 @@
 #include "os.h"
 #include "picosupport.h"
 
+#include "AutoResource.h"
 #include "Logger.h"
 
 //
@@ -28,6 +29,13 @@ SIZE_T MapProvidersCount = 0;
 
 static LONG MaInitialized = FALSE;
 
+static constinit UNICODE_STRING MaServiceRegistryKey = RTL_CONSTANT_STRING(
+    L"\\Registry\\Machine\\SYSTEM\\CurrentControlSet\\Services\\lxmonika"
+);
+static constinit UNICODE_STRING MaEnableLateRegistrationRegistryValue = RTL_CONSTANT_STRING(
+    L"MaEnableLateRegistration"
+);
+
 //
 // Monika lifetime functions
 //
@@ -48,20 +56,17 @@ MapInitialize()
         return STATUS_SUCCESS;
     }
 
-    NTSTATUS status;
+    // Clear the initialized flag if any of the following code fails.
+    PLONG pInitializedFlagGuard = &MaInitialized;
+    AUTO_RESOURCE(pInitializedFlagGuard, [](auto p) { *p = FALSE; });
 
-    status = PicoSppDetermineAbiStatus(
+    MA_RETURN_IF_FAIL(PicoSppDetermineAbiStatus(
         &MapSystemProviderRoutinesSize,
         &MapSystemPicoRoutinesSize,
         &MapSystemAbiVersion,
         &MapSystemPicoHasSizeChecks,
         &MapTooLate
-    );
-
-    if (!NT_SUCCESS(status))
-    {
-        goto fail;
-    }
+    ));
 
     if (!MapTooLate)
     {
@@ -99,35 +104,79 @@ MapInitialize()
 
         if (MapSystemPicoHasSizeChecks)
         {
-            status = PsRegisterPicoProvider(&MapOriginalProviderRoutines, &MapOriginalRoutines);
+            MA_RETURN_IF_FAIL(PsRegisterPicoProvider(
+                &MapOriginalProviderRoutines, &MapOriginalRoutines
+            ));
         }
         else // No size check, skip the first Size field.
         {
-            status = PsRegisterPicoProvider(
+            MA_RETURN_IF_FAIL(PsRegisterPicoProvider(
                 (PPS_PICO_PROVIDER_ROUTINES)&MapOriginalProviderRoutines.DispatchSystemCall,
                 (PPS_PICO_ROUTINES)&MapOriginalRoutines.CreateProcess
-            );
-        }
-
-        if (!NT_SUCCESS(status))
-        {
-            Logger::LogError("Unexpected failure when registering lxmonika: ", (PVOID)status);
-            goto fail;
+            ));
         }
     }
     else
     {
+        Logger::LogWarning("lxmonika is loaded too late to register as a Pico provider.");
+
+        OBJECT_ATTRIBUTES objectAttributes;
+        InitializeObjectAttributes(
+            &objectAttributes,
+            &MaServiceRegistryKey,
+            OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,
+            NULL,
+            NULL
+        );
+        HANDLE hServicesRegistryKey = NULL;
+        MA_RETURN_IF_FAIL(ZwOpenKey(
+            &hServicesRegistryKey,
+            KEY_READ,
+            &objectAttributes
+        ));
+
+        union
+        {
+            KEY_VALUE_PARTIAL_INFORMATION keyInformation;
+            CHAR keyBuffer[sizeof(KEY_VALUE_PARTIAL_INFORMATION) + sizeof(DWORD)];
+        };
+        ULONG ulResultLength = 0;
+
+        NTSTATUS status = ZwQueryValueKey(
+            hServicesRegistryKey,
+            &MaEnableLateRegistrationRegistryValue,
+            KeyValuePartialInformation,
+            &keyInformation,
+            sizeof(keyBuffer),
+            &ulResultLength
+        );
+
+        if (!NT_SUCCESS(status)
+            || keyInformation.Type != REG_DWORD
+            || keyInformation.DataLength != sizeof(DWORD)
+            || *((DWORD*)keyInformation.Data) == 0)
+        {
+            Logger::LogError("Refusing to use unsupported heuristics.");
+            Logger::LogError(
+                "To enable offset-based heuristics, set the \"",
+                &MaEnableLateRegistrationRegistryValue, "\" registry value to 1."
+            );
+            Logger::LogError(
+                "Alternatively, run \"monika.exe install\" again with the "
+                "\"--enable-late-registration\" switch."
+            );
+            return STATUS_TOO_LATE;
+        }
+        else
+        {
+            Logger::LogWarning("Falling back to unsupported heuristics.");
+            Logger::LogWarning("This may trigger PatchGuard and cause system instability.");
+        }
+
         PPS_PICO_ROUTINES pRoutines = NULL;
         PPS_PICO_PROVIDER_ROUTINES pProviderRoutines = NULL;
 
-        status = PicoSppLocateRoutines(&pRoutines);
-
-        Logger::LogTrace("PicoSppLocateRoutines status=", (void*)status);
-
-        if (!NT_SUCCESS(status))
-        {
-            goto fail;
-        }
+        MA_RETURN_IF_FAIL(PicoSppLocateRoutines(&pRoutines));
 
         MapOriginalRoutines = *pRoutines;
 
@@ -138,14 +187,7 @@ MapInitialize()
             Logger::LogWarning("Please update the pico struct definitions.");
         }
 
-        status = PicoSppLocateProviderRoutines(&pProviderRoutines);
-
-        Logger::LogTrace("PicoSppLocateProviderRoutines status=", (void*)status);
-
-        if (!NT_SUCCESS(status))
-        {
-            goto fail;
-        }
+        MA_RETURN_IF_FAIL(PicoSppLocateProviderRoutines(&pProviderRoutines));
 
         MapOriginalProviderRoutines = *pProviderRoutines;
 
@@ -198,11 +240,10 @@ MapInitialize()
 #include "monika_providers.cpp"
 #undef MONIKA_PROVIDER
 
-    return STATUS_SUCCESS;
+    // Everything is OK, release the guard.
+    pInitializedFlagGuard = NULL;
 
-fail:
-    MaInitialized = FALSE;
-    return status;
+    return STATUS_SUCCESS;
 }
 
 extern "C"
