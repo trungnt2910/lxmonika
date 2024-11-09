@@ -37,6 +37,15 @@ DriverEntry(
         return status;
     }
 
+    // Optional step: Patching LXSS.
+    status = MapLxssInitialize(DriverObject);
+
+    if (!NT_SUCCESS(status))
+    {
+        Logger::LogWarning("Failed to integrate LXSS into lxmonika, status=", (PVOID)status);
+        Logger::LogWarning("WSL integration features may not work.");
+    }
+
     // /dev/reality and \Device\Reality
     // Initializing the reality devices requires knowing our DRIVER_OBJECT.
     // As MapInitialize may be indirectly called by other drivers through MaRegisterPicoProvider,
@@ -44,8 +53,18 @@ DriverEntry(
     // For this reason, RlpInitializeDevices needs to be directly handled by DriverEntry.
     status = RlpInitializeDevices(DriverObject);
 
+    // Should call this regardless of whether we succeeded.
+    NTSTATUS statusUnpatch = MapLxssPrepareForPatchGuard();
+
+    if (!NT_SUCCESS(statusUnpatch))
+    {
+        Logger::LogWarning("Problem undoing LXSS patches, status=", (PVOID)statusUnpatch);
+        Logger::LogWarning("You may encounter issues with PatchGuard.");
+    }
+
     if (!NT_SUCCESS(status))
     {
+        MapLxssCleanup();
         MapCleanup();
 
         // The reality device (at least the Win32 one) is required for userland hosts to launch
@@ -68,6 +87,8 @@ DriverUnload(
     UNREFERENCED_PARAMETER(DriverObject);
 
     RlpCleanupDevices();
+
+    MapLxssCleanup();
 
     MapCleanup();
 }

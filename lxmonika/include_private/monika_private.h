@@ -27,6 +27,17 @@ VOID
 // Monika LXSS hooks
 //
 
+NTSTATUS
+    MapLxssInitialize(
+        _In_ PDRIVER_OBJECT DriverObject
+    );
+
+NTSTATUS
+    MapLxssPrepareForPatchGuard();
+
+VOID
+    MapLxssCleanup();
+
 VOID
     MapLxssSystemCallHook(
         _In_ PPS_PICO_SYSTEM_CALL_INFORMATION pSyscallInfo
@@ -161,14 +172,20 @@ enum
 // Monika data
 //
 
+extern BOOLEAN MapTooLate;
+
 extern PS_PICO_PROVIDER_ROUTINES MapOriginalProviderRoutines;
 extern PS_PICO_ROUTINES MapOriginalRoutines;
 
+extern BOOLEAN MapPicoRegistrationDisabled;
 extern PS_PICO_PROVIDER_ROUTINES MapProviderRoutines[MaPicoProviderMaxCount];
 extern PS_PICO_ROUTINES MapRoutines[MaPicoProviderMaxCount];
+extern MA_PICO_PROVIDER_ROUTINES MapAdditionalProviderRoutines[MaPicoProviderMaxCount];
 extern SIZE_T MapProvidersCount;
 
-extern BOOLEAN MapPatchedLxss;
+extern BOOLEAN MapLxssPatched;
+extern BOOLEAN MapLxssRegistering;
+extern SIZE_T MapLxssProviderIndex;
 
 #ifdef __cplusplus
 }

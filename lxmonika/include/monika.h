@@ -14,10 +14,6 @@
 #define MONIKA_EXPORT __declspec(dllimport)
 #endif
 
-#ifdef MONIKA_IN_DRIVER
-#include "monika_private.h"
-#endif
-
 #ifdef __cplusplus
 extern "C"
 {
@@ -165,4 +161,8 @@ NTSTATUS NTAPI
 
 #ifdef __cplusplus
 }
+#endif
+
+#ifdef MONIKA_IN_DRIVER
+#include "monika_private.h"
 #endif

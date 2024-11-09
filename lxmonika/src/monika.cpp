@@ -1,6 +1,5 @@
 #include "monika.h"
 
-#include "module.h"
 #include "os.h"
 #include "picosupport.h"
 
@@ -19,13 +18,12 @@ BOOLEAN MapTooLate = FALSE;
 PS_PICO_PROVIDER_ROUTINES MapOriginalProviderRoutines;
 PS_PICO_ROUTINES MapOriginalRoutines;
 
+BOOLEAN MapPicoRegistrationDisabled = FALSE;
 PS_PICO_PROVIDER_ROUTINES MapProviderRoutines[MaPicoProviderMaxCount];
 PS_PICO_ROUTINES MapRoutines[MaPicoProviderMaxCount];
 MA_PICO_PROVIDER_ROUTINES MapAdditionalProviderRoutines[MaPicoProviderMaxCount];
 MA_PICO_ROUTINES MapAdditionalRoutines[MaPicoProviderMaxCount];
 SIZE_T MapProvidersCount = 0;
-
-BOOLEAN MapPatchedLxss = FALSE;
 
 static LONG MaInitialized = FALSE;
 
@@ -194,40 +192,6 @@ MapInitialize()
 #include "monika_providers.cpp"
 #undef MONIKA_PROVIDER
 
-    // Optional step: Register WSL as a lxmonika client to simplify Pico process routines handling.
-    HANDLE hdlLxCore;
-    if (NT_SUCCESS(MdlpFindModuleByName("lxcore.sys", &hdlLxCore, NULL)))
-    {
-        PPS_PICO_ROUTINES pLxpRoutines = NULL;
-        status = MdlpGetProcAddress(hdlLxCore, "LxpRoutines", (PVOID*)&pLxpRoutines);
-
-        if (NT_SUCCESS(status))
-        {
-            // This function should be called before any MaRegisterPicoProvider calls succeeds.
-            ASSERT(MapProvidersCount == 0);
-            ++MapProvidersCount;
-            ASSERT(MapProvidersCount == 1);
-
-            Logger::LogTrace("lxcore.sys detected. Found LxpRoutines at ", pLxpRoutines);
-
-            // Should be safe to patch everything here since lxcore.sys, as a core driver,
-            // should be initialized before third-party ones.
-            MapProviderRoutines[0] = MapOriginalProviderRoutines;
-            *pLxpRoutines = MapRoutines[0];
-
-            // Use a special hook designed for WSL instead of the generic lxmonika shims.
-            MapProviderRoutines[0].DispatchSystemCall = MapLxssSystemCallHook;
-
-            MapAdditionalProviderRoutines[0].GetAllocatedProviderName =
-                MapLxssGetAllocatedProviderName;
-            MapAdditionalProviderRoutines[0].GetConsole = MapLxssGetConsole;
-
-            MapPatchedLxss = TRUE;
-
-            Logger::LogTrace("lxcore.sys successfully registered as a lxmonika provider.");
-        }
-    }
-
     return STATUS_SUCCESS;
 
 fail:
@@ -241,24 +205,18 @@ MapCleanup()
 {
     if (InterlockedCompareExchange(&MaInitialized, FALSE, TRUE))
     {
-        if (MapTooLate)
+        PPS_PICO_PROVIDER_ROUTINES pRoutines = NULL;
+        if (NT_SUCCESS(PicoSppLocateProviderRoutines(&pRoutines)))
         {
-            PPS_PICO_PROVIDER_ROUTINES pRoutines = NULL;
-            if (NT_SUCCESS(PicoSppLocateProviderRoutines(&pRoutines)))
+            if (!MapTooLate)
             {
-                *pRoutines = MapOriginalProviderRoutines;
+                // Wire lxcore directly to the system.
+                *pRoutines = MapProviderRoutines[MapLxssProviderIndex];
             }
-            if (MapPatchedLxss)
+            else
             {
-                PPS_PICO_ROUTINES pLxpRoutines = NULL;
-                HANDLE hdlLxCore;
-                if (NT_SUCCESS(MdlpFindModuleByName("lxcore.sys", &hdlLxCore, NULL))
-                    && NT_SUCCESS(MdlpGetProcAddress(hdlLxCore, "LxpRoutines",
-                        (PVOID*)&pLxpRoutines)))
-                {
-                    *pLxpRoutines = MapOriginalRoutines;
-                }
-                MapPatchedLxss = FALSE;
+                // The original ones are the ones belonging to lxcore.
+                *pRoutines = MapOriginalProviderRoutines;
             }
         }
     }
@@ -303,6 +261,18 @@ MaRegisterPicoProviderEx(
         return STATUS_INVALID_PARAMETER;
     }
 
+    if (MapPicoRegistrationDisabled)
+    {
+        // No, we are not evil like Microsoft.
+        //
+        // MapPicoRegistrationDisabled is only set early during initialization to prevent lxcore
+        // from registering a second time. Other drivers should not even be loaded yet.
+        //
+        // The return status is a bit ironic, it should have been STATUS_TOO_EARLY or something.
+        // However, this one is compatible with what the function in ntoskrnl returns.
+        return STATUS_TOO_LATE;
+    }
+
     // BE CAREFUL! This function might be called by other drivers before lxmonika's own DriverEntry
     // gets called.
     NTSTATUS status = MapInitialize();
@@ -344,6 +314,12 @@ MaRegisterPicoProviderEx(
     if (Index != NULL)
     {
         *Index = uProviderIndex;
+    }
+
+    if (MapLxssRegistering)
+    {
+        // The hooked built-in function has no way to inform the index.
+        MapLxssProviderIndex = uProviderIndex;
     }
 
     return STATUS_SUCCESS;

@@ -3,6 +3,7 @@
 #include <ntifs.h>
 
 #include "lxss.h"
+#include "module.h"
 
 #include "AutoResource.h"
 #include "Logger.h"
@@ -30,6 +31,190 @@
 #define MONIKA_KERNEL_BUILD_NUMBER  "1"
 #endif
 #endif
+
+//
+// LXSS hook initialization
+//
+
+BOOLEAN MapLxssPatched = FALSE;
+BOOLEAN MapLxssRegistering = FALSE;
+SIZE_T MapLxssProviderIndex = (SIZE_T)-1;
+
+//static PVOID MaLxssOriginalImportValue = NULL;
+static CHAR MaLxssTrampolineBytes[MDL_TRAMPOLINE_SIZE];
+static PPS_PICO_PROVIDER_SYSTEM_CALL_DISPATCH MaLxssOriginalDispatchSystemCall = NULL;
+
+extern "C"
+NTSTATUS
+MapLxssInitialize(
+    _In_ PDRIVER_OBJECT DriverObject
+)
+{
+    // Optional step: Register WSL as a lxmonika client to simplify Pico process routines handling.
+    HANDLE hdlLxCore;
+    MA_RETURN_IF_FAIL(MdlpFindModuleByName("lxcore.sys", &hdlLxCore, NULL));
+
+    if (!MapTooLate)
+    {
+        // We are loaded early and successfully registered ourselves as a Pico provider.
+        // We are free from PatchGuard's wrath, and can temporarily patch lxcore to use
+        // our own Pico registration function.
+
+        // The cleaner method of patching IATs for PsRegisterPicoProvider was tried.
+        // The patching succeeded, but somehow lxcore had all its ntoskrnl.exe imports
+        // magically baked in when loaded into memory and skipped the IAT altogether.
+
+        //MA_RETURN_IF_FAIL(MdlpPatchImport(
+        //    hdlLxCore,
+        //    "ntoskrnl.exe",
+        //    "PsRegisterPicoProvider",
+        //    &MaLxssOriginalImportValue
+        //));
+
+        // Therefore we have to directly patch the function in ntoskrnl with a trampoline.
+        // These trampolines are architecture-specific and requires special shellcode.
+        //
+        // Since we are doing this very early, before PatchGuard initialization, we should
+        // not worry about having to patch the kernel. MapLxssPrepareForPatchGuard will
+        // restore the original code before DriverEntry returns.
+
+        MA_RETURN_IF_FAIL(MdlpPatchTrampoline(
+            PsRegisterPicoProvider,
+            MaRegisterPicoProvider,
+            MaLxssTrampolineBytes,
+            sizeof(MaLxssTrampolineBytes)
+        ));
+
+        LX_SUBSYSTEM lxSubsystem = { };
+
+        MapLxssRegistering = TRUE;
+        MA_RETURN_IF_FAIL(LxInitialize(DriverObject, &lxSubsystem));
+        MapLxssRegistering = FALSE;
+
+        ASSERT(MapLxssProviderIndex != (SIZE_T)-1);
+
+        // Hook the system call dispatching callback.
+        MaLxssOriginalDispatchSystemCall =
+            MapProviderRoutines[MapLxssProviderIndex].DispatchSystemCall;
+        MapProviderRoutines[MapLxssProviderIndex].DispatchSystemCall = MapLxssSystemCallHook;
+
+        // Our own extensions.
+        MapAdditionalProviderRoutines[MapLxssProviderIndex] =
+        {
+            .Size = sizeof(MA_PICO_PROVIDER_ROUTINES),
+            .GetAllocatedProviderName = MapLxssGetAllocatedProviderName,
+            .GetConsole = MapLxssGetConsole
+        };
+
+        // To prevent lxcore from registering itself a second time in RlpInitializeDevices,
+        // we disable Pico registration for now.
+        MapPicoRegistrationDisabled = TRUE;
+    }
+    else // if (MapTooLate) // We are too late
+    {
+        PPS_PICO_ROUTINES pLxpRoutines = NULL;
+
+        // We are loaded late. lxcore has already been initialized by lxss.
+        MA_RETURN_IF_FAIL(MdlpGetProcAddress(hdlLxCore, "LxpRoutines", (PVOID*)&pLxpRoutines));
+
+        Logger::LogTrace("lxcore.sys detected. Found LxpRoutines at ", pLxpRoutines);
+
+        // The "original" provider routines in this case are those registered by lxcore.
+        PS_PICO_PROVIDER_ROUTINES lxProviderRoutines = MapOriginalProviderRoutines;
+
+        // Hook the system call dispatching callback.
+        MaLxssOriginalDispatchSystemCall = lxProviderRoutines.DispatchSystemCall;
+        lxProviderRoutines.DispatchSystemCall = MapLxssSystemCallHook;
+
+        // Our own extensions
+        MA_PICO_PROVIDER_ROUTINES lxAdditionalProviderRoutines =
+        {
+            .Size = sizeof(MA_PICO_PROVIDER_ROUTINES),
+            .GetAllocatedProviderName = MapLxssGetAllocatedProviderName,
+            .GetConsole = MapLxssGetConsole
+        };
+
+        // Ignored but filled to prevent the function from complaining.
+        MA_PICO_ROUTINES lxAdditionalRoutines
+        {
+            .Size = sizeof(MA_PICO_ROUTINES)
+        };
+
+        MA_RETURN_IF_FAIL(MaRegisterPicoProviderEx(
+            &lxProviderRoutines,
+            pLxpRoutines,
+            &lxAdditionalProviderRoutines,
+            &lxAdditionalRoutines,
+            &MapLxssProviderIndex
+        ));
+    }
+
+    Logger::LogTrace("lxcore.sys successfully registered as a lxmonika provider.");
+
+    MapLxssPatched = TRUE;
+    return STATUS_SUCCESS;
+}
+
+extern "C"
+NTSTATUS
+MapLxssPrepareForPatchGuard()
+{
+
+    if (!MapTooLate)
+    {
+        // Unpatch everything, preparing for PatchGuard initialization.
+
+        //HANDLE hdlLxCore;
+        //MA_RETURN_IF_FAIL(MdlpFindModuleByName("lxcore.sys", &hdlLxCore, NULL));
+
+        //MA_RETURN_IF_FAIL(MdlpPatchImport(
+        //    hdlLxCore,
+        //    "ntoskrnl.exe",
+        //    "PsRegisterPicoProvider",
+        //    &MaLxssOriginalImportValue
+        //));
+
+        MA_RETURN_IF_FAIL(MdlpPatchTrampoline(
+            PsRegisterPicoProvider,
+            NULL,
+            MaLxssTrampolineBytes,
+            sizeof(MaLxssTrampolineBytes)
+        ));
+
+        // lxcore should have finished initializing. Enable Pico registration again.
+        MapPicoRegistrationDisabled = FALSE;
+    }
+    else
+    {
+        // Nothing to do here, PatchGuard has started way before we load.
+    }
+
+    return STATUS_SUCCESS;
+}
+
+extern "C"
+VOID
+MapLxssCleanup()
+{
+    if (!MapLxssPatched)
+    {
+        return;
+    }
+
+    PPS_PICO_ROUTINES pLxpRoutines = NULL;
+    HANDLE hdlLxCore;
+    if (NT_SUCCESS(MdlpFindModuleByName("lxcore.sys", &hdlLxCore, NULL))
+        && NT_SUCCESS(MdlpGetProcAddress(hdlLxCore, "LxpRoutines",
+            (PVOID*)&pLxpRoutines)))
+    {
+        // Whether we are too late or not, MapOriginalRoutines contains whatever the system would
+        // bless its one and only official Pico provider with. We pass that back to lxcore.
+        *pLxpRoutines = MapOriginalRoutines;
+    }
+
+    MapLxssPatched = FALSE;
+}
+
 
 //
 // LXSS hooked provider routines
@@ -71,7 +256,7 @@ MapLxssSystemCallHook(
         Logger::LogTrace("uname(", pUtsName, ")");
     }
 
-    MapOriginalProviderRoutines.DispatchSystemCall(pSyscallInfo);
+    MaLxssOriginalDispatchSystemCall(pSyscallInfo);
 
     if (pUtsName != NULL
         // Also check for a success return value.
