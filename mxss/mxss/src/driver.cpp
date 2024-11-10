@@ -49,7 +49,8 @@ DriverEntry(
         .Size = sizeof(MA_PICO_PROVIDER_ROUTINES),
         .GetAllocatedProviderName = MxGetAllocatedProviderName,
         .StartSession = MxStartSession,
-        .GetConsole = MxGetConsole
+        .GetConsole = MxGetConsole,
+        .AbiVersion = NTDDI_WIN10_RS1
     };
 
     MxAdditionalRoutines.Size = sizeof(MA_PICO_ROUTINES);

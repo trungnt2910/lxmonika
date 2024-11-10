@@ -249,16 +249,58 @@ MaRegisterPicoProviderEx(
     _Out_opt_ PSIZE_T Index
 )
 {
-    if (ProviderRoutines->Size != sizeof(PS_PICO_PROVIDER_ROUTINES)
-        || PicoRoutines->Size != sizeof(PS_PICO_ROUTINES))
+    if (ProviderRoutines->Size > sizeof(PS_PICO_PROVIDER_ROUTINES)
+        || PicoRoutines->Size > sizeof(PS_PICO_ROUTINES))
     {
+        if (MmIsAddressValid((PVOID)ProviderRoutines->Size)
+            || MmIsAddressValid((PVOID)PicoRoutines->Size))
+        {
+            // The driver was not aware about the Size member.
+            // Therefore, those insanely big SIZE_T values are actually pointers.
+            // This only happens in very old versions of lxcore.
+            // (Or when some random noob messing up the structs).
+            //
+            // We do not know how much data to read, so just fail.
+            Logger::LogTrace("The provider did not tell lxmonika the struct sizes.");
+        }
+        else
+        {
+            // This driver comes from an optimistic future where M$ worked on Pico providers again.
+            // (Or from some random noob messing up the callback sizes).
+            //
+            // The Pico ABI it uses is newer than lxmonika and unlikely to be compatible.
+            Logger::LogTrace("Detected a driver with more routines than lxmonika knows.");
+            Logger::LogTrace("ProviderRoutines->Size: ", ProviderRoutines->Size);
+            Logger::LogTrace("PicoRoutines->Size: ", PicoRoutines->Size);
+        }
+
         return STATUS_INFO_LENGTH_MISMATCH;
     }
 
-    if ((ProviderRoutines->OpenProcess & (~PROCESS_ALL_ACCESS)) != 0
-        || (ProviderRoutines->OpenThread & (~THREAD_ALL_ACCESS)) != 0)
+    DWORD dwAbiVersion = 0;
+    if (AdditionalProviderRoutines != NULL)
     {
-        return STATUS_INVALID_PARAMETER;
+        // Respect any ABI claims by lxmonika-aware providers.
+        dwAbiVersion = AdditionalProviderRoutines->AbiVersion;
+    }
+    if (dwAbiVersion == 0)
+    {
+        // The additional routines were NULL or did not have an ABI version.
+        MA_RETURN_IF_FAIL(PicoSppDetermineAbiVersion(
+            ProviderRoutines->Size,
+            PicoRoutines->Size,
+            &dwAbiVersion
+        ));
+    }
+
+    if (dwAbiVersion >= NTDDI_WIN10_RS1)
+    {
+        // RS1 Pico structs require these two ACCESS_MASK members.
+        if ((ProviderRoutines->OpenProcess & (~PROCESS_ALL_ACCESS)) != 0
+            || (ProviderRoutines->OpenThread & (~THREAD_ALL_ACCESS)) != 0)
+        {
+            return STATUS_INVALID_PARAMETER;
+        }
     }
 
     if (MapPicoRegistrationDisabled)
@@ -294,8 +336,13 @@ MaRegisterPicoProviderEx(
         return STATUS_INSUFFICIENT_RESOURCES;
     }
 
-    MapProviderRoutines[uProviderIndex] = *ProviderRoutines;
-    *PicoRoutines = MapRoutines[uProviderIndex];
+    // Make sure all trailing members are filled with zero.
+    memset(&MapProviderRoutines[uProviderIndex], 0, sizeof(PS_PICO_PROVIDER_ROUTINES));
+    memcpy(&MapProviderRoutines[uProviderIndex], ProviderRoutines, ProviderRoutines->Size);
+
+    // Keep the potentially larger size, hoping that some drivers
+    // might know that they are outdated.
+    memcpy(PicoRoutines, &MapRoutines[uProviderIndex], PicoRoutines->Size);
 
     // Allows compatibility between different versions of lxmonika.
     // (Hopefully, at least when the API becomes stable).
@@ -311,6 +358,9 @@ MaRegisterPicoProviderEx(
             min(sizeof(MA_PICO_ROUTINES), AdditionalPicoRoutines->Size));
     }
 
+    // Always set the correct detected ABI version.
+    MapAdditionalProviderRoutines[uProviderIndex].AbiVersion = dwAbiVersion;
+
     if (Index != NULL)
     {
         *Index = uProviderIndex;
@@ -321,6 +371,9 @@ MaRegisterPicoProviderEx(
         // The hooked built-in function has no way to inform the index.
         MapLxssProviderIndex = uProviderIndex;
     }
+
+    Logger::LogTrace("Registered Pico provider #", uProviderIndex, ".");
+    Logger::LogTrace("Identified ABI version is ", (PVOID)(SIZE_T)dwAbiVersion, ".");
 
     return STATUS_SUCCESS;
 }
