@@ -183,8 +183,18 @@ MapCreateProcess(
 
     ProcessAttributes->Context = pContext;
 
-    NTSTATUS status = MapOriginalRoutines.CreateProcess(
-        ProcessAttributes, CreateInfo, ProcessHandle);
+    NTSTATUS status;
+
+    if (MapSystemAbiVersion >= NTDDI_WIN10_RS1)
+    {
+        status = MapOriginalRoutines.CreateProcess(
+            ProcessAttributes, CreateInfo, ProcessHandle);
+    }
+    else // TH1
+    {
+        status = ((PS_PICO_CREATE_PROCESS_TH1*)&MapOriginalRoutines.CreateProcess)(
+            ProcessAttributes, ProcessHandle);
+    }
 
     ProcessAttributes->Context = pContext->Context;
 
@@ -245,8 +255,18 @@ MapCreateThread(
 
     ThreadAttributes->Context = pContext;
 
-    NTSTATUS status = MapOriginalRoutines.CreateThread(
-        ThreadAttributes, CreateInfo, ThreadHandle);
+    NTSTATUS status;
+
+    if (MapSystemAbiVersion >= NTDDI_WIN10_RS1)
+    {
+        status = MapOriginalRoutines.CreateThread(
+            ThreadAttributes, CreateInfo, ThreadHandle);
+    }
+    else // TH1
+    {
+        status = ((PS_PICO_CREATE_THREAD_TH1*)&MapOriginalRoutines.CreateThread)(
+            ThreadAttributes, ThreadHandle);
+    }
 
     ThreadAttributes->Context = pContext->Context;
 
@@ -428,6 +448,15 @@ MapResumeThread(
     {                                                                                           \
         return MapCreateProcess(index, ProcessAttributes, CreateInfo, ProcessHandle);           \
     }                                                                                           \
+    extern "C"                                                                                  \
+    NTSTATUS                                                                                    \
+        MaPicoCreateProcessTh1##index(                                                          \
+            _In_ PPS_PICO_PROCESS_ATTRIBUTES ProcessAttributes,                                 \
+            _Outptr_ PHANDLE ProcessHandle                                                      \
+        )                                                                                       \
+    {                                                                                           \
+        return MapCreateProcess(index, ProcessAttributes, NULL, ProcessHandle);                 \
+    }                                                                                           \
                                                                                                 \
     extern "C"                                                                                  \
     NTSTATUS                                                                                    \
@@ -438,6 +467,15 @@ MapResumeThread(
         )                                                                                       \
     {                                                                                           \
         return MapCreateThread(index, ThreadAttributes, CreateInfo, ThreadHandle);              \
+    }                                                                                           \
+    extern "C"                                                                                  \
+    NTSTATUS                                                                                    \
+        MaPicoCreateThreadTh1##index(                                                           \
+            _In_ PPS_PICO_THREAD_ATTRIBUTES ThreadAttributes,                                   \
+            _Outptr_ PHANDLE ThreadHandle                                                       \
+        )                                                                                       \
+    {                                                                                           \
+        return MapCreateThread(index, ThreadAttributes, NULL, ThreadHandle);                    \
     }                                                                                           \
                                                                                                 \
     extern "C"                                                                                  \

@@ -11,7 +11,7 @@
 
 SIZE_T MapSystemProviderRoutinesSize = sizeof(PS_PICO_PROVIDER_ROUTINES);
 SIZE_T MapSystemPicoRoutinesSize = sizeof(PS_PICO_ROUTINES);
-DWORD MapSystemAbiVersion = NTDDI_WIN10_RS1;
+ULONG MapSystemAbiVersion = NTDDI_WIN10_RS1;
 BOOLEAN MapSystemPicoHasSizeChecks = TRUE;
 BOOLEAN MapTooLate = FALSE;
 
@@ -21,6 +21,7 @@ PS_PICO_ROUTINES MapOriginalRoutines;
 BOOLEAN MapPicoRegistrationDisabled = FALSE;
 PS_PICO_PROVIDER_ROUTINES MapProviderRoutines[MaPicoProviderMaxCount];
 PS_PICO_ROUTINES MapRoutines[MaPicoProviderMaxCount];
+PS_PICO_ROUTINES MapRoutinesTh1[MaPicoProviderMaxCount];
 MA_PICO_PROVIDER_ROUTINES MapAdditionalProviderRoutines[MaPicoProviderMaxCount];
 MA_PICO_ROUTINES MapAdditionalRoutines[MaPicoProviderMaxCount];
 SIZE_T MapProvidersCount = 0;
@@ -164,22 +165,28 @@ MapInitialize()
     }
 
     // Initialize pico routines
-#define MONIKA_PROVIDER(index)                                              \
-    MapRoutines[MaPicoProvider##index] =                                    \
-    {                                                                       \
-        .Size = sizeof(PS_PICO_ROUTINES),                                   \
-        .CreateProcess = MaPicoCreateProcess##index,                        \
-        .CreateThread = MaPicoCreateThread##index,                          \
-        .GetProcessContext = MaPicoGetProcessContext##index,                \
-        .GetThreadContext = MaPicoGetThreadContext##index,                  \
-        .GetContextThreadInternal = MaPicoGetContextThreadInternal##index,  \
-        .SetContextThreadInternal = MaPicoSetContextThreadInternal##index,  \
-        .TerminateThread = MaPicoTerminateThread##index,                    \
-        .ResumeThread = MaPicoResumeThread##index,                          \
-        .SetThreadDescriptorBase = MaPicoSetThreadDescriptorBase##index,    \
-        .SuspendThread = MaPicoSuspendThread##index,                        \
-        .TerminateProcess = MaPicoTerminateProcess##index                   \
-    };
+#define MONIKA_PROVIDER(index)                                                  \
+    MapRoutines[MaPicoProvider##index] =                                        \
+    {                                                                           \
+        .Size = sizeof(PS_PICO_ROUTINES),                                       \
+        .CreateProcess = MaPicoCreateProcess##index,                            \
+        .CreateThread = MaPicoCreateThread##index,                              \
+        .GetProcessContext = MaPicoGetProcessContext##index,                    \
+        .GetThreadContext = MaPicoGetThreadContext##index,                      \
+        .GetContextThreadInternal = MaPicoGetContextThreadInternal##index,      \
+        .SetContextThreadInternal = MaPicoSetContextThreadInternal##index,      \
+        .TerminateThread = MaPicoTerminateThread##index,                        \
+        .ResumeThread = MaPicoResumeThread##index,                              \
+        .SetThreadDescriptorBase = MaPicoSetThreadDescriptorBase##index,        \
+        .SuspendThread = MaPicoSuspendThread##index,                            \
+        .TerminateProcess = MaPicoTerminateProcess##index                       \
+    };                                                                          \
+                                                                                \
+    MapRoutinesTh1[MaPicoProvider##index] = MapRoutines[MaPicoProvider##index]; \
+    MapRoutinesTh1[MaPicoProvider##index].CreateProcess =                       \
+        (PPS_PICO_CREATE_PROCESS)MaPicoCreateProcessTh1##index;                 \
+    MapRoutinesTh1[MaPicoProvider##index].CreateThread =                        \
+        (PPS_PICO_CREATE_THREAD)MaPicoCreateThreadTh1##index;
 #include "monika_providers.cpp"
 #undef MONIKA_PROVIDER
 
@@ -342,7 +349,14 @@ MaRegisterPicoProviderEx(
 
     // Keep the potentially larger size, hoping that some drivers
     // might know that they are outdated.
-    memcpy(PicoRoutines, &MapRoutines[uProviderIndex], PicoRoutines->Size);
+    if (dwAbiVersion >= NTDDI_WIN10_RS1)
+    {
+        memcpy(PicoRoutines, &MapRoutines[uProviderIndex], PicoRoutines->Size);
+    }
+    else // NTDDI_WIN10
+    {
+        memcpy(PicoRoutines, &MapRoutinesTh1[uProviderIndex], PicoRoutines->Size);
+    }
 
     // Allows compatibility between different versions of lxmonika.
     // (Hopefully, at least when the API becomes stable).
