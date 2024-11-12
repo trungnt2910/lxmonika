@@ -99,11 +99,13 @@ MapLxssInitialize(
         MapProviderRoutines[MapLxssProviderIndex].DispatchSystemCall = MapLxssSystemCallHook;
 
         // Our own extensions.
+        ULONG ulAbiVersion = MapAdditionalProviderRoutines[MapLxssProviderIndex].AbiVersion;
         MapAdditionalProviderRoutines[MapLxssProviderIndex] =
         {
             .Size = sizeof(MA_PICO_PROVIDER_ROUTINES),
             .GetAllocatedProviderName = MapLxssGetAllocatedProviderName,
-            .GetConsole = MapLxssGetConsole
+            .GetConsole = MapLxssGetConsole,
+            .AbiVersion = ulAbiVersion
         };
 
         // To prevent lxcore from registering itself a second time in RlpInitializeDevices,
