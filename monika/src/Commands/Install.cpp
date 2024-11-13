@@ -1,6 +1,7 @@
 #include "Commands/Install.h"
 
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <memory>
 
@@ -176,6 +177,13 @@ Install::Execute() const
                     installedCorePath.wstring().c_str(),
                     true
                 ));
+
+                std::ofstream coreDriverCopiedDataStream;
+                coreDriverCopiedDataStream.open(
+                    installedCorePath.wstring() + L":" MA_CORE_COPIED_STREAM_NAME L":$DATA",
+                    std::ios_base::out | std::ios_base::binary
+                );
+                coreDriverCopiedDataStream.put(1);
             }
         },
         [&]()
