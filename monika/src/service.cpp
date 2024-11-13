@@ -72,8 +72,7 @@ SvInstallDriver(
     Transaction copyDriverFile(
         [&]()
         {
-            std::filesystem::path installDir = UtilGetSystemDirectory();
-            installDir /= "drivers";
+            std::filesystem::path installDir = UtilGetDriversDirectory();
 
             std::filesystem::path fullPath = std::filesystem::canonical(binaryPath);
             newPath = installDir / fullPath.filename();
@@ -433,10 +432,9 @@ SvIsLxMonikaRunning(
         }
     }
 
-    // lxmonika.sys driver file exists in C:\Windows\System32.
+    // lxmonika.sys driver file exists in C:\Windows\System32\drivers.
 
-    std::filesystem::path installPath = UtilGetSystemDirectory();
-    installPath /= "drivers";
+    std::filesystem::path installPath = UtilGetDriversDirectory();
     installPath /= MA_SERVICE_DRIVER_NAME;
 
     if (!std::filesystem::exists(installPath))
