@@ -92,6 +92,92 @@ UtilGetSystemDirectory()
     return result;
 }
 
+static
+std::wstring
+UtilGetFinalPathNameByHandle(
+    HANDLE handle,
+    DWORD dwFlags
+)
+{
+    DWORD dwRequiredSize = Win32Exception::ThrowIfNull(GetFinalPathNameByHandleW(
+        handle,
+        NULL,
+        0,
+        dwFlags
+    ));
+
+    std::wstring result;
+    result.resize(dwRequiredSize);
+
+    while (true)
+    {
+        dwRequiredSize = Win32Exception::ThrowIfNull(GetFinalPathNameByHandleW(
+            handle,
+            result.data(),
+            (DWORD)result.size(),
+            dwFlags
+        ));
+
+        if (dwRequiredSize > result.size())
+        {
+            result.resize(dwRequiredSize);
+            continue;
+        }
+        else
+        {
+            result.resize(dwRequiredSize);
+            break;
+        }
+    }
+
+    return result;
+}
+
+std::filesystem::path
+UtilNtToWin32Path(
+    const std::filesystem::path& ntPath
+)
+{
+    std::wstring ntPathString = ntPath.wstring();
+    UNICODE_STRING ntPathUnicode;
+    RtlInitUnicodeString(&ntPathUnicode, ntPathString.c_str());
+
+    OBJECT_ATTRIBUTES objectAttributes;
+    InitializeObjectAttributes(
+        &objectAttributes,
+        &ntPathUnicode,
+        OBJ_CASE_INSENSITIVE,
+        NULL,
+        NULL
+    );
+
+    IO_STATUS_BLOCK ioStatus;
+
+    HANDLE fileHandle = NULL;
+    NTSTATUS status = NtCreateFile(
+        &fileHandle,
+        SYNCHRONIZE, // At least this must be specified, else we'll get STATUS_INVALID_PARAMETER.
+        &objectAttributes,
+        &ioStatus,
+        NULL,
+        FILE_ATTRIBUTE_NORMAL,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        FILE_OPEN,
+        0,
+        NULL,
+        0
+    );
+
+    if (!NT_SUCCESS(status))
+    {
+        throw NTException(status);
+    }
+
+    auto sharedHandle = UtilGetSharedWin32Handle(fileHandle);
+
+    return UtilGetFinalPathNameByHandle(sharedHandle.get(), VOLUME_NAME_DOS);
+}
+
 std::wstring
 UtilWin32ToNtPath(
     const std::filesystem::path& win32Path
@@ -120,38 +206,7 @@ UtilWin32ToNtPath(
         ));
     }
 
-    DWORD dwRequiredSize = Win32Exception::ThrowIfNull(GetFinalPathNameByHandleW(
-        handle.get(),
-        NULL,
-        0,
-        VOLUME_NAME_NT
-    ));
-
-    std::wstring result;
-    result.resize(dwRequiredSize);
-
-    while (true)
-    {
-        dwRequiredSize = Win32Exception::ThrowIfNull(GetFinalPathNameByHandleW(
-            handle.get(),
-            result.data(),
-            (DWORD)result.size(),
-            VOLUME_NAME_NT
-        ));
-
-        if (dwRequiredSize > result.size())
-        {
-            result.resize(dwRequiredSize);
-            continue;
-        }
-        else
-        {
-            result.resize(dwRequiredSize);
-            break;
-        }
-    }
-
-    return result;
+    return UtilGetFinalPathNameByHandle(handle.get(), VOLUME_NAME_NT);
 }
 
 std::vector<std::wstring>

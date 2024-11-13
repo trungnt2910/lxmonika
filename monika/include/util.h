@@ -36,6 +36,11 @@ std::shared_ptr<std::remove_pointer_t<HANDLE>>
 std::wstring
     UtilGetSystemDirectory();
 
+std::filesystem::path
+    UtilNtToWin32Path(
+        const std::filesystem::path& ntPath
+    );
+
 std::wstring
     UtilWin32ToNtPath(
         const std::filesystem::path& win32Path
