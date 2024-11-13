@@ -24,11 +24,18 @@ ServiceHandle
         const std::optional<std::wstring>& displayName,
         const std::optional<std::wstring>& description,
         const std::filesystem::path& binaryPath,
-        const std::optional<std::vector<std::wstring>>& dependencies
+        const std::optional<std::vector<std::wstring>>& dependencies,
+        const std::optional<std::wstring>& borrowedServiceName
     );
 
 bool
     SvUninstallDriver(
+        ServiceHandle manager,
+        const std::wstring& serviceName
+    );
+
+bool
+    SvIsServiceInstalled(
         ServiceHandle manager,
         const std::wstring& serviceName
     );
