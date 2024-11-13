@@ -555,3 +555,32 @@ SvQueryServiceConfig(
 
     return (LPQUERY_SERVICE_CONFIGW)buffer.data();
 }
+
+void
+SvSetServiceParameters(
+    const std::wstring& serviceName,
+    RegistryValues parameters,
+    bool replace
+)
+{
+    if (replace)
+    {
+        SvClearServiceParameters(serviceName);
+    }
+
+    RegSetRegistryKey(
+        SvGetServiceRegistryKeyName(serviceName) + L"\\Parameters",
+        parameters
+    );
+}
+
+void
+SvClearServiceParameters(
+    const std::wstring& serviceName
+)
+{
+    RegDeleteKeyW(
+        HKEY_LOCAL_MACHINE,
+        (SvGetServiceRegistryKeyName(serviceName) + L"\\Parameters").c_str()
+    );
+}

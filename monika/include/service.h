@@ -13,6 +13,8 @@
 
 #include <Windows.h>
 
+#include "registry.h"
+
 using ServiceHandle = std::shared_ptr<std::remove_pointer_t<SC_HANDLE>>;
 
 ServiceHandle
@@ -60,4 +62,16 @@ const LPQUERY_SERVICE_CONFIG
     SvQueryServiceConfig(
         ServiceHandle service,
         std::vector<char>& buffer
+    );
+
+void
+    SvSetServiceParameters(
+        const std::wstring& serviceName,
+        RegistryValues parameters,
+        bool replace = false
+    );
+
+void
+    SvClearServiceParameters(
+        const std::wstring& serviceName
     );
