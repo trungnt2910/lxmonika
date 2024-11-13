@@ -14,9 +14,11 @@ private:
     const InstallProvider _installProviderCommand;
     const Switch<std::optional<std::filesystem::path>> _rest;
     const Switch<std::optional<std::filesystem::path>> _coreSwitch;
+    const Switch<std::optional<std::wstring>> _borrowSwitch;
     const Switch<bool> _forceSwitch;
     std::optional<std::filesystem::path> _path;
     std::optional<std::filesystem::path> _core;
+    std::optional<std::wstring> _borrow;
     bool _force = false;
 public:
     Install(const CommandBase* parentCommand = nullptr);
