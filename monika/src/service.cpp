@@ -8,20 +8,23 @@
 #include <winternl.h>
 
 #include "constants.h"
+#include "registry.h"
 #include "util.h"
 
 #include "Exception.h"
+
+#define MA_SERVICE_OLD_KEY_PREFIX L"MaOld"
 
 class Transaction
 {
 private:
     bool _commit = false;
-    const std::function<void()>& _cleanup;
+    std::function<void()> _cleanup;
 public:
     Transaction(
         const std::function<void()>& action,
-        const std::function<void()>& cleanup
-    ) : _cleanup(cleanup)
+        std::function<void()>&& cleanup
+    ) : _cleanup(std::move(cleanup))
     {
         action();
     }
@@ -42,6 +45,44 @@ public:
     }
 };
 
+static
+std::wstring
+SvGetServiceRegistryKeyName(
+    const std::wstring& serviceName
+)
+{
+    return L"SYSTEM\\CurrentControlSet\\Services\\" + serviceName;
+}
+
+static
+RegistryValues
+SvQueryServiceRegistry(
+    const std::wstring& serviceName
+)
+{
+    return RegQueryRegistryKey(
+        SvGetServiceRegistryKeyName(serviceName)
+    );
+}
+
+static
+void
+SvSetServiceRegistry(
+    const std::wstring& serviceName,
+    const RegistryValues& contents,
+    bool replace
+)
+{
+    std::wstring key = SvGetServiceRegistryKeyName(serviceName);
+
+    if (replace)
+    {
+        RegClearRegistryKey(key);
+    }
+
+    RegSetRegistryKey(key, contents);
+}
+
 ServiceHandle
 SvInstallDriver(
     ServiceHandle manager,
@@ -51,7 +92,8 @@ SvInstallDriver(
     const std::optional<std::wstring>& displayName,
     const std::optional<std::wstring>& description,
     const std::filesystem::path& binaryPath,
-    const std::optional<std::vector<std::wstring>>& dependencies
+    const std::optional<std::vector<std::wstring>>& dependencies,
+    const std::optional<std::wstring>& borrowedServiceName
 )
 {
     std::filesystem::path newPath;
@@ -77,30 +119,38 @@ SvInstallDriver(
         }
     );
 
+    bool borrow = borrowedServiceName.has_value();
+    bool borrowedServiceInstalled = false;
+    std::unordered_map<std::wstring, std::any> borrowedServiceRegistryValues;
+
+    if (borrow)
+    {
+        borrowedServiceInstalled = SvIsServiceInstalled(
+            manager,
+            borrowedServiceName.value()
+        );
+    }
+
     Transaction installService(
         [&]()
         {
-            const auto GetDependenciesString = [&]()
+            std::wstring dependenciesString;
+            if (dependencies.has_value())
             {
-                if (!dependencies.has_value())
-                {
-                    return std::wstring();
-                }
-                std::wstring result;
-                for (const auto& value : dependencies.value())
-                {
-                    result += value;
-                    result += L'\0';
-                }
-                return result;
-            };
+                dependenciesString = UtilVectorToStringList(dependencies.value());
+            }
+            if (borrow)
+            {
+                dependenciesString += borrowedServiceName.value();
+                dependenciesString.push_back(L'\0');
+            }
 
             service = UtilGetSharedServiceHandle(CreateServiceW(
                 manager.get(),
                 serviceName.data(),
                 displayName.has_value() ? displayName.value().data() : NULL,
                 dwDesiredAccess | DELETE |
-                    (description.has_value() ? SERVICE_CHANGE_CONFIG : 0),
+                (description.has_value() ? SERVICE_CHANGE_CONFIG : 0),
                 SERVICE_KERNEL_DRIVER,
                 dwStartType,
                 SERVICE_ERROR_NORMAL,
@@ -113,7 +163,7 @@ SvInstallDriver(
                 std::format(L"\\??\\{}", std::filesystem::canonical(newPath).wstring()).c_str(),
                 NULL,
                 NULL,
-                GetDependenciesString().c_str(),
+                dependenciesString.c_str(),
                 NULL,
                 NULL
             ));
@@ -135,8 +185,72 @@ SvInstallDriver(
         ));
     }
 
+    Transaction borrowCoreService(
+        [&]()
+        {
+            if (!borrow)
+            {
+                return;
+            }
+
+            if (borrowedServiceInstalled)
+            {
+                // Get a handle to the borrowed service.
+                auto borrowedService = UtilGetSharedServiceHandle(OpenServiceW(
+                    manager.get(),
+                    borrowedServiceName.value().c_str(),
+                    DELETE
+                ));
+
+                // Get the borrowed service registry values.
+                borrowedServiceRegistryValues = SvQueryServiceRegistry(
+                    borrowedServiceName.value()
+                );
+            }
+
+            // Get the installed service registry values
+            auto serviceRegistryValues = RegQueryRegistryKey(
+                L"SYSTEM\\CurrentControlSet\\Services\\" + serviceName
+            );
+
+            if (borrowedServiceInstalled)
+            {
+                // Backup original registry values as "MaOld<Name>"
+                for (const auto& [name, value] : borrowedServiceRegistryValues)
+                {
+                    serviceRegistryValues.emplace(MA_SERVICE_OLD_KEY_PREFIX + name, value);
+                }
+            }
+
+            // Core services, at least, the supported ones, should not really depend on anything.
+            serviceRegistryValues.erase(L"DependOnService");
+
+            // Replace the borrowed core's values with the installed service's values.
+            SvSetServiceRegistry(
+                borrowedServiceName.value(),
+                serviceRegistryValues,
+                true
+            );
+        },
+        [&]()
+        {
+            if (!borrow)
+            {
+                return;
+            }
+
+            // Restore the core service registry values.
+            SvSetServiceRegistry(
+                borrowedServiceName.value(),
+                borrowedServiceRegistryValues,
+                true
+            );
+        }
+    );
+
     copyDriverFile.Commit();
     installService.Commit();
+    borrowCoreService.Commit();
 
     return service;
 }
@@ -151,11 +265,66 @@ SvUninstallDriver(
         manager.get(), serviceName.c_str(), SERVICE_QUERY_CONFIG | SERVICE_STOP | DELETE
     ));
 
-    std::filesystem::path installPath;
+    // Query some configuration information
+    std::vector<std::wstring> dependencies;
+    std::filesystem::path installPath; // Keep this path for file deletion later.
     {
         std::vector<char> buffer;
         LPQUERY_SERVICE_CONFIG pServiceConfig = SvQueryServiceConfig(service, buffer);
-        installPath = std::filesystem::canonical(pServiceConfig->lpBinaryPathName);
+        dependencies = UtilStringListToVector(pServiceConfig->lpDependencies);
+
+        installPath = std::filesystem::canonical(
+            UtilNtToWin32Path(pServiceConfig->lpBinaryPathName)
+        );
+    }
+
+    std::wstring imagePath = std::any_cast<ExpandString>(
+        SvQueryServiceRegistry(serviceName)[L"ImagePath"]
+    );
+
+    bool hasBorrowedService = false;
+
+    // Enumerate the dependencies
+    for (const std::wstring& dependencyName : dependencies)
+    {
+        // Check to see any "borrowed" services
+        //
+        // Directly accessing the registry instead of relying on the service manager,
+        // since sometimes when listing these services as a dependency of lxmonika,
+        // the service manager just refuse to acknowledge their existence.
+        RegistryValues dependencyValues = SvQueryServiceRegistry(dependencyName);
+
+        auto it = dependencyValues.find(L"ImagePath");
+        if (it == dependencyValues.end())
+        {
+            // No image path registered.
+            continue;
+        }
+
+        const std::wstring& dependencyImagePath = std::any_cast<ExpandString>(
+            dependencyValues[L"ImagePath"]
+        );
+
+        if (dependencyImagePath != imagePath)
+        {
+            // Not a borrowed service, since it is not using the same driver as the original.
+            continue;
+        }
+
+        hasBorrowedService = true;
+
+        // Restore the registry
+        RegistryValues restoredValues;
+        for (auto& [name, value] : dependencyValues)
+        {
+            if (name.starts_with(MA_SERVICE_OLD_KEY_PREFIX))
+            {
+                std::wstring newName = name.substr(wcslen(MA_SERVICE_OLD_KEY_PREFIX));
+                restoredValues.emplace(std::move(newName), std::move(value));
+            }
+        }
+
+        SvSetServiceRegistry(dependencyName, restoredValues, true);
     }
 
     Win32Exception::ThrowIfFalse(DeleteService(service.get()));
@@ -163,41 +332,53 @@ SvUninstallDriver(
     SERVICE_STATUS serviceStatus{ .dwCurrentState = 0 };
     ControlService(service.get(), SERVICE_CONTROL_STOP, &serviceStatus);
 
+    bool stoppedAndDeleted = false;
+
     if (serviceStatus.dwCurrentState == SERVICE_STOPPED)
     {
         // The service has stopped, we can delete the driver now.
         if (DeleteFileW(installPath.wstring().c_str()))
         {
             // Everything going on well.
-            return true;
+            stoppedAndDeleted = true;
         }
     }
 
-    // Otherwise, we use this API to try deleting the driver on reboot.
-    Win32Exception::ThrowIfFalse(MoveFileExW(
-        installPath.wstring().c_str(),
-        NULL,
-        MOVEFILE_DELAY_UNTIL_REBOOT
-    ));
+    if (!stoppedAndDeleted)
+    {
+        // Otherwise, we use this API to try deleting the driver on reboot.
+        Win32Exception::ThrowIfFalse(MoveFileExW(
+            installPath.wstring().c_str(),
+            NULL,
+            MOVEFILE_DELAY_UNTIL_REBOOT
+        ));
+    }
 
-    SetLastError(ERROR_SUCCESS_REBOOT_REQUIRED);
-    return false;
+    if (!hasBorrowedService && stoppedAndDeleted)
+    {
+        // Everything is OK, we can return now.
+        return true;
+    }
+    else
+    {
+        // Either we have directly modified the registry and require the service manager to reload,
+        // or the target driver is still running and does not like being unloaded.
+        SetLastError(ERROR_SUCCESS_REBOOT_REQUIRED);
+        return false;
+    }
 }
 
 bool
-SvIsLxMonikaInstalled(
-    ServiceHandle manager
+SvIsServiceInstalled(
+    ServiceHandle manager,
+    const std::wstring& serviceName
 )
 {
-    // Basic checks only.
-    // For a comprehensive check to see whether lxmonika is actually usable, use
-    // SvIsLxMonikaRunning.
-
-    auto lxmonika = UtilGetSharedServiceHandle(OpenServiceW(
-        manager.get(), MA_SERVICE_NAME, SERVICE_QUERY_STATUS
+    auto service = UtilGetSharedServiceHandle(OpenServiceW(
+        manager.get(), serviceName.c_str(), SERVICE_QUERY_STATUS
     ), false);
 
-    if (lxmonika.get() != NULL)
+    if (service.get() != NULL)
     {
         return true;
     }
@@ -209,6 +390,18 @@ SvIsLxMonikaInstalled(
     }
 
     throw Win32Exception(code);
+}
+
+bool
+SvIsLxMonikaInstalled(
+    ServiceHandle manager
+)
+{
+    // Basic checks only.
+    // For a comprehensive check to see whether lxmonika is actually usable, use
+    // SvIsLxMonikaRunning.
+
+    return SvIsServiceInstalled(manager, MA_SERVICE_NAME);
 }
 
 bool
