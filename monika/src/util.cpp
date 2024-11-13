@@ -1,5 +1,7 @@
 #include "util.h"
 
+#include <algorithm>
+#include <fstream>
 #include <unordered_map>
 
 #include <comdef.h>
@@ -237,4 +239,46 @@ UtilVectorToStringList(
         result.push_back('\0');
     }
     return result;
+}
+
+bool
+UtilCheckCoreDriverName(
+    const std::wstring& name
+)
+{
+    static const std::vector<BYTE> winload = ([]()
+    {
+        std::vector<BYTE> contents;
+
+        std::fstream fin(
+            std::filesystem::path(UtilGetSystemDirectory()) / "winload.exe",
+            std::ios_base::in | std::ios_base::binary
+        );
+
+        if (!fin.is_open())
+        {
+            // Some newer versions of Windows do not have a winload.exe.
+            // Only UEFI boot is supported on these copies.
+            fin.open(
+                std::filesystem::path(UtilGetSystemDirectory()) / "winload.efi",
+                std::ios_base::in | std::ios_base::binary
+            );
+        }
+
+        std::transform(
+            std::istreambuf_iterator<char>(fin),
+            std::istreambuf_iterator<char>(),
+            std::back_inserter(contents),
+            [](char ch) { return (BYTE)ch; }
+        );
+
+        return contents;
+    })();
+
+    return std::search(
+        winload.begin(), winload.end(),
+        (BYTE*)&name[0],
+        // One byte past the string's null terminator.
+        (BYTE*)&name[name.size()] + sizeof(WCHAR)
+    ) != winload.end();
 }

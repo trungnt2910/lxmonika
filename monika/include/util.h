@@ -55,3 +55,8 @@ std::wstring
     UtilVectorToStringList(
         const std::vector<std::wstring>& strings
     );
+
+bool
+    UtilCheckCoreDriverName(
+        const std::wstring& name
+    );
