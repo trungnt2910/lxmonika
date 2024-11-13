@@ -129,6 +129,7 @@
     <ClInclude Include="include\constants.h" />
     <ClInclude Include="include\Exception.h" />
     <ClInclude Include="include\Parameter.h" />
+    <ClInclude Include="include\Transaction.h" />
     <ClInclude Include="include\Switch.h" />
     <ClInclude Include="include\registry.h" />
     <ClInclude Include="include\service.h" />
