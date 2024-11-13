@@ -113,6 +113,7 @@
     <ClCompile Include="src\Parameter.cpp" />
     <ClCompile Include="src\Switch.cpp" />
     <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\registry.cpp" />
     <ClCompile Include="src\service.cpp" />
     <ClCompile Include="src\util.cpp" />
   </ItemGroup>
@@ -129,6 +130,7 @@
     <ClInclude Include="include\Exception.h" />
     <ClInclude Include="include\Parameter.h" />
     <ClInclude Include="include\Switch.h" />
+    <ClInclude Include="include\registry.h" />
     <ClInclude Include="include\service.h" />
     <ClInclude Include="include\util.h" />
     <ClInclude Include="res\resource.h" />
