@@ -365,7 +365,7 @@ RlLxssFileIoctl(
             {
                 if (pMaContext->Provider != uNewIndex)
                 {
-                    PMA_CONTEXT pNewContext = MapAllocateContext((DWORD)uNewIndex, NULL);
+                    PMA_CONTEXT pNewContext = MapAllocateContext((DWORD)uNewIndex, NULL, NULL);
                     if (pNewContext == NULL)
                     {
                         return -LINUX_ENOMEM;

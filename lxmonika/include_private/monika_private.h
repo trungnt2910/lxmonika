@@ -98,6 +98,12 @@ ULONG
         _In_ ULONG FrameCount
     );
 
+NTSTATUS
+    MapGetAllocatedProcessImageName(
+        _In_ PEPROCESS Process,
+        _Outptr_ PUNICODE_STRING* ImageName
+    );
+
 //
 // Monika-managed context
 //
@@ -108,13 +114,15 @@ typedef struct _MA_CONTEXT {
     ULONG                   Magic;
     DWORD                   Provider;
     PVOID                   Context;
+    UNICODE_STRING          ImageFileName;
     struct _MA_CONTEXT*     Parent;
 } MA_CONTEXT, *PMA_CONTEXT;
 
 PMA_CONTEXT
     MapAllocateContext(
         _In_ DWORD Provider,
-        _In_opt_ PVOID OriginalContext
+        _In_opt_ PVOID OriginalContext,
+        _In_opt_ PPS_PICO_CREATE_INFO CreateInfo
     );
 
 VOID

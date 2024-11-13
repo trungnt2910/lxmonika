@@ -78,9 +78,7 @@ MapInitialize()
             .TerminateProcess = MapTerminateProcess,
             .WalkUserStack = MapWalkUserStack,
             .ProtectedRanges = NULL,
-            // TODO: Implement this callback.
-            // We can store the ImageFileName in MA_CONTEXT for newer drivers.
-            .GetAllocatedProcessImageName = NULL,
+            .GetAllocatedProcessImageName = MapGetAllocatedProcessImageName,
 
             // Request full access. We will duplicate the handles before returning to consumers.
             .OpenProcess = PROCESS_ALL_ACCESS,

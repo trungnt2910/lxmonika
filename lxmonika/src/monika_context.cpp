@@ -1,12 +1,15 @@
 #include "monika.h"
 
+#include "Logger.h"
+
 #define MA_CONTEXT_TAG ('xCaM')
 
 extern "C"
 PMA_CONTEXT
 MapAllocateContext(
     _In_ DWORD Provider,
-    _In_opt_ PVOID OriginalContext
+    _In_opt_ PVOID OriginalContext,
+    _In_opt_ PPS_PICO_CREATE_INFO CreateInfo
 )
 {
     PMA_CONTEXT pContext = (PMA_CONTEXT)
@@ -21,6 +24,26 @@ MapAllocateContext(
             .Context = OriginalContext,
             .Parent = NULL
         };
+
+        if (CreateInfo != NULL
+            && CreateInfo->ImageFileName != NULL
+            && CreateInfo->ImageFileName->Length != 0)
+        {
+            USHORT uLen = CreateInfo->ImageFileName->Length;
+
+            pContext->ImageFileName.Buffer = (PWSTR)
+                ExAllocatePoolZero(PagedPool, uLen, MA_CONTEXT_TAG);
+
+            if (pContext->ImageFileName.Buffer != NULL)
+            {
+                pContext->ImageFileName.MaximumLength = uLen;
+                RtlCopyUnicodeString(&pContext->ImageFileName, CreateInfo->ImageFileName);
+            }
+            else
+            {
+                Logger::LogWarning("Failed to allocate memory for image file name.");
+            }
+        }
     }
 
     return pContext;
@@ -42,6 +65,10 @@ MapFreeContext(
     do
     {
         PMA_CONTEXT pParentContext = Context->Parent;
+        if (Context->ImageFileName.Buffer != NULL)
+        {
+            ExFreePoolWithTag(Context->ImageFileName.Buffer, MA_CONTEXT_TAG);
+        }
         ExFreePoolWithTag(Context, MA_CONTEXT_TAG);
         Context = pParentContext;
     }

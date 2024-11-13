@@ -27,23 +27,29 @@ static_assert(!MaDetails::KernelProcessOrThread<PVOID>, "Concept broken");
 #define MA_DISPATCH_TO_PROVIDER(type, object, function, ...)                                    \
     do                                                                                          \
     {                                                                                           \
-        PMA_CONTEXT pContext = NULL;                                                            \
-        if (NT_SUCCESS(MapGetObjectContext(object, &pContext)))                                 \
+        PMA_CONTEXT pContext_ = NULL;                                                           \
+        if (NT_SUCCESS(MapGetObjectContext(object, &pContext_)))                                \
         {                                                                                       \
             __try                                                                               \
             {                                                                                   \
-                return MapProviderRoutines[pContext->Provider].function(__VA_ARGS__);           \
+                if (MapProviderRoutines[pContext_->Provider].function != NULL)                  \
+                {                                                                               \
+                    return MapProviderRoutines[pContext_->Provider].function(__VA_ARGS__);      \
+                }                                                                               \
             }                                                                                   \
             __finally                                                                           \
             {                                                                                   \
                 if constexpr ((type) & MA_DISPATCH_FREE)                                        \
                 {                                                                               \
-                    MapFreeContext(pContext);                                                   \
+                    MapFreeContext(pContext_);                                                  \
                 }                                                                               \
             }                                                                                   \
         }                                                                                       \
         else if constexpr (!((type) & MA_DISPATCH_NO_FALLBACK))                                 \
         {                                                                                       \
+            /* Would be impossible for lxmonika-managed processes/threads. */                   \
+            /* Also, letting this through would cause infinite recursion. */                    \
+            ASSERT(!MapTooLate);                                                                \
             if (MapOriginalProviderRoutines.function != NULL)                                   \
             {                                                                                   \
                 return MapOriginalProviderRoutines.function(__VA_ARGS__);                       \
@@ -143,23 +149,78 @@ MapWalkUserStack(
     return 0;
 }
 
+extern "C"
+NTSTATUS
+MapGetAllocatedProcessImageName(
+    _In_ PEPROCESS Process,
+    _Outptr_ PUNICODE_STRING* ImageName
+)
+{
+    // Respect any callbacks registered by providers.
+    MA_DISPATCH_TO_PROVIDER(MA_DISPATCH_NO_FALLBACK, Process,
+        GetAllocatedProcessImageName,
+            Process,
+            ImageName
+    );
+
+    PMA_CONTEXT pContext = NULL;
+    if (NT_SUCCESS(MapGetObjectContext(Process, &pContext))
+        && pContext->ImageFileName.Buffer != NULL)
+    {
+        *ImageName = (PUNICODE_STRING)
+            ExAllocatePoolZero(PagedPool, sizeof(UNICODE_STRING), '  aM');
+
+        if (*ImageName == NULL)
+        {
+            return STATUS_NO_MEMORY;
+        }
+
+        // Shallow copy. Only ImageName will be freed later.
+        **ImageName = pContext->ImageFileName;
+
+        return STATUS_SUCCESS;
+    }
+
+    // As our last resort, fall back to the original routines.
+    MA_DISPATCH_TO_PROVIDER(0, Process,
+        GetAllocatedProcessImageName,
+            Process,
+            ImageName
+    );
+
+    return STATUS_NOT_FOUND;
+}
+
 //
 // Pico routine dispatchers
 //
 
-#define MA_DISPATCH_TO_KERNEL(object, index, error, function, ...)                              \
+#define MA_DISPATCH_TO_KERNEL(object, index, error, nullerror, function, ...)                   \
     do                                                                                          \
     {                                                                                           \
         PMA_CONTEXT pContext = NULL;                                                            \
         if (NT_SUCCESS(MapGetObjectContext(object, index, &pContext)))                          \
         {                                                                                       \
-            return MapOriginalRoutines.function(__VA_ARGS__);                                   \
+            if (MapOriginalRoutines.function != NULL)                                           \
+            {                                                                                   \
+                return MapOriginalRoutines.function(__VA_ARGS__);                               \
+            }                                                                                   \
+            else                                                                                \
+            {                                                                                   \
+                return nullerror;                                                               \
+            }                                                                                   \
         }                                                                                       \
         else                                                                                    \
         {                                                                                       \
             return error;                                                                       \
         }                                                                                       \
     } while (FALSE)
+
+#define MA_SYSTEM_AT_LEAST(version)                                                             \
+    (MapSystemAbiVersion >= (version))
+
+#define MA_PROVIDER_AT_LEAST(index, version)                                                    \
+    (MapAdditionalProviderRoutines[(index)].AbiVersion >= (version))
 
 static
 NTSTATUS
@@ -175,32 +236,108 @@ MapCreateProcess(
         return STATUS_INVALID_PARAMETER;
     }
 
-    PMA_CONTEXT pContext = MapAllocateContext(ProviderIndex, ProcessAttributes->Context);
+    PMA_CONTEXT pContext = MapAllocateContext(
+        ProviderIndex, ProcessAttributes->Context, CreateInfo
+    );
     if (pContext == NULL)
     {
         return STATUS_NO_MEMORY;
     }
+    AUTO_RESOURCE(pContext, MapFreeContext);
 
     ProcessAttributes->Context = pContext;
 
     NTSTATUS status;
+    HANDLE hdlProcess = NULL;
 
-    if (MapSystemAbiVersion >= NTDDI_WIN10_RS1)
+    if (MA_SYSTEM_AT_LEAST(NTDDI_WIN10_RS1))
     {
         status = MapOriginalRoutines.CreateProcess(
-            ProcessAttributes, CreateInfo, ProcessHandle);
+            ProcessAttributes, CreateInfo, &hdlProcess);
     }
     else // TH1
     {
         status = ((PS_PICO_CREATE_PROCESS_TH1*)&MapOriginalRoutines.CreateProcess)(
-            ProcessAttributes, ProcessHandle);
+            ProcessAttributes, &hdlProcess);
     }
 
     ProcessAttributes->Context = pContext->Context;
 
-    if (!NT_SUCCESS(status))
+    MA_RETURN_IF_FAIL(status);
+    AUTO_RESOURCE(hdlProcess, [](auto hdl)
     {
-        MapFreeContext(pContext);
+        PEPROCESS pProcess = NULL;
+        AUTO_RESOURCE(pProcess, ObfDereferenceObject);
+
+        if (NT_SUCCESS(ObReferenceObjectByHandle(
+            hdl,
+            0,
+            *PsProcessType,
+            KernelMode,
+            (PVOID*)&pProcess,
+            0
+        )))
+        {
+            if (MapOriginalRoutines.TerminateProcess != NULL)
+            {
+                MapOriginalRoutines.TerminateProcess(pProcess, STATUS_UNSUCCESSFUL);
+            }
+            else
+            {
+                // The callback may not be available on earlier Windows versions.
+
+                HANDLE hdlKernelProcess = NULL;
+                AUTO_RESOURCE(hdlKernelProcess, ZwClose);
+
+                if (NT_SUCCESS(ObOpenObjectByPointer(
+                    pProcess,
+                    OBJ_KERNEL_HANDLE,
+                    NULL,
+                    PROCESS_ALL_ACCESS,
+                    *PsProcessType,
+                    KernelMode,
+                    &hdlKernelProcess
+                )))
+                {
+                    ZwTerminateProcess(hdlKernelProcess, STATUS_UNSUCCESSFUL);
+                }
+            }
+        }
+
+        ZwClose(hdl);
+    });
+
+    if (MA_PROVIDER_AT_LEAST(pContext->Provider, NTDDI_WIN10_RS1))
+    {
+        ACCESS_MASK maskDesired = MapProviderRoutines[pContext->Provider].OpenProcess;
+
+        if (!MA_SYSTEM_AT_LEAST(NTDDI_WIN10_RS1)
+            || maskDesired != MapOriginalProviderRoutines.OpenProcess)
+        {
+            // The system does not respect the desired access.
+
+            // For CreateProcess, ntoskrnl apparently generates kernel handles.
+            // OBJ_KERNEL_HANDLE must be passed while cloning, otherwise, WSL would fail.
+
+            MA_RETURN_IF_FAIL(ZwDuplicateObject(
+                ZwCurrentProcess(),
+                hdlProcess,
+                ZwCurrentProcess(),
+                &hdlProcess,
+                maskDesired,
+                OBJ_KERNEL_HANDLE,
+                DUPLICATE_SAME_ATTRIBUTES | DUPLICATE_CLOSE_SOURCE
+            ));
+        }
+    }
+
+    if (NT_SUCCESS(status))
+    {
+        *ProcessHandle = hdlProcess;
+
+        // Keep the process and its context alive on success.
+        hdlProcess = NULL;
+        pContext = NULL;
     }
 
     return status;
@@ -246,33 +383,86 @@ MapCreateThread(
         return STATUS_INVALID_PARAMETER;
     }
 
-    PMA_CONTEXT pContext = MapAllocateContext(ProviderIndex, ThreadAttributes->Context);
-
+    PMA_CONTEXT pContext = MapAllocateContext(
+        ProviderIndex, ThreadAttributes->Context, CreateInfo
+    );
     if (pContext == NULL)
     {
         return STATUS_NO_MEMORY;
     }
+    AUTO_RESOURCE(pContext, MapFreeContext);
 
     ThreadAttributes->Context = pContext;
 
     NTSTATUS status;
+    HANDLE hdlThread = NULL;
 
-    if (MapSystemAbiVersion >= NTDDI_WIN10_RS1)
+    if (MA_SYSTEM_AT_LEAST(NTDDI_WIN10_RS1))
     {
         status = MapOriginalRoutines.CreateThread(
-            ThreadAttributes, CreateInfo, ThreadHandle);
+            ThreadAttributes, CreateInfo, &hdlThread);
     }
     else // TH1
     {
         status = ((PS_PICO_CREATE_THREAD_TH1*)&MapOriginalRoutines.CreateThread)(
-            ThreadAttributes, ThreadHandle);
+            ThreadAttributes, &hdlThread);
     }
 
     ThreadAttributes->Context = pContext->Context;
 
-    if (!NT_SUCCESS(status))
+    MA_RETURN_IF_FAIL(status);
+    AUTO_RESOURCE(hdlThread, [](auto hdl)
     {
-        MapFreeContext(pContext);
+        PETHREAD pThread = NULL;
+        AUTO_RESOURCE(pThread, ObfDereferenceObject);
+
+        if (NT_SUCCESS(ObReferenceObjectByHandle(
+            hdl,
+            0,
+            *PsThreadType,
+            KernelMode,
+            (PVOID*)&pThread,
+            0
+        )))
+        {
+            // Always known to be available.
+            MapOriginalRoutines.TerminateThread(pThread, STATUS_UNSUCCESSFUL, TRUE);
+        }
+
+        ZwClose(hdl);
+    });
+
+    if (MA_PROVIDER_AT_LEAST(pContext->Provider, NTDDI_WIN10_RS1))
+    {
+        ACCESS_MASK maskDesired = MapProviderRoutines[pContext->Provider].OpenThread;
+
+        if (!MA_SYSTEM_AT_LEAST(NTDDI_WIN10_RS1)
+            || maskDesired != MapOriginalProviderRoutines.OpenThread)
+        {
+            // The system does not respect the desired access.
+
+            // For CreateThread, however, Windows generates USER mode handles.
+            // OBJ_KERNEL_HANDLE must NOT be passed, or a BSOD will occur.
+
+            MA_RETURN_IF_FAIL(ZwDuplicateObject(
+                ZwCurrentProcess(),
+                hdlThread,
+                ZwCurrentProcess(),
+                &hdlThread,
+                maskDesired,
+                0,
+                DUPLICATE_SAME_ATTRIBUTES | DUPLICATE_CLOSE_SOURCE
+            ));
+        }
+    }
+
+    if (NT_SUCCESS(status))
+    {
+        *ThreadHandle = hdlThread;
+
+        // Keep the thread and its context alive on success.
+        hdlThread = NULL;
+        pContext = NULL;
     }
 
     return status;
@@ -320,7 +510,8 @@ MapSetThreadDescriptorBase(
     _In_ ULONG_PTR Base
 )
 {
-    MA_DISPATCH_TO_KERNEL(PsGetCurrentThread(), ProviderIndex, (VOID)STATUS_INVALID_PARAMETER,
+    MA_DISPATCH_TO_KERNEL(PsGetCurrentThread(), ProviderIndex,
+        (VOID)STATUS_INVALID_PARAMETER, (VOID)STATUS_NOT_SUPPORTED,
         SetThreadDescriptorBase, Type, Base);
 }
 
@@ -368,7 +559,8 @@ MapSetContextThreadInternal(
     _In_ BOOLEAN PerformUnwind
 )
 {
-    MA_DISPATCH_TO_KERNEL(Thread, ProviderIndex, STATUS_INVALID_PARAMETER,
+    MA_DISPATCH_TO_KERNEL(Thread, ProviderIndex,
+        STATUS_INVALID_PARAMETER, STATUS_NOT_SUPPORTED,
         SetContextThreadInternal, Thread, ThreadContext, ProbeMode, CtxMode, PerformUnwind);
 }
 
@@ -383,7 +575,8 @@ MapGetContextThreadInternal(
     _In_ BOOLEAN PerformUnwind
 )
 {
-    MA_DISPATCH_TO_KERNEL(Thread, ProviderIndex, STATUS_INVALID_PARAMETER,
+    MA_DISPATCH_TO_KERNEL(Thread, ProviderIndex,
+        STATUS_INVALID_PARAMETER, STATUS_NOT_SUPPORTED,
         GetContextThreadInternal, Thread, ThreadContext, ProbeMode, CtxMode, PerformUnwind);
 }
 
@@ -421,7 +614,8 @@ MapSuspendThread(
     _Out_opt_ PULONG PreviousSuspendCount
 )
 {
-    MA_DISPATCH_TO_KERNEL(Thread, ProviderIndex, STATUS_INVALID_PARAMETER,
+    MA_DISPATCH_TO_KERNEL(Thread, ProviderIndex,
+        STATUS_INVALID_PARAMETER, STATUS_NOT_SUPPORTED,
         SuspendThread, Thread, PreviousSuspendCount);
 }
 
@@ -433,7 +627,8 @@ MapResumeThread(
     _Out_opt_ PULONG PreviousSuspendCount
 )
 {
-    MA_DISPATCH_TO_KERNEL(Thread, ProviderIndex, STATUS_INVALID_PARAMETER,
+    MA_DISPATCH_TO_KERNEL(Thread, ProviderIndex,
+        STATUS_INVALID_PARAMETER, STATUS_NOT_SUPPORTED,
         ResumeThread, Thread, PreviousSuspendCount);
 }
 
