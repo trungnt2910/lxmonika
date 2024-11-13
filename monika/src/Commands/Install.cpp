@@ -16,6 +16,7 @@
 #include "Exception.h"
 #include "Parameter.h"
 #include "Switch.h"
+#include "Transaction.h"
 
 #include "Commands/InstallProvider.h"
 
@@ -48,6 +49,13 @@ Install::Install(const CommandBase* parentCommand)
         -1, -1, MA_STRING_INSTALL_COMMAND_ARGUMENT_DESCRIPTION,
         DriverPathParameter, _path, true
     ),
+    _coreSwitch(
+        MA_STRING_INSTALL_SWITCH_CORE_NAME, -1,
+        MA_STRING_INSTALL_SWITCH_CORE_DESCRIPTION,
+        DriverPathParameter,
+        _core,
+        true
+    ),
     _forceSwitch(
         MA_STRING_INSTALL_SWITCH_FORCE_NAME, -1,
         MA_STRING_INSTALL_SWITCH_FORCE_DESCRIPTION,
@@ -58,12 +66,17 @@ Install::Install(const CommandBase* parentCommand)
 {
     AddCommand(_installProviderCommand);
 
+    AddSwitch(_coreSwitch);
     AddSwitch(_forceSwitch);
 }
 
 int
 Install::Execute() const
 {
+    //
+    // Build driver installation path
+    //
+
     std::filesystem::path fullPath;
 
     if (_path.has_value())
@@ -72,28 +85,10 @@ Install::Execute() const
     }
     else
     {
-        std::wstring executablePathString;
-        executablePathString.resize(executablePathString.capacity());
-
-        DWORD dwPathLength = Win32Exception::ThrowIfNull(GetModuleFileNameW(
-            NULL, executablePathString.data(), (DWORD)executablePathString.size()
-        ));
-
-        while (GetLastError() == ERROR_INSUFFICIENT_BUFFER)
-        {
-            executablePathString.resize(executablePathString.size() * 2);
-            dwPathLength = Win32Exception::ThrowIfNull(GetModuleFileNameW(
-                NULL, executablePathString.data(), (DWORD)executablePathString.size()
-            ));
-        }
-
-        executablePathString.resize(dwPathLength);
-
         std::error_code ec;
 
         fullPath = std::filesystem::canonical(
-            std::filesystem::path(executablePathString).parent_path()
-            / MA_SERVICE_DRIVER_NAME,
+            std::filesystem::path(UtilGetExecutableDirectory()) / MA_SERVICE_DRIVER_NAME,
             ec
         );
 
@@ -104,6 +99,10 @@ Install::Execute() const
         }
     }
 
+    //
+    // Check for existing installations
+    //
+
     auto manager = UtilGetSharedServiceHandle(OpenSCManagerW(
         NULL, NULL, SC_MANAGER_CREATE_SERVICE | SC_MANAGER_ENUMERATE_SERVICE
     ));
@@ -113,10 +112,84 @@ Install::Execute() const
         throw MonikaException(MA_STRING_EXCEPTION_LXMONIKA_ALREADY_INSTALLED);
     }
 
+    //
+    // Test signing
+    //
+
     if (!_force && !RegIsTestSigningEnabled())
     {
         throw MonikaException(MA_STRING_EXCEPTION_TEST_SIGNING_NOT_ENABLED);
     }
+
+    //
+    // Core check
+    //
+
+    std::filesystem::path installedCorePath =
+        std::filesystem::path(UtilGetDriversDirectory()) / MA_CORE_DRIVER_NAME;
+
+    std::filesystem::path coreDriverPath;
+    bool coreDriverPerformInstall = false;
+
+    // If lxcore.sys is not already installed.
+    if (!std::filesystem::exists(installedCorePath))
+    {
+        coreDriverPerformInstall = true;
+
+        if (_core.has_value())
+        {
+            // Guaranteed to be valid by DriverPathParameter
+            coreDriverPath = _core.value();
+        }
+        else
+        {
+            coreDriverPath = std::filesystem::weakly_canonical(
+                std::filesystem::path(UtilGetExecutableDirectory()) / MA_CORE_DRIVER_NAME
+            );
+        }
+    }
+
+    if (coreDriverPerformInstall
+        && !std::filesystem::exists(coreDriverPath))
+    {
+        if (!_force)
+        {
+            // lxcore.sys is not already installed and the user has not specified a path,
+            // and the current installation does not come with one.
+            throw MonikaException(MA_STRING_EXCEPTION_CORE_DRIVER_NOT_FOUND,
+                HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND));
+        }
+        else
+        {
+            // The user doesn't care about lxcore.sys and is OK with a potential bootloop.
+            coreDriverPerformInstall = false;
+        }
+    }
+
+    Transaction coreDriverCopy(
+        [&]()
+        {
+            if (coreDriverPerformInstall)
+            {
+                Win32Exception::ThrowIfFalse(CopyFileW(
+                    coreDriverPath.wstring().c_str(),
+                    installedCorePath.wstring().c_str(),
+                    true
+                ));
+            }
+        },
+        [&]()
+        {
+            if (coreDriverPerformInstall)
+            {
+                std::filesystem::remove(installedCorePath);
+            }
+        }
+    );
+
+    //
+    // Service borrowing
+    //
 
     std::optional<std::wstring> borrowedService;
 
@@ -143,19 +216,36 @@ Install::Execute() const
         }
     }
 
-    auto service = SvInstallDriver(
-        manager,
-        SERVICE_START | DELETE,
-        // lxmonika.sys should start before any userland process is created,
-        // since these process may (indirectly) use lxcore.sys and Pico process services.
-        SERVICE_BOOT_START,
-        MA_SERVICE_NAME,
-        MA_SERVICE_DISPLAY_NAME,
-        std::wstring(UtilGetResourceString(MA_STRING_MONIKA_JUST_MONIKA)),
-        fullPath,
-        std::nullopt,
-        borrowedService
+    //
+    // Driver installation
+    //
+
+    ServiceHandle service;
+
+    Transaction driverInstall(
+        [&]()
+        {
+            service = SvInstallDriver(
+                manager,
+                SERVICE_START | DELETE,
+                // lxmonika.sys should start before any userland process is created,
+                // since these process may (indirectly) use lxcore.sys and Pico process services.
+                SERVICE_BOOT_START,
+                MA_SERVICE_NAME,
+                MA_SERVICE_DISPLAY_NAME,
+                std::wstring(UtilGetResourceString(MA_STRING_MONIKA_JUST_MONIKA)),
+                fullPath,
+                std::nullopt,
+                borrowedService
+            );
+        },
+        [&]()
+        {
+            SvUninstallDriver(manager, MA_SERVICE_NAME);
+        }
     );
+
+    HRESULT hresult = HRESULT_FROM_WIN32(ERROR_SUCCESS);
 
     if (!StartServiceW(
         service.get(),
@@ -166,27 +256,23 @@ Install::Execute() const
         int code = GetLastError();
         switch (code)
         {
+            // This error occurs when a driver fails to start, for example, when an old
+            // lxmonika copy prevents the new one from using heuristics to detect offsets.
+            // Give the user another chance to reboot in this case.
             case ERROR_NOT_FOUND:
-            {
-                // This error occurs when a driver fails to start, for example, when an old
-                // lxmonika copy prevents the new one from using heuristics to detect offsets.
-                // Give the user another chance to reboot in this case.
-                return HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED);
-            }
+            // Recent versions of lxmonika return STATUS_TOO_LATE on their first run
+            // since they could not access Pico provider registration functions.
+            // This translates to a Win32 "ERROR_WRITE_PROTECT".
             case ERROR_WRITE_PROTECT:
-            {
-                // Recent versions of lxmonika returns STATUS_TOO_LATE on their first run
-                // since they could not access Pico provider registration functions.
-                // This translates to a Win32 "ERROR_WRITE_PROTECT".
-                return HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED);
-            }
+                hresult = ERROR_SUCCESS_REBOOT_REQUIRED;
+            break;
             default:
-            {
-                SvUninstallDriver(manager, MA_SERVICE_NAME);
-                return HRESULT_FROM_WIN32(code);
-            }
+                throw Win32Exception(code);
         }
     }
 
-    return 0;
+    coreDriverCopy.Commit();
+    driverInstall.Commit();
+
+    return hresult;
 }

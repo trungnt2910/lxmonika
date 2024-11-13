@@ -13,8 +13,10 @@ class Install : public Command<std::optional<std::filesystem::path>>
 private:
     const InstallProvider _installProviderCommand;
     const Switch<std::optional<std::filesystem::path>> _rest;
+    const Switch<std::optional<std::filesystem::path>> _coreSwitch;
     const Switch<bool> _forceSwitch;
     std::optional<std::filesystem::path> _path;
+    std::optional<std::filesystem::path> _core;
     bool _force = false;
 public:
     Install(const CommandBase* parentCommand = nullptr);
