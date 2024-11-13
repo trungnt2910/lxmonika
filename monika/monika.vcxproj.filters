@@ -77,6 +77,9 @@
     <ClInclude Include="include\Parameter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include\Transaction.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="include\Switch.h">
       <Filter>Header Files</Filter>
     </ClInclude>
