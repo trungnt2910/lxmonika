@@ -8,6 +8,7 @@
 #include <winsvc.h>
 
 #include "constants.h"
+#include "registry.h"
 #include "resource.h"
 #include "service.h"
 #include "util.h"
@@ -110,6 +111,11 @@ Install::Execute() const
     if (SvIsLxMonikaInstalled(manager))
     {
         throw MonikaException(MA_STRING_EXCEPTION_LXMONIKA_ALREADY_INSTALLED);
+    }
+
+    if (!_force && !RegIsTestSigningEnabled())
+    {
+        throw MonikaException(MA_STRING_EXCEPTION_TEST_SIGNING_NOT_ENABLED);
     }
 
     std::optional<std::wstring> borrowedService;
