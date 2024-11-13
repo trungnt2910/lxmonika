@@ -57,6 +57,13 @@ Install::Install(const CommandBase* parentCommand)
         _core,
         true
     ),
+    _borrowSwitch(
+        MA_STRING_INSTALL_SWITCH_BORROW_NAME, -1,
+        MA_STRING_INSTALL_SWITCH_BORROW_DESCRIPTION,
+        StringParameter,
+        _borrow,
+        true
+    ),
     _forceSwitch(
         MA_STRING_INSTALL_SWITCH_FORCE_NAME, -1,
         MA_STRING_INSTALL_SWITCH_FORCE_DESCRIPTION,
@@ -68,6 +75,7 @@ Install::Install(const CommandBase* parentCommand)
     AddCommand(_installProviderCommand);
 
     AddSwitch(_coreSwitch);
+    AddSwitch(_borrowSwitch);
     AddSwitch(_forceSwitch);
 }
 
@@ -199,15 +207,18 @@ Install::Execute() const
     // Service borrowing
     //
 
-    std::optional<std::wstring> borrowedService;
+    std::optional<std::wstring> borrowedService = _borrow;
 
-    // First loop: Check for running Pico providers to intercept.
-    for (PCWSTR pService : MaKnownCorePicoServices)
+    if (!borrowedService.has_value())
     {
-        if (SvIsServiceInstalled(manager, pService) && UtilCheckCoreDriverName(pService))
+        // First loop: Check for running Pico providers to intercept.
+        for (PCWSTR pService : MaKnownCorePicoServices)
         {
-            borrowedService = pService;
-            break;
+            if (SvIsServiceInstalled(manager, pService) && UtilCheckCoreDriverName(pService))
+            {
+                borrowedService = pService;
+                break;
+            }
         }
     }
 
@@ -221,6 +232,26 @@ Install::Execute() const
                 borrowedService = pService;
                 break;
             }
+        }
+    }
+
+    if (!_force)
+    {
+        if (!borrowedService.has_value())
+        {
+            // No borrowable core service found on the system.
+            throw MonikaException(
+                MA_STRING_EXCEPTION_BORROWED_SERVICE_NOT_FOUND,
+                HRESULT_FROM_WIN32(ERROR_SERVICE_NOT_FOUND)
+            );
+        }
+        else if (!UtilCheckCoreDriverName(borrowedService.value()))
+        {
+            // The specified service is not a whitelisted core driver service.
+            throw MonikaException(
+                MA_STRING_EXCEPTION_BORROWED_SERVICE_INVALID,
+                HRESULT_FROM_WIN32(ERROR_SERVICE_NOT_FOUND)
+            );
         }
     }
 
