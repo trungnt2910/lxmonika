@@ -94,6 +94,34 @@ UtilGetSystemDirectory()
     return result;
 }
 
+std::wstring
+UtilGetDriversDirectory()
+{
+    return (std::filesystem::path(UtilGetSystemDirectory()) / "drivers").wstring();
+}
+
+std::wstring
+UtilGetExecutableDirectory()
+{
+    std::wstring executablePathString;
+    executablePathString.resize(executablePathString.capacity());
+
+    DWORD dwPathLength = Win32Exception::ThrowIfNull(GetModuleFileNameW(
+        NULL, executablePathString.data(), (DWORD)executablePathString.size()
+    ));
+
+    while (GetLastError() == ERROR_INSUFFICIENT_BUFFER)
+    {
+        executablePathString.resize(executablePathString.size() * 2);
+        dwPathLength = Win32Exception::ThrowIfNull(GetModuleFileNameW(
+            NULL, executablePathString.data(), (DWORD)executablePathString.size()
+        ));
+    }
+
+    executablePathString.resize(dwPathLength);
+    return std::filesystem::path(executablePathString).parent_path().wstring();
+}
+
 static
 std::wstring
 UtilGetFinalPathNameByHandle(
