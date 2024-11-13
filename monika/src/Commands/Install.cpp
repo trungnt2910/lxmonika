@@ -46,9 +46,18 @@ Install::Install(const CommandBase* parentCommand)
     _rest(
         -1, -1, MA_STRING_INSTALL_COMMAND_ARGUMENT_DESCRIPTION,
         DriverPathParameter, _path, true
+    ),
+    _forceSwitch(
+        MA_STRING_INSTALL_SWITCH_FORCE_NAME, -1,
+        MA_STRING_INSTALL_SWITCH_FORCE_DESCRIPTION,
+        NullParameter,
+        _force,
+        true
     )
 {
     AddCommand(_installProviderCommand);
+
+    AddSwitch(_forceSwitch);
 }
 
 int
