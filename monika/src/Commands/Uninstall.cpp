@@ -1,5 +1,7 @@
 #include "Commands/Uninstall.h"
 
+#include <fstream>
+
 #include "constants.h"
 #include "resource.h"
 #include "service.h"
@@ -27,7 +29,10 @@ Uninstall::Execute() const
         NULL, NULL, SC_MANAGER_CREATE_SERVICE
     ));
 
-    // fail if any service is using lxmonika.
+    //
+    // Check for dependent services.
+    //
+
     std::vector<char> buffer;
     if (SvGetLxMonikaDependentServices(
         manager,
@@ -40,7 +45,51 @@ Uninstall::Execute() const
         );
     }
 
-    Win32Exception::ThrowIfFalse(SvUninstallDriver(manager, MA_SERVICE_NAME));
+    HRESULT hresult = HRESULT_FROM_WIN32(ERROR_SUCCESS);
 
-    return 0;
+    //
+    // Uninstall driver.
+    //
+
+    if (!SvUninstallDriver(manager, MA_SERVICE_NAME))
+    {
+        Win32Exception::ThrowUnless(ERROR_SUCCESS_REBOOT_REQUIRED);
+        hresult = HRESULT_FROM_WIN32(GetLastError());
+    }
+
+    //
+    // Remove core driver if we own it.
+    //
+
+    std::filesystem::path coreDriverInstalledPath =
+        std::filesystem::path(UtilGetDriversDirectory()) / MA_CORE_DRIVER_NAME;
+    std::ifstream coreDriverCopiedDataStream;
+    coreDriverCopiedDataStream.open(
+        coreDriverInstalledPath.wstring() + L":" MA_CORE_COPIED_STREAM_NAME L":$DATA",
+        std::ios_base::in | std::ios_base::binary
+    );
+
+    if (coreDriverCopiedDataStream.is_open() && coreDriverCopiedDataStream.get() == 1)
+    {
+        // lxcore.sys was copied by us during installation.
+
+        // Close the data stream to prevent DeleteFileW from failing.
+        coreDriverCopiedDataStream.close();
+
+        if (!DeleteFileW(coreDriverInstalledPath.wstring().c_str()))
+        {
+            if (MoveFileExW(
+                coreDriverInstalledPath.wstring().c_str(),
+                NULL,
+                MOVEFILE_DELAY_UNTIL_REBOOT
+            ))
+            {
+                hresult = ERROR_SUCCESS_REBOOT_REQUIRED;
+            }
+
+            // Ignore further errors since there's no going back now.
+        }
+    }
+
+    return hresult;
 }
