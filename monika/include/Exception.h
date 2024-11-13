@@ -39,6 +39,15 @@ public:
 
     static void ThrowIfFalse(BOOL result) { if (!result) throw Win32Exception(); }
 
+    template <typename T>
+    static void ThrowIfNonZero(T result)
+    {
+        if (result != ERROR_SUCCESS)
+        {
+            throw Win32Exception(result);
+        }
+    }
+
     static HANDLE ThrowIfInvalid(HANDLE result)
     {
         return (result != INVALID_HANDLE_VALUE) ? result : throw Win32Exception();
