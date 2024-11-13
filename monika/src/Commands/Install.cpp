@@ -64,6 +64,13 @@ Install::Install(const CommandBase* parentCommand)
         _borrow,
         true
     ),
+    _enableLateRegistrationSwitch(
+        MA_STRING_INSTALL_SWITCH_ENABLE_LATE_REGISTRATION_NAME, -1,
+        MA_STRING_INSTALL_SWITCH_ENABLE_LATE_REGISTRATION_DESCRIPTION,
+        NullParameter,
+        _enableLateRegistration,
+        true
+    ),
     _forceSwitch(
         MA_STRING_INSTALL_SWITCH_FORCE_NAME, -1,
         MA_STRING_INSTALL_SWITCH_FORCE_DESCRIPTION,
@@ -76,12 +83,17 @@ Install::Install(const CommandBase* parentCommand)
 
     AddSwitch(_coreSwitch);
     AddSwitch(_borrowSwitch);
+    AddSwitch(_enableLateRegistrationSwitch);
     AddSwitch(_forceSwitch);
 }
 
 int
 Install::Execute() const
 {
+    // Should be either SUCCESS or SUCCESS_REBOOT_REQUIRED.
+    // Error codes should be thrown as exceptions.
+    HRESULT hresult = HRESULT_FROM_WIN32(ERROR_SUCCESS);
+
     //
     // Build driver installation path
     //
@@ -239,11 +251,14 @@ Install::Execute() const
     {
         if (!borrowedService.has_value())
         {
-            // No borrowable core service found on the system.
-            throw MonikaException(
-                MA_STRING_EXCEPTION_BORROWED_SERVICE_NOT_FOUND,
-                HRESULT_FROM_WIN32(ERROR_SERVICE_NOT_FOUND)
-            );
+            if (!_enableLateRegistration)
+            {
+                // No borrowable core service found on the system.
+                throw MonikaException(
+                    MA_STRING_EXCEPTION_BORROWED_SERVICE_NOT_FOUND,
+                    HRESULT_FROM_WIN32(ERROR_SERVICE_NOT_FOUND)
+                );
+            }
         }
         else if (!UtilCheckCoreDriverName(borrowedService.value()))
         {
@@ -284,8 +299,6 @@ Install::Execute() const
         }
     );
 
-    HRESULT hresult = HRESULT_FROM_WIN32(ERROR_SUCCESS);
-
     if (!StartServiceW(
         service.get(),
         0,
@@ -310,8 +323,38 @@ Install::Execute() const
         }
     }
 
+    //
+    // Late registration
+    //
+
+    Transaction lateRegistrationRegistryKeyAdd(
+        [&]()
+        {
+            if (_enableLateRegistration)
+            {
+                SvSetServiceParameters(
+                    MA_SERVICE_NAME,
+                    {
+                        {
+                            std::wstring(MA_SERVICE_REGISTRY_ENABLE_LATE_REGISTRATION),
+                            (DWORD)1
+                        }
+                    }
+                );
+            }
+        },
+        [&]()
+        {
+            if (_enableLateRegistration)
+            {
+                SvClearServiceParameters(MA_SERVICE_NAME);
+            }
+        }
+    );
+
     coreDriverCopy.Commit();
     driverInstall.Commit();
+    lateRegistrationRegistryKeyAdd.Commit();
 
     return hresult;
 }

@@ -30,7 +30,7 @@ SIZE_T MapProvidersCount = 0;
 static LONG MaInitialized = FALSE;
 
 static constinit UNICODE_STRING MaServiceRegistryKey = RTL_CONSTANT_STRING(
-    L"\\Registry\\Machine\\SYSTEM\\CurrentControlSet\\Services\\lxmonika"
+    L"\\Registry\\Machine\\SYSTEM\\CurrentControlSet\\Services\\lxmonika\\Parameters"
 );
 static constinit UNICODE_STRING MaEnableLateRegistrationRegistryValue = RTL_CONSTANT_STRING(
     L"MaEnableLateRegistration"
@@ -120,6 +120,13 @@ MapInitialize()
     {
         Logger::LogWarning("lxmonika is loaded too late to register as a Pico provider.");
 
+        union
+        {
+            KEY_VALUE_PARTIAL_INFORMATION keyInformation;
+            CHAR keyBuffer[sizeof(KEY_VALUE_PARTIAL_INFORMATION) + sizeof(DWORD)];
+        };
+        ULONG ulResultLength = 0;
+
         OBJECT_ATTRIBUTES objectAttributes;
         InitializeObjectAttributes(
             &objectAttributes,
@@ -129,27 +136,23 @@ MapInitialize()
             NULL
         );
         HANDLE hServicesRegistryKey = NULL;
-        MA_RETURN_IF_FAIL(ZwOpenKey(
+        NTSTATUS status = ZwOpenKey(
             &hServicesRegistryKey,
             KEY_READ,
             &objectAttributes
-        ));
-
-        union
-        {
-            KEY_VALUE_PARTIAL_INFORMATION keyInformation;
-            CHAR keyBuffer[sizeof(KEY_VALUE_PARTIAL_INFORMATION) + sizeof(DWORD)];
-        };
-        ULONG ulResultLength = 0;
-
-        NTSTATUS status = ZwQueryValueKey(
-            hServicesRegistryKey,
-            &MaEnableLateRegistrationRegistryValue,
-            KeyValuePartialInformation,
-            &keyInformation,
-            sizeof(keyBuffer),
-            &ulResultLength
         );
+
+        if (NT_SUCCESS(status))
+        {
+            status = ZwQueryValueKey(
+                hServicesRegistryKey,
+                &MaEnableLateRegistrationRegistryValue,
+                KeyValuePartialInformation,
+                &keyInformation,
+                sizeof(keyBuffer),
+                &ulResultLength
+            );
+        }
 
         if (!NT_SUCCESS(status)
             || keyInformation.Type != REG_DWORD
