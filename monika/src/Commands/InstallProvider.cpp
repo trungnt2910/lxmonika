@@ -72,7 +72,8 @@ InstallProvider::Execute() const
         _serviceDisplayName.empty() ? std::optional<std::wstring>() : _serviceDisplayName,
         std::nullopt,
         fullPath,
-        std::vector<std::wstring>{ MA_SERVICE_NAME }
+        std::vector<std::wstring>{ MA_SERVICE_NAME },
+        std::nullopt
     );
 
     if (!StartServiceW(service.get(), 0, NULL))
