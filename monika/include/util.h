@@ -40,3 +40,13 @@ std::wstring
     UtilWin32ToNtPath(
         const std::filesystem::path& win32Path
     );
+
+std::vector<std::wstring>
+    UtilStringListToVector(
+        LPCWSTR pStringList
+    );
+
+std::wstring
+    UtilVectorToStringList(
+        const std::vector<std::wstring>& strings
+    );

@@ -153,3 +153,33 @@ UtilWin32ToNtPath(
 
     return result;
 }
+
+std::vector<std::wstring>
+UtilStringListToVector(
+    LPCWSTR pStringList
+)
+{
+    std::vector<std::wstring> result;
+    LPCWSTR pCurrent = pStringList;
+    while (*pCurrent != L'\0')
+    {
+        result.emplace_back(pCurrent);
+        pCurrent += result.back().size() + 1;
+    }
+    return result;
+}
+
+std::wstring
+UtilVectorToStringList(
+    const std::vector<std::wstring>& strings
+)
+{
+    std::wstring result;
+    for (const std::wstring& str : strings)
+    {
+        result.reserve(result.size() + str.size() + 1);
+        result += str;
+        result.push_back('\0');
+    }
+    return result;
+}
