@@ -340,7 +340,8 @@ MaRegisterPicoProviderEx(
         // If the reported value is greater than that, it's likely to be a pointer.
         // We will be a bit generous and go up to 0x0C000000, which rules out everything with
         // the most significant bit set (usually kernel mode pointers in 32-bit OSes).
-        if (dwAbiVersion < NTDDI_WINBLUE || dwAbiVersion > 0x0C000000)
+        if (dwAbiVersion != 0 &&
+            (dwAbiVersion < NTDDI_WINBLUE || dwAbiVersion > 0x0C000000))
         {
             Logger::LogWarning("Provider is reporting an invalid ABI version: ",
                 (PVOID)AdditionalProviderRoutines->AbiVersion);
