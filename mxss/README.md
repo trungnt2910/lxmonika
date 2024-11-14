@@ -15,11 +15,12 @@ Like SysX, it is still under development and only supports a few simple function
 
 ### Building the `mxss` driver
 
-Please refer to the [`lxmonika`](../lxmonika/README.md#build-instructions) build instructions to
-work out how to build and install a Windows kernel driver. For experienced NT driver devs, your
-favorite workflow should be good.
+`mxss` requires [`lxmonika`](../lxmonika/README.md#build-instructions) to be built and installed.
 
-You will have to install both `lxmonika` and `mxss` for the driver to function properly.
+After that, the [`monika.exe`](../monika) CLI can be used to deploy `mxss`.
+```cmd
+monika.exe install provider path\to\mxss\mxss.sys
+```
 
 ### Building the Monix distro
 
@@ -46,6 +47,8 @@ machine.
 
 ### Running
 
+#### Dedicated Monix host
+
 On your target machine, run:
 
 ```cmd
@@ -65,6 +68,13 @@ hello.
 ```
 
 You can then use Monix like an authentic [SysX](https://itsmevjnk.github.io/sysx-build) system.
+
+#### Unified `monika.exe` host
+
+The `monika.exe` CLI can also be used to launch a Monix process.
+```cmd
+monika exec --provider Monix --cd "\path\to\extracted\monix\root\bin" hello
+```
 
 ## Community
 

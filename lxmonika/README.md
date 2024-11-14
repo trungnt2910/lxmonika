@@ -22,14 +22,46 @@ structure. Specifically:
 
 ## How it works
 
+### New loading technique
+
+The current versions of `lxmonika` work by directly calling `PsRegisterPicoProvider`, an
+undocumented function used by `lxcore`, to install itself as a Pico provider. `lxmonika`
+detects the structure sizes that the function requires, allowing drivers to work seamlessly across
+breaking changes throughout Windows's version history.
+
+To be able to call `PsRegisterPicoProvider`, `lxmonika` needs to be loaded as a "core" driver, or
+one specified by a "core" service whitelisted by the bootloader (`winload`). To achieve this,
+`lxmonika` "borrows" one of these services. On machines with WSL1 (most 64-bit x86 and ARM
+Windows), the borrowed service is `LXSS`, on machines with AoW/Project Astoria, it is `ADSS`, and
+on other Windows 10 versions, it is `CNG`. The driver for the borrowed service will be replaced
+with `lxmonika.sys`, and `lxmonika.sys` will be responsible for bootstrapping the actual driver.
+
+`lxmonika` is linked to `lxcore.sys` and always attempts to load `lxcore`. Before loading,
+`lxmonika` installs a temporary hook at `nt!PsRegisterPicoProvider` to its managed variant,
+`lxmonika!MaRegisterPicoProvider`, allowing `lxcore` to be registered as a `lxmonika` provider and
+function seamlessly like one. The hook also prevents `lxcore` from overriding callbacks already set
+by `lxmonika`.
+
+### Legacy heuristics
+
+The legacy heuristics is used when `lxmonika` fails to be loaded as a core driver.
+
+Instead of calling `PsRegisterPicoProvider`, `lxmonika` searches for the provider callbacks
+structure (the one stored by this function) in memory and tries to synthesize the Pico callbacks
+structure (the one returned by this function).
+
 `lxmonika` first locates `ntoskrnl.exe` (the NT kernel image) and the `lxcore.sys` driver in
-memory.
+memory. Then, it uses heuristics to locate `PspPicoProviderRoutines`, a structure containing
+functions the NT kernel will call whenever a WSL1 process makes interactions with the kernel, such
+as performing a `syscall`.
 
-Then, it uses heuristics to locate `PspPicoProviderRoutines`, a structure containing functions
-the NT kernel will call whenever a WSL1 process makes interactions with the kernel, such as
-performing a `syscall`.
+The legacy method involves late kernel patching and may trigger PatchGuard. It is therefore
+unsupported.
 
-`lxmonika` then detects the `syscall` number, looks for `uname`, and modifies the return values.
+### Linux syscall hooking
+
+`lxmonika` detects the `syscall` number from the syscall dispatch callback in a `PKTRAP_FRAME`
+parameter. It then looks for `uname` and modifies the return values.
 
 ## Potential applications
 
@@ -44,15 +76,15 @@ issues are closed, and some closed issues are marked "fixed-in-WSL2"), being abl
 syscalls means that third-party kernel drivers can potentially deliver their own fixes, given
 enough knowledge about the NT kernel internals.
 
+`lxmonika` also bridges between older `lxcore.sys` and newer `ntoskrnl.exe` with ABI changes,
+allowing a part of Project Astoria to work on newer 32-bit Windows builds.
+
 It is also possible for open-source projects to port the whole Linux kernel as a Windows driver,
 creating a more modern version of [coLinux](http://www.colinux.org/) with 64-bit support and
 better integration.
 
 Finally, since Pico processes are not restricted to Linux, we can implement other kernels'
-ABIs, such as Darwin. An idea is to implement a special device to handle `ioctl`s using APIs
-exposed by [lxdk](https://github.com/billziss-gh/lxdk). After Microsoft's `init` is called,
-a special ELF binary can notify Monika using that device and `ioctl` to switch to Darwin mode,
-then give control to `launchd`.
+ABIs, such as Darwin.
 
 <!-- HyClone on Windows when? -->
 
@@ -63,12 +95,19 @@ then give control to `launchd`.
 - Visual Studio 2022.
 - The latest WDK. Download it
 [here](https://learn.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk).
+- WDK version
+[10.0.14393.0](https://download.microsoft.com/download/8/1/6/816FE939-15C7-4185-9767-42ED05524A95/wdk/wdksetup.exe)
+for 32-bit (x86, ARM) and x64 builds.
+- WDK version
+[10.0.17134.0](https://download.microsoft.com/download/B/5/8/B58D625D-17D6-47A8-B3D3-668670B6D1EB/wdk/wdksetup.exe)
+for ARM64 builds.
 - A Windows NT 10.0 machine with Test Signing enabled.
 
 ### Instructions
 
-Use whatever workflow you normally use for your kernel drivers. The steps below are my preferred
-procedure and friendly for KMDF newbies.
+Please use the [`monika.exe`](../monika) CLI to deploy `lxmonika`. This specialized tool
+handles "borrowing" and other quirks specific to `lxmonika.sys`, unlike generic tools like `sc`
+or `pnputil`.
 
 #### For the first time you deploy a driver on a new computer
 
@@ -91,10 +130,13 @@ shutdown /r /t 00
 
 On an elevated Command Prompt window on the test computer:
 
-- Run the command below. Replace the `path\to` part with the relevant paths. The space behind the
-equal sign and the value is required.
+- Uninstall existing installations of `lxmonika`.
 ```bat
-sc create lxmonika type= kernel start= system binPath= path\to\lxmonika\lxmonika.sys
+monika uninstall
+```
+- Run the command below. Replace the `path\to` part with the relevant paths.
+```bat
+monika install path\to\lxmonika\lxmonika.sys
 ```
 - Reboot the device.
 ```bat
@@ -107,7 +149,7 @@ On an elevated Command Prompt window on the test computer:
 
 - Run the command below.
 ```bat
-sc delete lxmonika
+monika uninstall
 ```
 - Reboot the device.
 ```bat
@@ -116,20 +158,11 @@ shutdown /r /t 00
 
 ### Notes
 
-For the latest Windows builds, WinDbg and Debug mode may not be required, since PatchGuard might
-have removed `PspPicoProviderRoutines` from its `PsKernelRangeList`. Therefore, modifying the
-structure may not cause the BSOD anymore.
+The driver has been tested on some builds of Windows 10 and Windows 11 and on all supported
+architectures (x86, x64, ARM, ARM64). Depending on the specific build you use, YMMV.
 
-The driver has only been tested on Windows build 22621 (Windows 11 23H2). For other Windows builds,
-YMMV.
-
-Only `x86_64` and `arm64` are supported. The 32-bit counterparts, `x86` and `arm`, being legacy
-platforms, are not supported. While `pico.h` also contains definitions for these older
-architectures, other parts may not work, especially those that rely on `lxcore.sys` (missing from
-both `x86` and `arm` except for very early Insider builds of Windows 10 Mobile).
-[`PspPicoProviderRoutinesOffsetGen`](https://github.com/trungnt2910/PspPicoProviderRoutinesOffsetGen),
-the source of known NT kernel function positions required for `lxmonika`, also does **not** offer
-information for 32-bit Windows.
+Windows 10 TH2 (all architectures) and Windows 10 pre-RS4 (ARM64) are not supported, since they do
+not provide the required Pico processes infrastructure.
 
 ## Building your own Pico provider
 
@@ -146,19 +179,19 @@ Your driver will need to add a reference to `lxmonika`. It should also have head
     </Link>
 ```
 
+After having the required imports, call `MaRegisterPicoProvider` or `MaRegisterPicoProviderEx` to
+register as a Pico provider.
+
+Install your driver using the `monika.exe` CLI.
+```bat
+monika install provider path\to\your\driver.sys
+```
+
 See the included sample, [`mxss`](../mxss), for more details.
 
 ## Future plans
 
-- [**DONE**] Fetch `LxpRoutines` from `lxcore.sys`. These are essential routines any pico provider
-would need to manage its processes. Normally, the struct would be returned by
-`PsRegisterPicoProvider`; however this function has already been locked down by Microsoft using a
-boolean guard (`PspPicoRegistrationDisabled`).
-- [**DONE**] Create a `MaRegisterPicoProvider` and let `lxmonika` manage these providers instead.
-Even if we override the boolean guard, `PsRegisterPicoProvider` would not correctly handle multiple
-Pico drivers, since `PspPicoProviderRoutines` is not an array or table but just a global variable.
-- [**DONE**] Provide a sample Pico provider.
-- (Far, far future) Port a newer version of Linux, Darwin, or even Haiku???
+- Port a newer version of Linux, Darwin, or even Haiku???
 - (Far, far future) Revive project Astoria???
 
 ## Community
