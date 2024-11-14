@@ -116,7 +116,7 @@
     <ClInclude Include="include\AutoResource.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="README.md" />
+    <None Include="..\README.md" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="$(SolutionDir)\lxmonika\lxmonika.vcxproj">
