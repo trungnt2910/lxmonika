@@ -24,8 +24,8 @@
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="lxstub.def">
-    </None>
+    <None Include="lxstub.def" />
+    <None Include="README.md" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\driver.cpp">
