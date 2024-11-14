@@ -14,7 +14,7 @@
           {
             toAppend += AddQuotes ? $";{varName}=\"{value}\"" : $";{varName}={value}";
           }
-          void Run(string varName, string command)
+          string Run(string command)
           {
             var p = new Process();
             p.StartInfo = new ProcessStartInfo("git", command);
@@ -22,12 +22,34 @@
             p.StartInfo.UseShellExecute = false;
             p.Start();
             p.WaitForExit();
-            Append(varName, p.StandardOutput.ReadToEnd().Trim());
+            return p.StandardOutput.ReadToEnd().Trim();
           }
-          Run("MONIKA_BUILD_NUMBER", "rev-list --count master");
-          Run("MONIKA_BUILD_TAG", "describe --broken --dirty --all");
-          Run("MONIKA_BUILD_HASH", "rev-parse --short HEAD");
-          Run("MONIKA_BUILD_ORIGIN", "remote get-url origin");
+          void AppendRun(string varName, string command)
+          {
+            Append(varName, Run(command));
+          }
+          if (Run("branch --show-current") == "master")
+          {
+            AppendRun("MONIKA_BUILD_NUMBER", "rev-list --count master");
+          }
+          else
+          {
+            var mergeBase = Run("merge-base refs/remotes/origin/master HEAD");
+            var masterCount = Run($"rev-list --count {mergeBase}");
+            var divergeCount = Run($"rev-list --count {mergeBase}..HEAD");
+            if (AddQuotes)
+            {
+              Append("MONIKA_BUILD_NUMBER", $"{masterCount}+{divergeCount}");
+            }
+            else
+            {
+              // The build number is interpreted as an integer literal for resources.
+              Append("MONIKA_BUILD_NUMBER", $"{masterCount}");
+            }
+          }
+          AppendRun("MONIKA_BUILD_TAG", "describe --broken --dirty --all");
+          AppendRun("MONIKA_BUILD_HASH", "rev-parse --short HEAD");
+          AppendRun("MONIKA_BUILD_ORIGIN", "remote get-url origin");
           foreach (var item in ItemList)
           {
             var cur = item.GetMetadata(metadataName);
