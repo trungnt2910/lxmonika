@@ -622,6 +622,14 @@ RlFileUpdateInformation(
         "MaProvidersMax:\t%zu", (SIZE_T)MaPicoProviderMaxCount
     ));
 
+    Write(_snprintf(pFile->Data + pFile->Length, uSizeLeft + 1,
+        "MaAbiVersion:\t%lx", MapSystemAbiVersion
+    ));
+
+    Write(_snprintf(pFile->Data + pFile->Length, uSizeLeft + 1,
+        "MaIsTooLate:\t%d", (DWORD)MapTooLate
+    ));
+
 #ifdef MONIKA_TIMESTAMP
     Write(_snprintf(pFile->Data + pFile->Length, uSizeLeft + 1,
         "MaBuildTime:\t" MONIKA_TIMESTAMP
