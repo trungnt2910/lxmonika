@@ -1,0 +1,53 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - "master"
+      - "staging"
+      - "dev/**"
+  pull_request:
+    branches:
+      - "master"
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        platform: [x86, x64, ARM, ARM64]
+        configuration: [Debug, Release]
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Fetch everything for build metadata to work
+          fetch-depth: 0
+
+      - name: Install build dependencies
+        run: powershell.exe -File ${{ github.workspace }}\setup.ps1
+        shell: cmd
+
+      - name: Add msbuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build
+        run: |
+            msbuild ${{ github.workspace }}\lxmonika.sln ^
+                /p:Platform=${{ matrix.platform }} ^
+                /p:Configuration=${{ matrix.configuration }}
+        shell: cmd
+
+      - name: Pack build artifacts
+        run: |
+            powershell.exe -File ${{ github.workspace }}\pack.ps1 ^
+                -Platform ${{ matrix.platform }} ^
+                -Configuration ${{ matrix.configuration }}
+        shell: cmd
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: monika_${{ matrix.configuration }}_${{ matrix.platform }}
+          path: out/${{ matrix.configuration }}
