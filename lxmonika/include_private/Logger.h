@@ -39,6 +39,7 @@ private:
     static void _Print(ULONGLONG ull);
 
     static void _Print(INT i);
+    static void _Print(UINT ui);
 
     static void _Print(PSTR pStr);
     static void _Print(PCSTR pcStr);

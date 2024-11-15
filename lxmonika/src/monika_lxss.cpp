@@ -247,6 +247,16 @@ MapLxssSystemCallHook(
     {
         pUtsName = (old_utsname*)pSyscallInfo->TrapFrame->X0;
     }
+#elif defined(_M_IX86)
+    if (pSyscallInfo->TrapFrame->Eax == 122)
+    {
+        pUtsName = (old_utsname*)pSyscallInfo->TrapFrame->Ebx;
+    }
+#elif defined(_M_ARM)
+    if (pSyscallInfo->R7 == 122)
+    {
+        pUtsName = (old_utsname*)pSyscallInfo->TrapFrame->R0;
+    }
 #else
 #error Detect the syscall arguments for this architecture!
 #endif
@@ -267,6 +277,10 @@ MapLxssSystemCallHook(
         && pSyscallInfo->TrapFrame->Rax == 0)
 #elif defined(_M_ARM64)
         && pSyscallInfo->TrapFrame->X0 == 0)
+#elif defined(_M_IX86)
+        && pSyscallInfo->TrapFrame->Eax == 0)
+#elif defined(_M_ARM)
+        && pSyscallInfo->TrapFrame->R0 == 0)
 #else
 #error Detect the syscall return value for this architecture!
 #endif

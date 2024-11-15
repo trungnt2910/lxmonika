@@ -396,6 +396,10 @@ PicoSppGetOffsets(
         pArchitecture = "x64";
 #elif defined(_M_ARM64)
         pArchitecture = "arm64";
+#elif defined(_M_IX86)
+        pArchitecture = "x86";
+#elif defined(_M_ARM)
+        pArchitecture = "arm";
 #else
 #error Define the identifier for this architecture!
 #endif

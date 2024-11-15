@@ -73,6 +73,12 @@ NTSTATUS
 
 #if defined(_M_X64)
 #define MDL_TRAMPOLINE_SIZE     12
+#elif defined(_M_ARM64)
+#define MDL_TRAMPOLINE_SIZE     16
+#elif defined(_M_IX86)
+#define MDL_TRAMPOLINE_SIZE     7
+#elif defined(_M_ARM)
+#define MDL_TRAMPOLINE_SIZE     8
 #else
 #error Define Trampoline size!
 #endif

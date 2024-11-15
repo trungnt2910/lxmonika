@@ -1,6 +1,24 @@
 <Project ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Label="Monika">
-    <MaTargetName Condition="'$(MaTargetName)'==''">lxmonika</MaTargetName>
-    <MaBuildAuthor Condition="'$(MaBuildAuthor)'==''">Trung Nguyen</MaBuildAuthor>
+    <MaTargetName Condition="'$(MaTargetName)' == ''">lxmonika</MaTargetName>
+    <MaBuildAuthor Condition="'$(MaBuildAuthor)' == ''">Trung Nguyen</MaBuildAuthor>
+    <MaTargetPlatformVersion Condition="'$(MaTargetPlatformVersion)' == ''">10.0.19041.0</MaTargetPlatformVersion>
+    <MaTargetPlatformMinVersion Condition="'$(MaTargetPlatformMinVersion)' == ''">10.0.10240.0</MaTargetPlatformMinVersion>
+    <MaWindowsKitsRoot Condition="'$(MaWindowsKitsRoot)' == ''">$(Registry:HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows Kits\Installed Roots@KitsRoot10)</MaWindowsKitsRoot>
+    <MaWindowsKitsRoot Condition="'$(MaWindowsKitsRoot)' == ''">$(Registry:HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\Microsoft\Windows Kits\Installed Roots@KitsRoot10)</MaWindowsKitsRoot>
+    <MaLatestTargetPlatformVersion>$([Microsoft.Build.Utilities.ToolLocationHelper]::GetLatestSDKTargetPlatformVersion('Windows', '10.0'))</MaLatestTargetPlatformVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Label="WDK">
+    <WDKContentRoot Condition="'$(WDKContentRoot)' == ''">$(MaWindowsKitsRoot)</WDKContentRoot>
+    <WDKBuildFolder Condition="'$(WDKBuildFolder)' == ''">$(MaLatestTargetPlatformVersion)</WDKBuildFolder>
+    <WDKBinRoot Condition="'$(WDKBinRoot)' == ''">$(WdkContentRoot)bin\$(MaLatestTargetPlatformVersion)</WDKBinRoot>
+  </PropertyGroup>
+
+  <PropertyGroup Label="CommonGlobals">
+    <Configuration Condition="'$(Configuration)' == ''">Debug</Configuration>
+    <Platform Condition="'$(Platform)' == ''">x64</Platform>
+    <WindowsTargetPlatformVersion>$(MaTargetPlatformVersion)</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformMinVersion>$(MaTargetPlatformMinVersion)</WindowsTargetPlatformMinVersion>
   </PropertyGroup>
 </Project>

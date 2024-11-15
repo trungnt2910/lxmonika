@@ -139,6 +139,12 @@ Logger::_Print(INT i)
 }
 
 void
+Logger::_Print(UINT i)
+{
+    WRITE("%u", i);
+}
+
+void
 Logger::_Print(PSTR pStr)
 {
     WRITE("%s", pStr);

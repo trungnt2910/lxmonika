@@ -565,6 +565,23 @@ MdlpPatchTrampoline(
             0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             // jmp rax
             0xff, 0xe0
+#elif defined(_M_ARM64)
+            // ldr x9, 8    -> Load the contents 8 bytes ahead of the current PC into x9.
+            0x49, 0x00, 0x00, 0x58,
+            // br x9        -> Jump to x9.
+            0x20, 0x01, 0x1F, 0xD6,
+            // .addr
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+#elif defined(_M_IX86)
+            // mov eax, [addr]
+            0xB8, 0x00, 0x00, 0x00, 0x00,
+            // jmp eax
+            0xFF, 0xE0
+#elif defined(_M_ARM)
+            // ldr pc, [pc, #-0x4]
+            0x04, 0xF0, 0x1F, 0xE5,
+            // .addr
+            0x00, 0x00, 0x00, 0x00
 #else
 #error Define Trampoline!
 #endif
@@ -572,6 +589,12 @@ MdlpPatchTrampoline(
 
 #if defined(_M_X64)
         memcpy(chShellCode + 2, &pHook, sizeof(PVOID));
+#elif defined(_M_ARM64)
+        memcpy(chShellCode + 8, &pHook, sizeof(PVOID));
+#elif defined(_M_IX86)
+        memcpy(chShellCode + 1, &pHook, sizeof(PVOID));
+#elif defined(_M_ARM)
+        memcpy(chShellCode + 4, &pHook, sizeof(PVOID));
 #else
 #error Put Address into Trampoline!
 #endif

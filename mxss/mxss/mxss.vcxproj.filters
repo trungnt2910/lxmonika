@@ -56,6 +56,9 @@
     <ClInclude Include="include\driver.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include\elf.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="include\os.h">
       <Filter>Header Files</Filter>
     </ClInclude>

@@ -55,4 +55,12 @@
       <ResourceCompileCopy Remove="@(ResourceCompileCopy)" />
     </ItemGroup>
   </Target>
+
+  <Target Name="MonikaFixToolPaths" Condition="$(MaTargetPlatformVersion) != ''"
+          BeforeTargets="Manifest;ResourceCompile;TestSign">
+    <PropertyGroup>
+      <RCToolPath>$([System.String]::Copy('$(RCToolPath)').Replace('$(MaTargetPlatformVersion)','$(MaLatestTargetPlatformVersion)'))</RCToolPath>
+      <DriverSignToolPath>$([System.String]::Copy('$(DriverSignToolPath)').Replace('$(MaTargetPlatformVersion)','$(MaLatestTargetPlatformVersion)'))</DriverSignToolPath>
+    </PropertyGroup>
+  </Target>
 </Project>

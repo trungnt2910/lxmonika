@@ -151,11 +151,11 @@ RlpFileRead(
 
             INT64 oEnd = min(oStart + szLength, pFile->Length);
 
-            memcpy(pBuffer, pFile->Data + oStart, oEnd - oStart);
+            memcpy(pBuffer, pFile->Data + oStart, (SIZE_T)(oEnd - oStart));
 
             if (pOffset == NULL)
             {
-                pFile->Offset = oEnd;
+                pFile->Offset = (SIZE_T)oEnd;
             }
             else
             {
@@ -164,7 +164,7 @@ RlpFileRead(
 
             if (pBytesTransferred != NULL)
             {
-                *pBytesTransferred = oEnd - oStart;
+                *pBytesTransferred = (SIZE_T)(oEnd - oStart);
             }
 
             return 0;
@@ -523,7 +523,7 @@ RlpFileSeek(
     }
     else
     {
-        pFile->Offset = newOffset;
+        pFile->Offset = (SIZE_T)newOffset;
         if (pResultOffset != NULL)
         {
             *pResultOffset = newOffset;
