@@ -80,6 +80,9 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include_private\compat.h">
+      <Filter>Private Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="include_private\condrv.h">
       <Filter>Private Header Files</Filter>
     </ClInclude>

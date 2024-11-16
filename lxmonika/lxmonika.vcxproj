@@ -85,6 +85,8 @@
       <PreprocessorDefinitions>MONIKA_BUILD_YEAR="$([System.DateTime]::UtcNow.ToString(yyyy))";%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions>MONIKA_BUILD_AUTHOR="$(MaBuildAuthor)";%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions>MONIKA_BUILD_NAME="$(MaTargetName)";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <!-- Work around compile errors in ntstrsafe.h -->
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);NTSTRSAFE_NO_UNICODE_STRING_FUNCTIONS</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>include;include_private;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4471;4748;5040;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <LanguageStandard>stdcpp20</LanguageStandard>
@@ -123,6 +125,7 @@
     <ClCompile Include="src\PoolAllocator.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include_private\compat.h" />
     <ClInclude Include="include_private\condrv.h" />
     <ClInclude Include="include_private\driver.h" />
     <ClInclude Include="include_private\lxerrno.h" />

@@ -6,6 +6,10 @@
 
 #include <ntifs.h>
 
+#ifdef MONIKA_IN_DRIVER
+#include "compat.h"
+#endif
+
 #include "pico.h"
 
 #ifdef MONIKA_IN_DRIVER

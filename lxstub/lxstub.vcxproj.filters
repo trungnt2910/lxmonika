@@ -29,6 +29,9 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\compat.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="include\pico.h">
       <Filter>Header Files</Filter>
     </ClInclude>

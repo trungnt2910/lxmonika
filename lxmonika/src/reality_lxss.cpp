@@ -5,6 +5,7 @@
 #include "module.h"
 #include "monika.h"
 
+#include "AutoResource.h"
 #include "Logger.h"
 
 // lxcore.sys imports
@@ -337,12 +338,37 @@ RlLxssFileIoctl(
             PCSTR pRequestedProvider = (PCSTR)pBuffer;
             Logger::LogTrace("MA_IOCTL_SET_PROVIDER ", pRequestedProvider);
 
-            UTF8_STRING strUtf8RequestedProvider;
-            RtlInitUTF8String(&strUtf8RequestedProvider, (PCSZ)pBuffer);
+            ULONG ulRequestByteCount = (ULONG)strlen(pRequestedProvider);
 
-            UNICODE_STRING strUnicodeRequestedProvider;
-            NTSTATUS status = RtlUTF8StringToUnicodeString(
-                &strUnicodeRequestedProvider, &strUtf8RequestedProvider, TRUE);
+            ULONG ulByteCount = 0;
+            NTSTATUS status = RtlUTF8ToUnicodeN(
+                NULL, 0, &ulByteCount, pRequestedProvider, ulRequestByteCount
+            );
+
+            PWSTR pUnicodeRequestedProvider = NULL;
+            AUTO_RESOURCE(pUnicodeRequestedProvider,
+                [](auto p) { ExFreePoolWithTag(p, MA_REALITY_TAG); }
+            );
+
+            if (NT_SUCCESS(status))
+            {
+                pUnicodeRequestedProvider = (PWSTR)ExAllocatePool2(
+                    PagedPool, ulByteCount, MA_REALITY_TAG
+                );
+
+                if (pUnicodeRequestedProvider == NULL)
+                {
+                    return -LINUX_ENOMEM;
+                }
+
+                status = RtlUTF8ToUnicodeN(
+                    pUnicodeRequestedProvider,
+                    ulByteCount,
+                    &ulByteCount,
+                    pRequestedProvider,
+                    ulRequestByteCount
+                );
+            }
 
             if (!NT_SUCCESS(status))
             {
@@ -350,8 +376,7 @@ RlLxssFileIoctl(
             }
 
             SIZE_T uNewIndex;
-            status = MaFindPicoProvider(strUnicodeRequestedProvider.Buffer, &uNewIndex);
-            RtlFreeUnicodeString(&strUnicodeRequestedProvider);
+            status = MaFindPicoProvider(pUnicodeRequestedProvider, &uNewIndex);
 
             if (!NT_SUCCESS(status))
             {

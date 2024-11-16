@@ -85,7 +85,8 @@ MapInitialize()
             .OpenThread = THREAD_ALL_ACCESS,
 
             // Not a good option, but there are no better ones.
-            .SubsystemInformationType = SubsystemInformationTypeWSL
+            .SubsystemInformationType = (SUBSYSTEM_INFORMATION_TYPE)1
+                // SubsystemInformationTypeWSL
         };
 
         MapOriginalRoutines = PS_PICO_ROUTINES

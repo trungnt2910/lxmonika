@@ -49,7 +49,7 @@ static_assert(!MaDetails::KernelProcessOrThread<PVOID>, "Concept broken");
         {                                                                                       \
             /* Would be impossible for lxmonika-managed processes/threads. */                   \
             /* Also, letting this through would cause infinite recursion. */                    \
-            ASSERT(!MapTooLate);                                                                \
+            MA_ASSERT(!MapTooLate);                                                             \
             if (MapOriginalProviderRoutines.function != NULL)                                   \
             {                                                                                   \
                 return MapOriginalProviderRoutines.function(__VA_ARGS__);                       \
@@ -167,8 +167,7 @@ MapGetAllocatedProcessImageName(
     if (NT_SUCCESS(MapGetObjectContext(Process, &pContext))
         && pContext->ImageFileName.Buffer != NULL)
     {
-        *ImageName = (PUNICODE_STRING)
-            ExAllocatePoolZero(PagedPool, sizeof(UNICODE_STRING), '  aM');
+        *ImageName = (PUNICODE_STRING)ExAllocatePool2(PagedPool, sizeof(UNICODE_STRING), '  aM');
 
         if (*ImageName == NULL)
         {

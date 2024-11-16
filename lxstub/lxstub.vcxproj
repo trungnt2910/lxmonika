@@ -103,6 +103,7 @@
     <ClCompile Include="src\driver.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\compat.h" />
     <ClInclude Include="include\pico.h" />
     <ClInclude Include="include\lxss.h" />
   </ItemGroup>

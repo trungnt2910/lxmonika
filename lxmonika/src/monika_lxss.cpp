@@ -91,7 +91,7 @@ MapLxssInitialize(
         MA_RETURN_IF_FAIL(LxInitialize(DriverObject, &lxSubsystem));
         MapLxssRegistering = FALSE;
 
-        ASSERT(MapLxssProviderIndex != (SIZE_T)-1);
+        MA_ASSERT(MapLxssProviderIndex != (SIZE_T)-1);
 
         // Hook the system call dispatching callback.
         MaLxssOriginalDispatchSystemCall =

@@ -3,6 +3,7 @@
 #include <ntifs.h>
 #include <ntintsafe.h>
 
+#include "compat.h"
 #include "pico.h"
 #include "picooffsets.h"
 

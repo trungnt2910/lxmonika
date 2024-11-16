@@ -4,6 +4,7 @@
 //
 // Just Monika.
 
+#include "compat.h"
 #include "pico.h"
 
 #include "Logger.h"
@@ -216,6 +217,17 @@ extern SIZE_T MapLxssProviderIndex;
         {                                                                       \
             Logger::LogTrace("Function failed with status ", (void*)status__);  \
             return status__;                                                    \
+        }                                                                       \
+    }                                                                           \
+    while (FALSE)
+
+// The built-in ASSERT causes compile errors in earlier WDK versions.
+#define MA_ASSERT(exp)                                                          \
+    do                                                                          \
+    {                                                                           \
+        if (!(exp))                                                             \
+        {                                                                       \
+            RtlAssert((PVOID)#exp, (PVOID)__FILE__, __LINE__, NULL);            \
         }                                                                       \
     }                                                                           \
     while (FALSE)

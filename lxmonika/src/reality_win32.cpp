@@ -3,6 +3,8 @@
 #include <ntstrsafe.h>
 #include <wdmsec.h>
 
+#include "compat.h"
+
 #include "AutoResource.h"
 #include "Logger.h"
 
@@ -155,7 +157,7 @@ RlWin32DeviceCreate(
 
     NTSTATUS status = STATUS_SUCCESS;
 
-    PRL_FILE pNewFile = (PRL_FILE)ExAllocatePoolZero(PagedPool, sizeof(RL_FILE), MA_REALITY_TAG);
+    PRL_FILE pNewFile = (PRL_FILE)ExAllocatePool2(PagedPool, sizeof(RL_FILE), MA_REALITY_TAG);
     if (pNewFile == NULL)
     {
         return RlWin32CompleteRequest(pIrp, STATUS_NO_MEMORY);

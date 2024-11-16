@@ -233,7 +233,7 @@ PicoSppLocateProviderRoutines(
             continue;
         }
 
-        if (pTestRoutines->SubsystemInformationType != SubsystemInformationTypeWSL)
+        if (pTestRoutines->SubsystemInformationType != 1 /* SubsystemInformationTypeWSL */)
         {
             continue;
         }

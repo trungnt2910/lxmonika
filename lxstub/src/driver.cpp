@@ -1,5 +1,7 @@
 #include <ntifs.h>
 
+#include "compat.h"
+
 #include "lxss.h"
 #include "pico.h"
 

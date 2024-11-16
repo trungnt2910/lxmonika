@@ -377,7 +377,7 @@ RlpFileIoctl(
 
             constexpr auto Copy = [](UNICODE_STRING& dstString, PUNICODE_STRING src)
             {
-                PWSTR dst = (PWSTR)ExAllocatePoolZero(PagedPool,
+                PWSTR dst = (PWSTR)ExAllocatePool2(PagedPool,
                     (src->Length + 1) * sizeof(WCHAR), MA_REALITY_TAG);
                 if (dst == NULL)
                 {
@@ -405,7 +405,7 @@ RlpFileIoctl(
                 SIZE_T srcCount
             )
             {
-                dstStringList.Strings = (PUNICODE_STRING)ExAllocatePoolZero(PagedPool,
+                dstStringList.Strings = (PUNICODE_STRING)ExAllocatePool2(PagedPool,
                     srcCount * sizeof(UNICODE_STRING), MA_REALITY_TAG);
                 if (dstStringList.Strings == NULL)
                 {
