@@ -24,6 +24,10 @@
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
+    <None Include="lxstub.def">
+    </None>
+  </ItemGroup>
+  <ItemGroup>
     <ClCompile Include="src\driver.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

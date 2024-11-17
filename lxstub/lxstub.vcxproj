@@ -91,6 +91,7 @@
     </ResourceCompile>
     <Link>
       <AdditionalDependencies>ntoskrnl.lib;BufferOverflowFastFailK.lib</AdditionalDependencies>
+      <ModuleDefinitionFile>lxstub.def</ModuleDefinitionFile>
       <EntryPointSymbol Condition="'$(Platform)' == 'Win32'">GsDriverEntry@8</EntryPointSymbol>
       <!-- x64 does not mangle the entrypoint name -->
       <EntryPointSymbol Condition="'$(Platform)' != 'Win32'">GsDriverEntry</EntryPointSymbol>
@@ -109,6 +110,9 @@
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="lxstub.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="lxstub.def" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
