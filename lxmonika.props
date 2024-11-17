@@ -17,6 +17,11 @@
     <MaTargetPlatformVersion Condition="'$(MaTargetPlatformVersion)' == ''">10.0.17134.0</MaTargetPlatformVersion>
   </PropertyGroup>
 
+  <PropertyGroup Label="Monika" Condition="'$(Platform)' == 'ARM' and '$(MaLatestTargetPlatformVersion)' > '10.0.22621.0'">
+    <!-- Last SDK/WDK version to support 32-bit ARM. -->
+    <MaLatestTargetPlatformVersion>10.0.22621.0</MaLatestTargetPlatformVersion>
+  </PropertyGroup>
+
   <PropertyGroup Label="WDK">
     <WDKContentRoot Condition="'$(WDKContentRoot)' == ''">$(MaWindowsKitsRoot)</WDKContentRoot>
     <WDKBuildFolder Condition="'$(WDKBuildFolder)' == ''">$(MaLatestTargetPlatformVersion)</WDKBuildFolder>
