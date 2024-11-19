@@ -256,7 +256,7 @@ MapCreateProcess(
     }
     else // TH1
     {
-        status = ((PS_PICO_CREATE_PROCESS_TH1*)&MapOriginalRoutines.CreateProcess)(
+        status = ((PS_PICO_CREATE_PROCESS_TH1*)MapOriginalRoutines.CreateProcess)(
             ProcessAttributes, &hdlProcess);
     }
 
@@ -403,7 +403,7 @@ MapCreateThread(
     }
     else // TH1
     {
-        status = ((PS_PICO_CREATE_THREAD_TH1*)&MapOriginalRoutines.CreateThread)(
+        status = ((PS_PICO_CREATE_THREAD_TH1*)MapOriginalRoutines.CreateThread)(
             ThreadAttributes, &hdlThread);
     }
 
