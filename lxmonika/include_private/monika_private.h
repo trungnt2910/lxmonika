@@ -234,6 +234,15 @@ extern SIZE_T MapLxssProviderIndex;
     }                                                                           \
     while (FALSE)
 
+#define MA_ALLOCATE_AUTO_OR_RETURN(Type, Name, Flags, NumberOfBytes, Tag)       \
+    Type Name;                                                                  \
+    Name = (Type)ExAllocatePool2((Flags), (NumberOfBytes), (Tag));              \
+    if (Name == NULL)                                                           \
+    {                                                                           \
+        return STATUS_NO_MEMORY;                                                \
+    }                                                                           \
+    AUTO_RESOURCE(Name, [](auto p__){ ExFreePoolWithTag(p__, (Tag)); })
+
 // The built-in ASSERT causes compile errors in earlier WDK versions.
 #define MA_ASSERT(exp)                                                          \
     do                                                                          \
