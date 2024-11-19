@@ -14,7 +14,6 @@
 #include "AutoResource.h"
 #include "Locker.h"
 #include "Logger.h"
-#include "PoolAllocator.h"
 
 //
 // Data
@@ -392,7 +391,7 @@ RlpFileIoctl(
 
             constexpr auto Copy = [](UNICODE_STRING& dstString, PUNICODE_STRING src)
             {
-                PWSTR dst = (PWSTR)ExAllocatePool2(PagedPool,
+                PWSTR dst = (PWSTR)ExAllocatePool2(POOL_FLAG_PAGED,
                     (src->Length + 1) * sizeof(WCHAR), MA_REALITY_TAG);
                 if (dst == NULL)
                 {
@@ -420,7 +419,7 @@ RlpFileIoctl(
                 SIZE_T srcCount
             )
             {
-                dstStringList.Strings = (PUNICODE_STRING)ExAllocatePool2(PagedPool,
+                dstStringList.Strings = (PUNICODE_STRING)ExAllocatePool2(POOL_FLAG_PAGED,
                     srcCount * sizeof(UNICODE_STRING), MA_REALITY_TAG);
                 if (dstStringList.Strings == NULL)
                 {
@@ -720,13 +719,14 @@ RlEscape()
 
     while (TRUE)
     {
-        PoolAllocator pBigpoolAllocator(uLen, 'eRaM');
-        if (pBigpoolAllocator.Get() == NULL)
+        PSYSTEM_BIGPOOL_INFORMATION pInfo = (PSYSTEM_BIGPOOL_INFORMATION)ExAllocatePool2(
+            POOL_FLAG_PAGED, uLen, MA_REALITY_TAG
+        );
+        if (pInfo == NULL)
         {
             return STATUS_NO_MEMORY;
         }
-
-        PSYSTEM_BIGPOOL_INFORMATION pInfo = pBigpoolAllocator.Get<SYSTEM_BIGPOOL_INFORMATION>();
+        AUTO_RESOURCE(pInfo, [](auto p) { ExFreePoolWithTag(p, MA_REALITY_TAG); });
 
         Logger::LogTrace("Attempting to get the system pool information using a buffer of ",
             uLen, " bytes.");

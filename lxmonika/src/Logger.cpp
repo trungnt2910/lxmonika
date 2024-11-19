@@ -48,7 +48,7 @@ void Write(PCWSTR pFormat, T arg)
 
             SIZE_T szBufferNewSize = LgOutputBufferSize * 2;
             PWCHAR pBufferNew = (PWCHAR)ExAllocatePool2(
-                PagedPool, szBufferNewSize, LOGGER_POOL_TAG
+                POOL_FLAG_PAGED, szBufferNewSize, LOGGER_POOL_TAG
             );
             if (pBufferNew == NULL)
             {
