@@ -7,7 +7,6 @@
 
 #include "AutoResource.h"
 #include "Logger.h"
-#include "PoolAllocator.h"
 
 #define MDL_RETURN_IF_OUT_OF_BOUNDS(ptr, error) \
     do                                          \
@@ -16,6 +15,8 @@
             return (error);                     \
     }                                           \
     while (FALSE);
+
+#define MDL_POOL_TAG ('dMaM')
 
 extern "C"
 NTSTATUS
@@ -35,13 +36,14 @@ MdlpFindModuleByName(
         // As we do not know the size yet, it will return STATUS_INFO_LENGTH_MISMATCH.
         ZwQuerySystemInformation(SystemModuleInformation, (PVOID)&uLen, 0, &uLen);
 
-        PoolAllocator pModulesAllocator(uLen, '--xS');
-        if (pModulesAllocator.Get() == NULL)
+        PRTL_PROCESS_MODULES pModules = (PRTL_PROCESS_MODULES)ExAllocatePool2(
+            POOL_FLAG_PAGED, uLen, MDL_POOL_TAG
+        );
+        if (pModules == NULL)
         {
             return STATUS_NO_MEMORY;
         }
-
-        PRTL_PROCESS_MODULES pModules = pModulesAllocator.Get<RTL_PROCESS_MODULES>();
+        AUTO_RESOURCE(pModules, [](auto p) { ExFreePoolWithTag(p, MDL_POOL_TAG); });
 
         status = ZwQuerySystemInformation(SystemModuleInformation, (PVOID)pModules, uLen, &uLen);
         if (!NT_SUCCESS(status))

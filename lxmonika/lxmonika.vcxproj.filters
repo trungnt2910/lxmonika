@@ -81,9 +81,6 @@
     <ClCompile Include="src\Logger.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\PoolAllocator.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include_private\compat.h">
@@ -137,9 +134,6 @@
     <ClInclude Include="include_private\Logger.h">
       <Filter>Private Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include_private\PoolAllocator.h">
-      <Filter>Private Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\monika.h">
@@ -156,6 +150,7 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <None Include="lxmonika.wprp" />
     <None Include="README.md" />
   </ItemGroup>
 </Project>

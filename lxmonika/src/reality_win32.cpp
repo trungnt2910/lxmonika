@@ -121,7 +121,9 @@ RlWin32DeviceCreate(
 
     NTSTATUS status = STATUS_SUCCESS;
 
-    PRL_FILE pNewFile = (PRL_FILE)ExAllocatePool2(PagedPool, sizeof(RL_FILE), MA_REALITY_TAG);
+    PRL_FILE pNewFile = (PRL_FILE)ExAllocatePool2(
+        POOL_FLAG_PAGED, sizeof(RL_FILE), MA_REALITY_TAG
+    );
     if (pNewFile == NULL)
     {
         return RlWin32CompleteRequest(pIrp, STATUS_NO_MEMORY);

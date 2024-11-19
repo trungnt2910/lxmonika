@@ -167,7 +167,9 @@ MapGetAllocatedProcessImageName(
     if (NT_SUCCESS(MapGetObjectContext(Process, &pContext))
         && pContext->ImageFileName.Buffer != NULL)
     {
-        *ImageName = (PUNICODE_STRING)ExAllocatePool2(PagedPool, sizeof(UNICODE_STRING), '  aM');
+        *ImageName = (PUNICODE_STRING)ExAllocatePool2(
+            POOL_FLAG_PAGED, sizeof(UNICODE_STRING), '  aM'
+        );
 
         if (*ImageName == NULL)
         {

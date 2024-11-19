@@ -13,7 +13,7 @@ MapAllocateContext(
 )
 {
     PMA_CONTEXT pContext = (PMA_CONTEXT)
-        ExAllocatePool2(PagedPool, sizeof(MA_CONTEXT), MA_CONTEXT_TAG);
+        ExAllocatePool2(POOL_FLAG_PAGED, sizeof(MA_CONTEXT), MA_CONTEXT_TAG);
 
     if (pContext != NULL)
     {
@@ -32,7 +32,7 @@ MapAllocateContext(
             USHORT uLen = CreateInfo->ImageFileName->Length;
 
             pContext->ImageFileName.Buffer = (PWSTR)
-                ExAllocatePool2(PagedPool, uLen, MA_CONTEXT_TAG);
+                ExAllocatePool2(POOL_FLAG_PAGED, uLen, MA_CONTEXT_TAG);
 
             if (pContext->ImageFileName.Buffer != NULL)
             {

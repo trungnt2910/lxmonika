@@ -155,7 +155,7 @@ DevpInsertDevice(
     if (pSet == NULL)
     {
         // No preferred set yet, allocate a new one.
-        pNewSet = (PDEVICE_SET)ExAllocatePool2(PagedPool, sizeof(DEVICE_SET), DEV_POOL_TAG);
+        pNewSet = (PDEVICE_SET)ExAllocatePool2(POOL_FLAG_PAGED, sizeof(DEVICE_SET), DEV_POOL_TAG);
         if (pNewSet == NULL)
         {
             return STATUS_NO_MEMORY;
@@ -168,7 +168,7 @@ DevpInsertDevice(
     }
 
     PDEVICE_ENTRY pNewEntry = (PDEVICE_ENTRY)
-        ExAllocatePool2(PagedPool, sizeof(DEVICE_ENTRY), DEV_POOL_TAG);
+        ExAllocatePool2(POOL_FLAG_PAGED, sizeof(DEVICE_ENTRY), DEV_POOL_TAG);
     if (pNewEntry == NULL)
     {
         return STATUS_NO_MEMORY;
@@ -182,7 +182,9 @@ DevpInsertDevice(
     ULONG ulDeviceNameLength = 0;
     ObQueryNameString(pDeviceObject, NULL, 0, &ulDeviceNameLength);
     POBJECT_NAME_INFORMATION pDeviceName =
-        (POBJECT_NAME_INFORMATION)ExAllocatePool2(PagedPool, ulDeviceNameLength, DEV_POOL_TAG);
+        (POBJECT_NAME_INFORMATION)ExAllocatePool2(
+            POOL_FLAG_PAGED, ulDeviceNameLength, DEV_POOL_TAG
+        );
     if (pDeviceName != NULL)
     {
         AUTO_RESOURCE(pDeviceName, [](auto p) { ExFreePoolWithTag(p, DEV_POOL_TAG); });

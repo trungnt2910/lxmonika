@@ -124,7 +124,6 @@
     <ClCompile Include="src\reality_lxss.cpp" />
     <ClCompile Include="src\reality_win32.cpp" />
     <ClCompile Include="src\Logger.cpp" />
-    <ClCompile Include="src\PoolAllocator.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include_private\compat.h" />
@@ -144,7 +143,6 @@
     <ClInclude Include="include_private\AutoResource.h" />
     <ClInclude Include="include_private\Locker.h" />
     <ClInclude Include="include_private\Logger.h" />
-    <ClInclude Include="include_private\PoolAllocator.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\monika.h" />

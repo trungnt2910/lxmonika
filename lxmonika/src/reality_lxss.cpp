@@ -354,7 +354,7 @@ RlLxssFileIoctl(
             if (NT_SUCCESS(status))
             {
                 pUnicodeRequestedProvider = (PWSTR)ExAllocatePool2(
-                    PagedPool, ulByteCount, MA_REALITY_TAG
+                    POOL_FLAG_PAGED, ulByteCount, MA_REALITY_TAG
                 );
 
                 if (pUnicodeRequestedProvider == NULL)
