@@ -36,14 +36,10 @@ MdlpFindModuleByName(
         // As we do not know the size yet, it will return STATUS_INFO_LENGTH_MISMATCH.
         ZwQuerySystemInformation(SystemModuleInformation, (PVOID)&uLen, 0, &uLen);
 
-        PRTL_PROCESS_MODULES pModules = (PRTL_PROCESS_MODULES)ExAllocatePool2(
+        MA_ALLOCATE_AUTO_OR_RETURN(
+            PRTL_PROCESS_MODULES, pModules,
             POOL_FLAG_PAGED, uLen, MDL_POOL_TAG
         );
-        if (pModules == NULL)
-        {
-            return STATUS_NO_MEMORY;
-        }
-        AUTO_RESOURCE(pModules, [](auto p) { ExFreePoolWithTag(p, MDL_POOL_TAG); });
 
         status = ZwQuerySystemInformation(SystemModuleInformation, (PVOID)pModules, uLen, &uLen);
         if (!NT_SUCCESS(status))
