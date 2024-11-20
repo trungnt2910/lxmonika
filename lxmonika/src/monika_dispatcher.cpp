@@ -249,10 +249,80 @@ MapCreateProcess(
     NTSTATUS status;
     HANDLE hdlProcess = NULL;
 
-    if (MA_SYSTEM_AT_LEAST(NTDDI_WIN10_RS1))
+    static BOOLEAN MapRanAbiCheck = FALSE;
+
+    if (MA_SYSTEM_AT_LEAST(NTDDI_WIN10_RS4))
     {
-        status = MapOriginalRoutines.CreateProcess(
+        status = ((PS_PICO_CREATE_PROCESS_RS4*)MapOriginalRoutines.CreateProcess)(
             ProcessAttributes, CreateInfo, &hdlProcess);
+    }
+    else if (MA_SYSTEM_AT_LEAST(NTDDI_WIN10_RS2) && !MapRanAbiCheck)
+    {
+        MapRanAbiCheck = TRUE;
+
+        Logger::LogTrace("Running ABI check before initial dispatch.");
+
+        // It would be nice if we could run this during initialization.
+        // However, starting processes when the system has not finished initializing
+        // is not a fun thing to do and has caused BSODs during testing.
+        // Instead, we wait until everything is ready and a provider starts requesting
+        // Pico processes.
+        // We are not doing anything similar for the threads, since one would need
+        // a working Pico process to create a Pico thread (theoretically).
+        // By the time the thread callbacks are called, we should have established
+        // our version.
+
+        // Still use the RS4 callback.
+        PS_PICO_CREATE_INFO psTempInfo = CreateInfo != NULL ?
+            *CreateInfo : PS_PICO_CREATE_INFO { };
+
+        status = ((PS_PICO_CREATE_PROCESS_RS4*)MapOriginalRoutines.CreateProcess)(
+            ProcessAttributes, &psTempInfo, &hdlProcess);
+
+        Logger::LogTrace("First call returned, status=", (PVOID)status);
+
+        if (NT_SUCCESS(status))
+        {
+            if (hdlProcess == NULL)
+            {
+                Logger::LogTrace("Call succeeded but output parameter is wrong.");
+                Logger::LogTrace("Old ABI detected.", (PVOID)status);
+
+                // This is actually RS3 or lower.
+                // The handle is in psTempInfo.
+                memcpy(&hdlProcess, &psTempInfo, sizeof(HANDLE));
+            }
+            else
+            {
+                Logger::LogTrace("RS4 ABI detected.");
+
+                // This is RS4, not RS2.
+                MapSystemAbiVersion = NTDDI_WIN10_RS4;
+            }
+        }
+        else
+        {
+            // On some other archs, ProcessAttributes is affected instead of hdlProcess.
+            // The function would fail due to ProcessAttributes being invalid.
+            // The first member, ParentProcess, would be NULL and considered an invalid handle.
+
+            Logger::LogTrace("Call failed, retrying with TH1 variant.");
+
+            // Retry with the TH1 variant.
+            status = ((PS_PICO_CREATE_PROCESS_TH1*)MapOriginalRoutines.CreateProcess)(
+                ProcessAttributes, &hdlProcess);
+
+            if (!NT_SUCCESS(status))
+            {
+                Logger::LogTrace("TH1 variant also failed, status=", (PVOID)status);
+                Logger::LogTrace("Invalidating ABI check results.", (PVOID)status);
+                MapRanAbiCheck = FALSE;
+            }
+            else
+            {
+                Logger::LogTrace("Old ABI detected.", (PVOID)status);
+            }
+        }
     }
     else // TH1
     {
@@ -396,9 +466,9 @@ MapCreateThread(
     NTSTATUS status;
     HANDLE hdlThread = NULL;
 
-    if (MA_SYSTEM_AT_LEAST(NTDDI_WIN10_RS1))
+    if (MA_SYSTEM_AT_LEAST(NTDDI_WIN10_RS4))
     {
-        status = MapOriginalRoutines.CreateThread(
+        status = ((PS_PICO_CREATE_THREAD_RS4*)MapOriginalRoutines.CreateThread)(
             ThreadAttributes, CreateInfo, &hdlThread);
     }
     else // TH1

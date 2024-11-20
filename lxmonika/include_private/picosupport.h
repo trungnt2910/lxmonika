@@ -50,8 +50,8 @@ NTSTATUS
 /// </summary>
 NTSTATUS
     PicoSppDetermineAbiVersion(
-        _In_ SIZE_T szProviderRoutines,
-        _In_ SIZE_T szPicoRoutines,
+        _In_ PPS_PICO_PROVIDER_ROUTINES pProviderRoutines,
+        _In_ PPS_PICO_ROUTINES pPicoRoutines,
         _Out_ DWORD* pAbiVersion
     );
 

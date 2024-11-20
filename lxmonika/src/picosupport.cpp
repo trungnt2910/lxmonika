@@ -3,6 +3,7 @@
 #include <ntddk.h>
 #include <wdm.h>
 
+#include "monika.h"
 #include "module.h"
 
 #include "AutoResource.h"
@@ -667,6 +668,13 @@ PicoSppDetermineAbiStatus(
                         Logger::LogWarning("Got an unexpected error code: ", (PVOID)status);
                     }
                     *pTooLate = TRUE;
+
+                    // The routines are not properly filled, so they are not to be trusted
+                    // by PicoSppDetermineAbiVersion below.
+                    psTestRoutines = PS_PICO_ROUTINES
+                    {
+                        .Size = szTestSize
+                    };
                 }
                 else
                 {
@@ -686,11 +694,15 @@ PicoSppDetermineAbiStatus(
             return STATUS_INFO_LENGTH_MISMATCH;
         }
 
-        return PicoSppDetermineAbiVersion(
-            *pProviderRoutinesSize,
-            *pPicoRoutinesSize,
+        MA_RETURN_IF_FAIL(PicoSppDetermineAbiVersion(
+            &psTestProviderRoutines,
+            &psTestRoutines,
             pAbiVersion
-        );
+        ));
+
+        Logger::LogTrace("The system ABI version is: ", (PVOID)*pAbiVersion);
+
+        return STATUS_SUCCESS;
     }
     else
     {
@@ -703,32 +715,46 @@ PicoSppDetermineAbiStatus(
 extern "C"
 NTSTATUS
 PicoSppDetermineAbiVersion(
-    _In_ SIZE_T szProviderRoutines,
-    _In_ SIZE_T szPicoRoutines,
+    _In_ PPS_PICO_PROVIDER_ROUTINES pProviderRoutines,
+    _In_ PPS_PICO_ROUTINES pPicoRoutines,
     _Out_ DWORD* pAbiVersion
 )
 {
-    if (szProviderRoutines > sizeof(PS_PICO_PROVIDER_ROUTINES)
-        || szPicoRoutines > sizeof(PS_PICO_ROUTINES))
+    if (pProviderRoutines == NULL || pPicoRoutines == NULL)
+    {
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    if (pProviderRoutines->Size > sizeof(PS_PICO_PROVIDER_ROUTINES)
+        || pPicoRoutines->Size > sizeof(PS_PICO_ROUTINES))
     {
         // A driver designed for a newer Windows version?
         return STATUS_NOT_SUPPORTED;
     }
 
-    // TODO: There is a gap between build 14347
-    // (the first build to introduce the additional members)
-    // and the actual build where the functions have their signatures changed
-    // (somewhere before 14393 - the RS1 release).
-    //
-    // These are very rare Insider builds that lxmonika will probably never run on.
+    *pAbiVersion = NTDDI_WIN10;
 
-    if (szProviderRoutines > FIELD_OFFSET(PS_PICO_PROVIDER_ROUTINES, OpenProcess))
+    if (pProviderRoutines->Size > FIELD_OFFSET(PS_PICO_PROVIDER_ROUTINES, OpenProcess))
     {
+        // ABI break not present, but we need to check the ACCESS_MASK fields.
         *pAbiVersion = NTDDI_WIN10_RS1;
     }
-    else
+
+    if (pProviderRoutines->Size >
+        FIELD_OFFSET(PS_PICO_PROVIDER_ROUTINES, SubsystemInformationType))
     {
-        *pAbiVersion = NTDDI_WIN10;
+        // SubsytstemInformationType was introduced in RS2.
+        // This is the last member added.
+        // ABI break is still not present until RS4.
+        *pAbiVersion = NTDDI_WIN10_RS2;
+
+        if (pProviderRoutines->DispatchSystemCall != NULL
+            && pProviderRoutines->GetAllocatedProcessImageName == NULL)
+        {
+            // This is likely to be a valid structure from a Pico provider.
+            // The driver is likely following the RS4 convention for registering image names.
+            *pAbiVersion = NTDDI_WIN10_RS4;
+        }
     }
 
     return STATUS_SUCCESS;
