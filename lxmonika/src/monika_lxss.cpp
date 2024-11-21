@@ -42,6 +42,7 @@ SIZE_T MapLxssProviderIndex = (SIZE_T)-1;
 
 //static PVOID MaLxssOriginalImportValue = NULL;
 static CHAR MaLxssTrampolineBytes[MDL_TRAMPOLINE_SIZE];
+static BOOLEAN MaLxssTrampolineInstalled = FALSE;
 static PPS_PICO_PROVIDER_SYSTEM_CALL_DISPATCH MaLxssOriginalDispatchSystemCall = NULL;
 
 extern "C"
@@ -85,32 +86,46 @@ MapLxssInitialize(
             sizeof(MaLxssTrampolineBytes)
         ));
 
+        MaLxssTrampolineInstalled = TRUE;
+
         LX_SUBSYSTEM lxSubsystem = { };
 
         MapLxssRegistering = TRUE;
         MA_RETURN_IF_FAIL(LxInitialize(DriverObject, &lxSubsystem));
         MapLxssRegistering = FALSE;
 
-        MA_ASSERT(MapLxssProviderIndex != (SIZE_T)-1);
-
-        // Hook the system call dispatching callback.
-        MaLxssOriginalDispatchSystemCall =
-            MapProviderRoutines[MapLxssProviderIndex].DispatchSystemCall;
-        MapProviderRoutines[MapLxssProviderIndex].DispatchSystemCall = MapLxssSystemCallHook;
-
-        // Our own extensions.
-        ULONG ulAbiVersion = MapAdditionalProviderRoutines[MapLxssProviderIndex].AbiVersion;
-        MapAdditionalProviderRoutines[MapLxssProviderIndex] =
+        if (MapLxssProviderIndex != (SIZE_T)-1)
         {
-            .Size = sizeof(MA_PICO_PROVIDER_ROUTINES),
-            .GetAllocatedProviderName = MapLxssGetAllocatedProviderName,
-            .GetConsole = MapLxssGetConsole,
-            .AbiVersion = ulAbiVersion
-        };
+            // lxcore successfully registered itself as a Pico provider.
 
-        // To prevent lxcore from registering itself a second time in RlpInitializeDevices,
-        // we disable Pico registration for now.
-        MapPicoRegistrationDisabled = TRUE;
+            // Hook the system call dispatching callback.
+            MaLxssOriginalDispatchSystemCall =
+                MapProviderRoutines[MapLxssProviderIndex].DispatchSystemCall;
+            MapProviderRoutines[MapLxssProviderIndex].DispatchSystemCall = MapLxssSystemCallHook;
+
+            // Our own extensions.
+            ULONG ulAbiVersion = MapAdditionalProviderRoutines[MapLxssProviderIndex].AbiVersion;
+            MapAdditionalProviderRoutines[MapLxssProviderIndex] =
+            {
+                .Size = sizeof(MA_PICO_PROVIDER_ROUTINES),
+                .GetAllocatedProviderName = MapLxssGetAllocatedProviderName,
+                .GetConsole = MapLxssGetConsole,
+                .AbiVersion = ulAbiVersion
+            };
+
+            // To prevent lxcore from registering itself a second time in RlpInitializeDevices,
+            // we disable Pico registration for now.
+            MapPicoRegistrationDisabled = TRUE;
+        }
+        else
+        {
+            // The initialization routine succeeded, but no registration occurred.
+            // This probably means we are relying on the lxstub instead of Microsoft's lxcore.
+            // (Or there might have been some issues with our hook).
+            Logger::LogWarning("Did not detect a Pico registration from lxcore.");
+
+            return STATUS_UNSUCCESSFUL;
+        }
     }
     else // if (MapTooLate) // We are too late
     {
@@ -176,12 +191,17 @@ MapLxssPrepareForPatchGuard()
         //    &MaLxssOriginalImportValue
         //));
 
-        MA_RETURN_IF_FAIL(MdlpPatchTrampoline(
-            PsRegisterPicoProvider,
-            NULL,
-            MaLxssTrampolineBytes,
-            sizeof(MaLxssTrampolineBytes)
-        ));
+        if (MaLxssTrampolineInstalled)
+        {
+            MA_RETURN_IF_FAIL(MdlpPatchTrampoline(
+                PsRegisterPicoProvider,
+                NULL,
+                MaLxssTrampolineBytes,
+                sizeof(MaLxssTrampolineBytes)
+            ));
+
+            MaLxssTrampolineInstalled = FALSE;
+        }
 
         // lxcore should have finished initializing. Enable Pico registration again.
         MapPicoRegistrationDisabled = FALSE;
