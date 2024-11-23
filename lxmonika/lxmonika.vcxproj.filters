@@ -36,6 +36,9 @@
     <ClCompile Include="src\condrv.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\device.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="src\driver.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -84,6 +87,9 @@
       <Filter>Private Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include_private\condrv.h">
+      <Filter>Private Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include_private\device.h">
       <Filter>Private Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include_private\driver.h">

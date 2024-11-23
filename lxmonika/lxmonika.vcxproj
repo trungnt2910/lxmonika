@@ -109,6 +109,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\condrv.cpp" />
+    <ClCompile Include="src\device.cpp" />
     <ClCompile Include="src\driver.cpp" />
     <ClCompile Include="src\module.cpp" />
     <ClCompile Include="src\monika.cpp" />
@@ -127,6 +128,7 @@
   <ItemGroup>
     <ClInclude Include="include_private\compat.h" />
     <ClInclude Include="include_private\condrv.h" />
+    <ClInclude Include="include_private\device.h" />
     <ClInclude Include="include_private\driver.h" />
     <ClInclude Include="include_private\lxerrno.h" />
     <ClInclude Include="include_private\lxss.h" />
