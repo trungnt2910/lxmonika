@@ -190,6 +190,36 @@ MdlpGetProcAddress(
     return STATUS_NOT_FOUND;
 }
 
+extern "C"
+NTSTATUS
+MdlpGetEntryPoint(
+    _In_ HANDLE hModule,
+    _Out_ PVOID* pProc
+)
+{
+    if (hModule == NULL || pProc == NULL)
+    {
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    PCHAR pStart = (PCHAR)hModule;
+
+    PIMAGE_DOS_HEADER pDosHeader = (PIMAGE_DOS_HEADER)pStart;
+    PIMAGE_NT_HEADERS pPeHeader = (PIMAGE_NT_HEADERS)(pStart + pDosHeader->e_lfanew);
+
+    DWORD dwEntryPointOffset = pPeHeader->OptionalHeader.AddressOfEntryPoint;
+    if (dwEntryPointOffset == 0)
+    {
+        // The image has no entry point?
+        return STATUS_NOT_FOUND;
+    }
+
+    PVOID pEntryPoint = pStart + dwEntryPointOffset;
+    *pProc = pEntryPoint;
+
+    return STATUS_SUCCESS;
+}
+
 static
 NTSTATUS
 MdlpGetResourceDirectory(
