@@ -39,7 +39,12 @@ DriverEntry(
     else
     {
         Logger::LogTrace("Ignoring reload attempt as \"", &DriverObject->DriverName, "\".");
-        DriverObject->DriverUnload = DriverUnload;
+
+        // Return, and do NOT register a DriverUnload callback.
+        //
+        // Simply ignoring DriverUnload will not work since a successful call will cause
+        // the driver's image to be unmapped from the address space, resulting in a
+        // DRIVER_UNLOADED_WITHOUT_CANCELLING_PENDING_OPERATIONS BSOD.
         return STATUS_SUCCESS;
     }
 
@@ -114,9 +119,13 @@ DriverEntry(
         return status;
     }
 
-    // TODO: Disallow unloading altogether for the main driver object?
-    // Especially when we're running as something like CNG.
-    DriverObject->DriverUnload = DriverUnload;
+    constexpr UNICODE_STRING strDriverLxmonika = RTL_CONSTANT_STRING(L"\\Driver\\lxmonika");
+    if (RtlEqualUnicodeString(&DriverObject->DriverName, &strDriverLxmonika, TRUE))
+    {
+        // Only allow unloading if we're not borrowing another driver.
+        // Unloading a core driver before reboot is a risky idea and may crash the system.
+        DriverObject->DriverUnload = DriverUnload;
+    }
 
     // Keep the object that we're attaching all our devices and stuff to.
     DriverGlobalObject = DriverObject;
