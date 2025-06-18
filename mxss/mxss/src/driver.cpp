@@ -36,9 +36,10 @@ DriverEntry(
         .WalkUserStack = MxWalkUserStack,
         .ProtectedRanges = NULL,
         .GetAllocatedProcessImageName = NULL,
-        .OpenProcess = SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_CREATE_PROCESS |
-            PROCESS_TERMINATE,
-        .OpenThread = SYNCHRONIZE | THREAD_QUERY_LIMITED_INFORMATION | THREAD_TERMINATE,
+        .OpenProcessAllowedAccess = SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION |
+            PROCESS_CREATE_PROCESS | PROCESS_TERMINATE,
+        .OpenThreadAllowedAccess = SYNCHRONIZE | THREAD_QUERY_LIMITED_INFORMATION |
+            THREAD_TERMINATE,
         .SubsystemInformationType = SubsystemInformationTypeWSL
     };
 

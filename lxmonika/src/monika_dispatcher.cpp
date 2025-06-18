@@ -379,10 +379,10 @@ MapCreateProcess(
 
     if (MA_PROVIDER_AT_LEAST(pContext->Provider, NTDDI_WIN10_RS1))
     {
-        ACCESS_MASK maskDesired = MapProviderRoutines[pContext->Provider].OpenProcess;
+        ACCESS_MASK maskDesired = MapProviderRoutines[pContext->Provider].OpenProcessAllowedAccess;
 
         if (!MA_SYSTEM_AT_LEAST(NTDDI_WIN10_RS1)
-            || maskDesired != MapOriginalProviderRoutines.OpenProcess)
+            || maskDesired != MapOriginalProviderRoutines.OpenProcessAllowedAccess)
         {
             // The system does not respect the desired access.
 
@@ -504,10 +504,10 @@ MapCreateThread(
 
     if (MA_PROVIDER_AT_LEAST(pContext->Provider, NTDDI_WIN10_RS1))
     {
-        ACCESS_MASK maskDesired = MapProviderRoutines[pContext->Provider].OpenThread;
+        ACCESS_MASK maskDesired = MapProviderRoutines[pContext->Provider].OpenThreadAllowedAccess;
 
         if (!MA_SYSTEM_AT_LEAST(NTDDI_WIN10_RS1)
-            || maskDesired != MapOriginalProviderRoutines.OpenThread)
+            || maskDesired != MapOriginalProviderRoutines.OpenThreadAllowedAccess)
         {
             // The system does not respect the desired access.
 

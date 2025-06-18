@@ -539,8 +539,8 @@ typedef struct _PS_PICO_PROVIDER_ROUTINES {
     PPS_PICO_PROVIDER_WALK_USER_STACK WalkUserStack;
     CONST KADDRESS_RANGE_DESCRIPTOR* ProtectedRanges;
     PPS_PICO_GET_ALLOCATED_PROCESS_IMAGE_NAME GetAllocatedProcessImageName;
-    ACCESS_MASK OpenProcess;
-    ACCESS_MASK OpenThread;
+    ACCESS_MASK OpenProcessAllowedAccess;
+    ACCESS_MASK OpenThreadAllowedAccess;
     SUBSYSTEM_INFORMATION_TYPE SubsystemInformationType;
 } PS_PICO_PROVIDER_ROUTINES, *PPS_PICO_PROVIDER_ROUTINES;
 

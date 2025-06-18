@@ -224,12 +224,12 @@ PicoSppLocateProviderRoutines(
             continue;
         }
 
-        if ((pTestRoutines->OpenProcess & (~PROCESS_ALL_ACCESS)) != 0)
+        if ((pTestRoutines->OpenProcessAllowedAccess & (~PROCESS_ALL_ACCESS)) != 0)
         {
             continue;
         }
 
-        if ((pTestRoutines->OpenThread & (~THREAD_ALL_ACCESS)) != 0)
+        if ((pTestRoutines->OpenThreadAllowedAccess & (~THREAD_ALL_ACCESS)) != 0)
         {
             continue;
         }
@@ -638,8 +638,8 @@ PicoSppDetermineAbiStatus(
         }
 
         // Set these masks to avoid failing parameter checks.
-        psTestProviderRoutines.OpenProcess = PROCESS_ALL_ACCESS;
-        psTestProviderRoutines.OpenThread = THREAD_ALL_ACCESS;
+        psTestProviderRoutines.OpenProcessAllowedAccess = PROCESS_ALL_ACCESS;
+        psTestProviderRoutines.OpenThreadAllowedAccess = THREAD_ALL_ACCESS;
 
         found = FALSE;
 
@@ -734,7 +734,7 @@ PicoSppDetermineAbiVersion(
 
     *pAbiVersion = NTDDI_WIN10;
 
-    if (pProviderRoutines->Size > FIELD_OFFSET(PS_PICO_PROVIDER_ROUTINES, OpenProcess))
+    if (pProviderRoutines->Size > FIELD_OFFSET(PS_PICO_PROVIDER_ROUTINES, OpenProcessAllowedAccess))
     {
         // ABI break not present, but we need to check the ACCESS_MASK fields.
         *pAbiVersion = NTDDI_WIN10_RS1;

@@ -86,8 +86,8 @@ MapInitialize()
             .GetAllocatedProcessImageName = MapGetAllocatedProcessImageName,
 
             // Request full access. We will duplicate the handles before returning to consumers.
-            .OpenProcess = PROCESS_ALL_ACCESS,
-            .OpenThread = THREAD_ALL_ACCESS,
+            .OpenProcessAllowedAccess = PROCESS_ALL_ACCESS,
+            .OpenThreadAllowedAccess = THREAD_ALL_ACCESS,
 
             // Not a good option, but there are no better ones.
             .SubsystemInformationType = (SUBSYSTEM_INFORMATION_TYPE)1
@@ -365,8 +365,8 @@ MaRegisterPicoProviderEx(
     if (dwAbiVersion >= NTDDI_WIN10_RS1)
     {
         // RS1 Pico structs require these two ACCESS_MASK members.
-        if ((ProviderRoutines->OpenProcess & (~PROCESS_ALL_ACCESS)) != 0
-            || (ProviderRoutines->OpenThread & (~THREAD_ALL_ACCESS)) != 0)
+        if ((ProviderRoutines->OpenProcessAllowedAccess & (~PROCESS_ALL_ACCESS)) != 0
+            || (ProviderRoutines->OpenThreadAllowedAccess & (~THREAD_ALL_ACCESS)) != 0)
         {
             return STATUS_INVALID_PARAMETER;
         }
