@@ -4,8 +4,9 @@
 
 #include "Parameter.h"
 
-extern const Switch<>& NullSwitch = Switch<>(NullParameter,
-    const_cast<std::remove_cv_t<decltype(std::ignore)>&>(std::ignore), true);
+const auto NullSwitchObj =  Switch<>(NullParameter,
+    const_cast<std::remove_cv_t<decltype(std::ignore)>&>(std::ignore), true);;
+const Switch<>& NullSwitch = NullSwitchObj;
 
 SwitchBase::SwitchBase(
     int name,

@@ -26,7 +26,7 @@ Parameter::Parameter(
 // we also want others to inherit it as well. If we define StringParameter here,
 // when other classes in this file inherit "StringParameter", MSVC will produce an
 // internal compiler error, possibly due to having the same name as the exported
-// constant, "extern const Parameter& StringParameter;".
+// constant, "const Parameter& StringParameter;".
 // Therefore, we create an "AbstractStringParameter" here, then define our
 // invisible StringParameter class later.
 
@@ -168,7 +168,7 @@ protected:
 // NullParameter
 //
 
-extern const Parameter& NullParameter = ([]()
+auto NullParameterObj = ([]()
 {
     static const class NullParameter : public Parameter
     {
@@ -205,11 +205,13 @@ extern const Parameter& NullParameter = ([]()
     return NullParameter;
 })();
 
+constinit const Parameter& NullParameter = NullParameterObj;
+
 //
 // ArgumentsParameter
 //
 
-extern const Parameter& ArgumentsParameter = ([]()
+auto ArgumentsParameterObj = ([]()
 {
     static const class ArgumentsParameter : public Parameter
     {
@@ -269,11 +271,13 @@ extern const Parameter& ArgumentsParameter = ([]()
     return ArgumentsParameter;
 })();
 
+constinit const Parameter& ArgumentsParameter = ArgumentsParameterObj;
+
 //
 // StringParameter
 //
 
-extern const Parameter& StringParameter = ([]()
+auto StringParameterObj = ([]()
 {
     static const class StringParameter : public AbstractStringParameter
     {
@@ -284,11 +288,13 @@ extern const Parameter& StringParameter = ([]()
     return StringParameter;
 })();
 
+constinit const Parameter& StringParameter = StringParameterObj;
+
 //
 // DriverPathParameter
 //
 
-extern const Parameter& DriverPathParameter = ([]()
+auto DriverPathParameterObj = ([]()
 {
     static const class DriverPathParameter : public AbstractPathParameter
     {
@@ -331,11 +337,13 @@ extern const Parameter& DriverPathParameter = ([]()
     return DriverPathParameter;
 })();
 
+constinit const Parameter& DriverPathParameter = DriverPathParameterObj;
+
 //
 // PathParameter
 //
 
-extern const Parameter& PathParameter = ([]()
+auto PathParameterObj = ([]()
 {
     static const class PathParameter : public AbstractPathParameter
     {
@@ -346,11 +354,13 @@ extern const Parameter& PathParameter = ([]()
     return PathParameter;
 })();
 
+constinit const Parameter& PathParameter = PathParameterObj;
+
 //
 // ServiceNameParameter
 //
 
-extern const Parameter& ServiceNameParameter = ([]()
+auto ServiceNameParameterObj = ([]()
 {
     static const class ServiceNameParameter : public AbstractStringParameter
     {
@@ -406,3 +416,5 @@ extern const Parameter& ServiceNameParameter = ([]()
 
     return ServiceNameParameter;
 })();
+
+constinit const Parameter& ServiceNameParameter = ServiceNameParameterObj;
