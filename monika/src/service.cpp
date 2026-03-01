@@ -1,5 +1,6 @@
 #include "service.h"
 
+#include <algorithm>
 #include <filesystem>
 
 #include <Windows.h>

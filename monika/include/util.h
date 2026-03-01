@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <memory>
 #include <string_view>
+#include <vector>
 
 #include <Windows.h>
 #include <winsvc.h>

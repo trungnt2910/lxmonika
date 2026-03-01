@@ -2,6 +2,7 @@
 
 #include <optional>
 #include <string_view>
+#include <tuple>
 #include <typeinfo>
 #include <type_traits>
 

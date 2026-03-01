@@ -1,6 +1,7 @@
 #include "Commands/Monika.h"
 
 #include <iostream>
+#include <sstream>
 
 #include <Windows.h>
 #include <winternl.h>

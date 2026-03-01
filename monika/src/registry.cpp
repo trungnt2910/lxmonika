@@ -1,6 +1,7 @@
 #include "registry.h"
 
 #include <memory>
+#include <sstream>
 #include <vector>
 
 #include <Windows.h>

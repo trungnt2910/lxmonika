@@ -1,5 +1,6 @@
 #include "Parameter.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <vector>
