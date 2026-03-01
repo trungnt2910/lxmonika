@@ -243,7 +243,7 @@ extern const Parameter& ArgumentsParameter = ([]()
                     vectorChosenArgs.begin(),
                     vectorChosenArgs.end(),
                     std::back_inserter(containerResult),
-                    [](const wchar_t* pStr) { return Container::value_type(pStr); }
+                    [](const wchar_t* pStr) { return typename Container::value_type(pStr); }
                 );
                 return containerResult;
             };
