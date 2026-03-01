@@ -530,7 +530,7 @@ SvGetLxMonikaDependentServices(
     );
 }
 
-const LPQUERY_SERVICE_CONFIG
+LPQUERY_SERVICE_CONFIG
 SvQueryServiceConfig(
     ServiceHandle service,
     std::vector<char>& buffer

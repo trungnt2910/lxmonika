@@ -21,7 +21,7 @@ protected:
     std::wstring_view& SetMessage(const std::wstring_view& message) { return _message = message; }
 public:
     const std::wstring_view& Message() const { return _message; }
-    const HRESULT GetHresult() const { return _hresult; }
+    HRESULT GetHresult() const { return _hresult; }
 };
 
 class Win32Exception : public Exception
