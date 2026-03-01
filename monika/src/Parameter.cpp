@@ -36,6 +36,8 @@ public:
     virtual std::any Parse(int& argc, wchar_t**& argv,
         const std::type_info& type, bool more) const override final
     {
+        (void)more;
+
         std::optional<std::wstring_view> arg;
 
         if (argc > 0)
@@ -66,6 +68,8 @@ protected:
     AbstractStringParameter(int type) : Parameter(type) { }
     virtual bool Validate(const std::wstring_view& arg) const
     {
+        (void)arg;
+
         return true;
     }
     const std::wstring_view& EnsureHasValue(
@@ -173,6 +177,10 @@ extern const Parameter& NullParameter = ([]()
         virtual std::any Parse(int& argc, wchar_t**& argv,
             const std::type_info& type, bool more) const
         {
+            (void)argc;
+            (void)argv;
+            (void)more;
+
             if (type == typeid(std::ignore))
             {
                 return std::ignore;
