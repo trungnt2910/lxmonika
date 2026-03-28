@@ -577,28 +577,6 @@ typedef struct _PS_PICO_PROVIDER_ROUTINES {
                                    0xFFF)
 #endif
 
-//
-#define THREAD_TERMINATE                 (0x0001)
-#define THREAD_SUSPEND_RESUME            (0x0002)
-#define THREAD_GET_CONTEXT               (0x0008)
-#define THREAD_SET_CONTEXT               (0x0010)
-#define THREAD_QUERY_INFORMATION         (0x0040)
-#define THREAD_SET_INFORMATION           (0x0020)
-#define THREAD_SET_THREAD_TOKEN          (0x0080)
-#define THREAD_IMPERSONATE               (0x0100)
-#define THREAD_DIRECT_IMPERSONATION      (0x0200)
-#define THREAD_SET_LIMITED_INFORMATION   (0x0400)  // winnt
-#define THREAD_QUERY_LIMITED_INFORMATION (0x0800)  // winnt
-#define THREAD_RESUME                    (0x1000)  // winnt
-
-#if (NTDDI_VERSION >= NTDDI_VISTA)
-#define THREAD_ALL_ACCESS         (STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | \
-                                   0xFFFF)
-#else
-#define THREAD_ALL_ACCESS         (STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | \
-                                   0x3FF)
-#endif
-
 #if (NTDDI_VERSION >= NTDDI_THRESHOLD)
 _IRQL_requires_max_(PASSIVE_LEVEL)
 NTKERNELAPI
