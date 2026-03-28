@@ -91,8 +91,8 @@ RlpCleanupWin32Device()
 // Driver dispatch functions
 //
 
-static
 [[nodiscard]]
+static
 NTSTATUS
 RlWin32CompleteRequest(
     _Inout_ PIRP pIrp,
