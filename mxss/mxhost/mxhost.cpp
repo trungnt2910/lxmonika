@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <filesystem>
 #include <iostream>
 #include <memory>
@@ -47,7 +48,7 @@ WSTRING Win32HandleToPath(HANDLE hdlFile, DWORD dwFlags)
             hdlFile, str.data(), (DWORD)str.size(), dwFlags);
         if (dwRequiredSize > str.size())
         {
-            str.resize(max(str.size(), dwRequiredSize) * 2);
+            str.resize((std::max)(str.size(), dwRequiredSize) * 2);
             continue;
         }
 
