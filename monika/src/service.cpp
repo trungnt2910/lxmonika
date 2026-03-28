@@ -447,8 +447,16 @@ SvIsLxMonikaRunning(
 
     LPQUERY_SERVICE_CONFIGW pQueryServiceConfig = SvQueryServiceConfig(lxmonika, buffer);
 
-    if (std::filesystem::canonical(installPath)
-        != std::filesystem::weakly_canonical(pQueryServiceConfig->lpBinaryPathName))
+    try
+    {
+        std::filesystem::path binaryPath = UtilNtToWin32Path(pQueryServiceConfig->lpBinaryPathName);
+        if (std::filesystem::canonical(installPath)
+            != std::filesystem::weakly_canonical(binaryPath))
+        {
+            return false;
+        }
+    }
+    catch (const Exception& e)
     {
         return false;
     }
