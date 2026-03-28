@@ -1,5 +1,5 @@
-#include <cstddef>
-#include <cstdint>
+typedef __SIZE_TYPE__   size_t;
+typedef __INTPTR_TYPE__ intptr_t;
 
 template <typename... Args>
 inline static
@@ -69,6 +69,12 @@ MonixSyscall(
         return reg_rret;                                                    \
     }                                                                       \
     while (0)
+
+#ifdef __GNUC__
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wuninitialized"
+#endif
+
 #ifdef __x86_64__
     DO_SYSCALL(syscall, rax, rax,
                rdi, rsi, rdx, r10, r8, r9,
@@ -92,6 +98,10 @@ MonixSyscall(
                r0, r1, r2, r3, r4, r5);
 #else
 #error Write the syscall code for this architecture!
+#endif
+
+#ifdef __GNUC__
+    #pragma GCC diagnostic pop
 #endif
 
 #undef SET_REGISTER_IF_PRESENT
