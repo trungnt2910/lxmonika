@@ -90,6 +90,7 @@
       <AdditionalIncludeDirectories>include;include_private;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4471;4748;5040;5257;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalOptions Condition="'$(Platform)'=='ARM64'">/forceInterlockedFunctions- %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>MONIKA_BUILD_YEAR=$([System.DateTime]::UtcNow.ToString(yyyy));%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -98,7 +99,7 @@
     </ResourceCompile>
     <Link>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories);$(SolutionDir)\lxstub\$(OutDir)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>%(AdditionalDependencies);Wdmsec.lib;Cng.lib;LXCORE.lib</AdditionalDependencies>
+      <AdditionalDependencies>%(AdditionalDependencies);libcntpr.lib;Wdmsec.lib;Cng.lib;LXCORE.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

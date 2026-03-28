@@ -85,7 +85,8 @@
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>$(SolutionDir)\lxmonika\$(OutDir)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>%(AdditionalDependencies);Wdmsec.lib;lxmonika.lib</AdditionalDependencies>
+      <AdditionalDependencies>%(AdditionalDependencies);libcntpr.lib;Wdmsec.lib;lxmonika.lib</AdditionalDependencies>
+      <AdditionalOptions>%(AdditionalOptions) /ALTERNATENAME:_guard_check_icall=__guard_check_icall_thunk</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
