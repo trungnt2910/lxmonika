@@ -1,6 +1,6 @@
 # lxmonika
 
-[![Discord Invite](https://dcbadge.vercel.app/api/server/bcV3gXGtsJ?style=flat)](https://discord.gg/bcV3gXGtsJ)
+[![Discord Invite][2]][1]
 
 A Windows driver to monitor kernel access of Pico processes.
 
@@ -196,10 +196,9 @@ See the included sample, [`mxss`](../mxss), for more details.
 
 ## Community
 
-This repo is a part of [Project Reality](https://discord.gg/bcV3gXGtsJ).
+This repo is a part of [Project Reality][1].
 
-Need help using this project? Join me on [Discord](https://discord.gg/bcV3gXGtsJ), and let's find a
-solution together.
+Need help using this project? Join me on [Discord][1], and let's find a solution together.
 
 ## Acknowledements
 
@@ -224,3 +223,6 @@ an ARM64 device. Without this, the ARM64 port is virtually impossible.
 by Alex Ionescu ([**@ionescu007**](https://github.com/ionescu007)).
 - [Write a Hello World Windows Driver (KMDF)](https://learn.microsoft.com/en-us/windows-hardware/drivers/gettingstarted/writing-a-very-small-kmdf--driver).
 Highly recomended if you are new to Windows driver development like me.
+
+[1]: https://reality.trungnt2910.com/discord/lxmonika
+[2]: https://img.shields.io/discord/1185622479436251227?logo=discord&logoColor=white&label=Discord&labelColor=%235865F2

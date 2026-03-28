@@ -1,6 +1,6 @@
 # monika.exe
 
-[![Discord Invite](https://dcbadge.vercel.app/api/server/bcV3gXGtsJ?style=flat)](https://discord.gg/bcV3gXGtsJ)
+[![Discord Invite][2]][1]
 
 Unified host for `lxmonika`.
 
@@ -47,7 +47,9 @@ monika exec --provider ExampleOS --cd "path\to\binary\dir" binary
 
 ## Community
 
-This repo is a part of [Project Reality](https://discord.gg/bcV3gXGtsJ).
+This repo is a part of [Project Reality][1].
 
-Need help using this project? Join me on [Discord](https://discord.gg/bcV3gXGtsJ), and let's find a
-solution together.
+Need help using this project? Join me on [Discord][1], and let's find a solution together.
+
+[1]: https://reality.trungnt2910.com/discord/lxmonika
+[2]: https://img.shields.io/discord/1185622479436251227?logo=discord&logoColor=white&label=Discord&labelColor=%235865F2
