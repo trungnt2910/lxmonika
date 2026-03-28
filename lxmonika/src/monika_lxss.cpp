@@ -81,8 +81,8 @@ MapLxssInitialize(
         // restore the original code before DriverEntry returns.
 
         MA_RETURN_IF_FAIL(MdlpPatchTrampoline(
-            PsRegisterPicoProvider,
-            MaRegisterPicoProvider,
+            (PVOID)PsRegisterPicoProvider,
+            (PVOID)MaRegisterPicoProvider,
             MaLxssTrampolineBytes,
             sizeof(MaLxssTrampolineBytes)
         ));
@@ -203,7 +203,7 @@ MapLxssPrepareForPatchGuard()
         if (MaLxssTrampolineInstalled)
         {
             MA_RETURN_IF_FAIL(MdlpPatchTrampoline(
-                PsRegisterPicoProvider,
+                (PVOID)PsRegisterPicoProvider,
                 NULL,
                 MaLxssTrampolineBytes,
                 sizeof(MaLxssTrampolineBytes)

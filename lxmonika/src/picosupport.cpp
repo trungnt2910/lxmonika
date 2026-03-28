@@ -180,32 +180,32 @@ PicoSppLocateProviderRoutines(
         }
 
         // Check routines
-        if (!CheckLxCoreAddress(pTestRoutines->DispatchSystemCall))
+        if (!CheckLxCoreAddress((PVOID)pTestRoutines->DispatchSystemCall))
         {
             continue;
         }
 
-        if (!CheckLxCoreAddress(pTestRoutines->ExitThread))
+        if (!CheckLxCoreAddress((PVOID)pTestRoutines->ExitThread))
         {
             continue;
         }
 
-        if (!CheckLxCoreAddress(pTestRoutines->ExitProcess))
+        if (!CheckLxCoreAddress((PVOID)pTestRoutines->ExitProcess))
         {
             continue;
         }
 
-        if (!CheckLxCoreAddress(pTestRoutines->DispatchException))
+        if (!CheckLxCoreAddress((PVOID)pTestRoutines->DispatchException))
         {
             continue;
         }
 
-        if (!CheckLxCoreAddress(pTestRoutines->TerminateProcess))
+        if (!CheckLxCoreAddress((PVOID)pTestRoutines->TerminateProcess))
         {
             continue;
         }
 
-        if (!CheckLxCoreAddress(pTestRoutines->WalkUserStack))
+        if (!CheckLxCoreAddress((PVOID)pTestRoutines->WalkUserStack))
         {
             continue;
         }
@@ -219,7 +219,7 @@ PicoSppLocateProviderRoutines(
         // This member is NULL in newer Windows versions
         // (Tested on Windows 11 23H2)
         if (pTestRoutines->GetAllocatedProcessImageName != NULL &&
-            !CheckLxCoreAddress(pTestRoutines->GetAllocatedProcessImageName))
+            !CheckLxCoreAddress((PVOID)pTestRoutines->GetAllocatedProcessImageName))
         {
             continue;
         }

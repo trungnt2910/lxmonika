@@ -255,7 +255,7 @@ MapCreateProcess(
 
     if (MA_SYSTEM_AT_LEAST(NTDDI_WIN10_RS4))
     {
-        status = ((PS_PICO_CREATE_PROCESS_RS4*)MapOriginalRoutines.CreateProcess)(
+        status = ((PS_PICO_CREATE_PROCESS_RS4*)(PVOID)MapOriginalRoutines.CreateProcess)(
             ProcessAttributes, CreateInfo, &hdlProcess);
     }
     else if (MA_SYSTEM_AT_LEAST(NTDDI_WIN10_RS2) && !MapRanAbiCheck)
@@ -277,7 +277,7 @@ MapCreateProcess(
         PS_PICO_CREATE_INFO psTempInfo = CreateInfo != NULL ?
             *CreateInfo : PS_PICO_CREATE_INFO { };
 
-        status = ((PS_PICO_CREATE_PROCESS_RS4*)MapOriginalRoutines.CreateProcess)(
+        status = ((PS_PICO_CREATE_PROCESS_RS4*)(PVOID)MapOriginalRoutines.CreateProcess)(
             ProcessAttributes, &psTempInfo, &hdlProcess);
 
         Logger::LogTrace("First call returned, status=", LogHex, status);
@@ -310,7 +310,7 @@ MapCreateProcess(
             Logger::LogTrace("Call failed, retrying with TH1 variant.");
 
             // Retry with the TH1 variant.
-            status = ((PS_PICO_CREATE_PROCESS_TH1*)MapOriginalRoutines.CreateProcess)(
+            status = ((PS_PICO_CREATE_PROCESS_TH1*)(PVOID)MapOriginalRoutines.CreateProcess)(
                 ProcessAttributes, &hdlProcess);
 
             if (!NT_SUCCESS(status))
@@ -327,7 +327,7 @@ MapCreateProcess(
     }
     else // TH1
     {
-        status = ((PS_PICO_CREATE_PROCESS_TH1*)MapOriginalRoutines.CreateProcess)(
+        status = ((PS_PICO_CREATE_PROCESS_TH1*)(PVOID)MapOriginalRoutines.CreateProcess)(
             ProcessAttributes, &hdlProcess);
     }
 
@@ -469,12 +469,12 @@ MapCreateThread(
 
     if (MA_SYSTEM_AT_LEAST(NTDDI_WIN10_RS2))
     {
-        status = ((PS_PICO_CREATE_THREAD_RS2*)MapOriginalRoutines.CreateThread)(
+        status = ((PS_PICO_CREATE_THREAD_RS2*)(PVOID)MapOriginalRoutines.CreateThread)(
             ThreadAttributes, CreateInfo, &hdlThread);
     }
     else // TH1
     {
-        status = ((PS_PICO_CREATE_THREAD_TH1*)MapOriginalRoutines.CreateThread)(
+        status = ((PS_PICO_CREATE_THREAD_TH1*)(PVOID)MapOriginalRoutines.CreateThread)(
             ThreadAttributes, &hdlThread);
     }
 
