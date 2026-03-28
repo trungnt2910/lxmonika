@@ -218,17 +218,32 @@ CompatPoolFlagsToPoolTypeImpl(
     return Type;
 }
 
+// Newer SDKs define POOL_ZERO_ALLOCATION along with ExAllocatePoolZero.
+// They also deprecate ExAllocatePoolWithTag, causing clang to complain.
+// Meanwhile, older SDKs do not define ExAllocatePoolZero at all.
+
+#ifdef POOL_ZERO_ALLOCATION
+#define CompatAllocatePool ExAllocatePoolZero
+constexpr bool CompatPoolNeedsManualZeroing = false;
+#else
+#define CompatAllocatePool ExAllocatePoolWithTag
+constexpr bool CompatPoolNeedsManualZeroing = true;
+#endif
+
 #define ExAllocatePool2(Flags, NumberOfBytes, Tag)                                              \
     ([&]() [[msvc::forceinline]]                                                                \
     {                                                                                           \
         constexpr CompatPOOL_TYPE Type = CompatPoolFlagsToPoolTypeImpl((Flags));                \
         static_assert(Type.IsSupported(), "Unsupported Pool Flags.");                           \
-        PVOID pReturn = ExAllocatePoolWithTag((POOL_TYPE)Type, (NumberOfBytes), (Tag));         \
+        PVOID pReturn = CompatAllocatePool((POOL_TYPE)Type, (NumberOfBytes), (Tag));            \
         if constexpr (!((Flags) & POOL_FLAG_UNINITIALIZED))                                     \
         {                                                                                       \
-            if (pReturn != NULL)                                                                \
+            if constexpr (CompatPoolNeedsManualZeroing)                                         \
             {                                                                                   \
-                memset(pReturn, 0, NumberOfBytes);                                              \
+                if (pReturn != NULL)                                                            \
+                {                                                                               \
+                    memset(pReturn, 0, NumberOfBytes);                                          \
+                }                                                                               \
             }                                                                                   \
         }                                                                                       \
         return pReturn;                                                                         \
