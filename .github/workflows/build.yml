@@ -25,6 +25,34 @@ jobs:
           # Fetch everything for build metadata to work
           fetch-depth: 0
 
+      - name: Uninstall Windows SDK/WDK
+        run: |
+          # Windows SDK/WDK 26100 are problematic. They do not coexist peacefully with older kits.
+          # For now, we nuke every existing kit on the cloud and replace them with our own script.
+          # Once we migrate to clang for 32-bit and VS2026 for 64-bit, we can remove this step.
+          $KitPatterns = @(
+            "Windows Software Development Kit - Windows 10.0.*",
+            "Windows Driver Kit - Windows 10.0.*"
+          )
+
+          $Kits = `
+            Get-ChildItem -Path `
+              "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", `
+              "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall" |
+            Get-ItemProperty |
+            Where-Object {
+                $name = $_.DisplayName
+                $match = $false
+                foreach ($p in $KitPatterns) { if ($name -like $p) { $match = $true } }
+                $match
+            }
+
+          foreach ($kit in $Kits) {
+            Write-Host "Uninstalling: $($kit.DisplayName)" -ForegroundColor Cyan
+            Start-Process cmd.exe -ArgumentList "/c $($kit.QuietUninstallString)" -Wait -NoNewWindow
+          }
+        shell: powershell
+
       - name: Install build dependencies
         run: powershell.exe -File ${{ github.workspace }}\setup.ps1
         shell: cmd
