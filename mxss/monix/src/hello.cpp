@@ -50,7 +50,7 @@ MonixSyscall(
         asm volatile(                                                       \
             #op                                                             \
             /* Outputs */                                                   \
-            : "+r"(reg_rret)                                                \
+            : "=r"(reg_rret)                                                \
             /* Inputs */                                                    \
             : "r"(reg_rnum),                                                \
               "r"(reg_r0), "r"(reg_r1), "r"(reg_r2),                        \
