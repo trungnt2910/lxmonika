@@ -3,6 +3,7 @@
 #include <ntdef.h>
 #include <intsafe.h>
 
+#pragma system_header
 #pragma warning(disable: 4201)
 
 // pe.h
