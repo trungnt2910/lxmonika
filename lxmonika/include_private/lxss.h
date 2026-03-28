@@ -226,8 +226,8 @@ struct _LX_INODE_CALLBACKS
     PVOID InotifyNtWatchIncrementWatchCount;
     PVOID ReferenceNtFileObject;
     PVOID Pin;
-    struct LX_INODE_XATTR_CALLBACKS* ExtendedAttributeCallbacks;
-    struct LX_INODE_XATTR_CALLBACKS* SystemExtendedAttributeCallbacks;
+    PLX_INODE_XATTR_CALLBACKS ExtendedAttributeCallbacks;
+    PLX_INODE_XATTR_CALLBACKS SystemExtendedAttributeCallbacks;
 
     PVOID Reserved[6];
 };
