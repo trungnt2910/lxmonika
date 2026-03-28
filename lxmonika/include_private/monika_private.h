@@ -176,9 +176,9 @@ enum
 };
 
 #define MONIKA_PROVIDER(index)                                                          \
-    extern PS_PICO_CREATE_PROCESS               MaPicoCreateProcess##index;             \
+    extern PS_PICO_CREATE_PROCESS_RS4           MaPicoCreateProcess##index;             \
     extern PS_PICO_CREATE_PROCESS_TH1           MaPicoCreateProcessTh1##index;          \
-    extern PS_PICO_CREATE_THREAD                MaPicoCreateThread##index;              \
+    extern PS_PICO_CREATE_THREAD_RS2            MaPicoCreateThread##index;              \
     extern PS_PICO_CREATE_THREAD_TH1            MaPicoCreateThreadTh1##index;           \
     extern PS_PICO_GET_PROCESS_CONTEXT          MaPicoGetProcessContext##index;         \
     extern PS_PICO_GET_THREAD_CONTEXT           MaPicoGetThreadContext##index;          \

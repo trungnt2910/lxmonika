@@ -209,28 +209,28 @@ MapInitialize()
     }
 
     // Initialize pico routines
-#define MONIKA_PROVIDER(index)                                                  \
-    MapRoutines[MaPicoProvider##index] =                                        \
-    {                                                                           \
-        .Size = sizeof(PS_PICO_ROUTINES),                                       \
-        .CreateProcess = MaPicoCreateProcess##index,                            \
-        .CreateThread = MaPicoCreateThread##index,                              \
-        .GetProcessContext = MaPicoGetProcessContext##index,                    \
-        .GetThreadContext = MaPicoGetThreadContext##index,                      \
-        .GetContextThreadInternal = MaPicoGetContextThreadInternal##index,      \
-        .SetContextThreadInternal = MaPicoSetContextThreadInternal##index,      \
-        .TerminateThread = MaPicoTerminateThread##index,                        \
-        .ResumeThread = MaPicoResumeThread##index,                              \
-        .SetThreadDescriptorBase = MaPicoSetThreadDescriptorBase##index,        \
-        .SuspendThread = MaPicoSuspendThread##index,                            \
-        .TerminateProcess = MaPicoTerminateProcess##index                       \
-    };                                                                          \
-                                                                                \
-    MapRoutinesTh1[MaPicoProvider##index] = MapRoutines[MaPicoProvider##index]; \
-    MapRoutinesTh1[MaPicoProvider##index].CreateProcess =                       \
-        (PPS_PICO_CREATE_PROCESS)MaPicoCreateProcessTh1##index;                 \
-    MapRoutinesTh1[MaPicoProvider##index].CreateThread =                        \
-        (PPS_PICO_CREATE_THREAD)MaPicoCreateThreadTh1##index;
+#define MONIKA_PROVIDER(index)                                                          \
+    MapRoutines[MaPicoProvider##index] =                                                \
+    {                                                                                   \
+        .Size = sizeof(PS_PICO_ROUTINES),                                               \
+        .CreateProcess = (PPS_PICO_CREATE_PROCESS)(PVOID)MaPicoCreateProcess##index,    \
+        .CreateThread = (PPS_PICO_CREATE_THREAD)(PVOID)MaPicoCreateThread##index,       \
+        .GetProcessContext = MaPicoGetProcessContext##index,                            \
+        .GetThreadContext = MaPicoGetThreadContext##index,                              \
+        .GetContextThreadInternal = MaPicoGetContextThreadInternal##index,              \
+        .SetContextThreadInternal = MaPicoSetContextThreadInternal##index,              \
+        .TerminateThread = MaPicoTerminateThread##index,                                \
+        .ResumeThread = MaPicoResumeThread##index,                                      \
+        .SetThreadDescriptorBase = MaPicoSetThreadDescriptorBase##index,                \
+        .SuspendThread = MaPicoSuspendThread##index,                                    \
+        .TerminateProcess = MaPicoTerminateProcess##index                               \
+    };                                                                                  \
+                                                                                        \
+    MapRoutinesTh1[MaPicoProvider##index] = MapRoutines[MaPicoProvider##index];         \
+    MapRoutinesTh1[MaPicoProvider##index].CreateProcess =                               \
+        (PPS_PICO_CREATE_PROCESS)(PVOID)MaPicoCreateProcessTh1##index;                  \
+    MapRoutinesTh1[MaPicoProvider##index].CreateThread =                                \
+        (PPS_PICO_CREATE_THREAD)(PVOID)MaPicoCreateThreadTh1##index;
 #include "monika_providers.cpp"
 #undef MONIKA_PROVIDER
 
