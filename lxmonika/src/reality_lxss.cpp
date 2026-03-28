@@ -235,7 +235,7 @@ RlLxssDeviceOpen(
     {
         // Since VfsFileDeallocate or the like is not exposed, we have no way to clean up
         // the allocated file and cleanly fail here.
-        Logger::LogWarning("Failed to update file information, status=", (PVOID)status);
+        Logger::LogWarning("Failed to update file information, status=", LogHex, status);
     }
 
     *pFile = pNewFile;

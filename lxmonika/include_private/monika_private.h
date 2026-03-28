@@ -228,7 +228,7 @@ extern SIZE_T MapLxssProviderIndex;
         NTSTATUS status__ = (s);                                                \
         if (!NT_SUCCESS(status__))                                              \
         {                                                                       \
-            Logger::LogTrace("Function failed with status ", (void*)status__);  \
+            Logger::LogTrace("Function failed with status ", LogHex, status__); \
             return status__;                                                    \
         }                                                                       \
     }                                                                           \

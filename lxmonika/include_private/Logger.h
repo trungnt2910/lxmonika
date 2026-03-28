@@ -17,6 +17,8 @@ enum class LogLevel
 #define LOGGER_MINIMUM_LEVEL (LogLevel::Warning)
 #endif
 
+constexpr struct LogHex_t {} LogHex;
+
 class Logger
 {
 private:
@@ -51,6 +53,16 @@ private:
     static void _Print(T* ptr) { _Print((PVOID)ptr); }
     template <typename T>
     static void _Print(const T* ptr) { _Print((PVOID)ptr); }
+
+    template <typename TFirst, typename... TRest>
+    static void _Print(const LogHex_t&, TFirst first, TRest... args)
+    {
+        _Print(LogHex, first);
+        _Print(args...);
+    }
+
+    static void _Print(const LogHex_t&, LONG l) { _Print((PVOID)(INT_PTR)l); }
+    static void _Print(const LogHex_t&, ULONG ul) { _Print((PVOID)(UINT_PTR)ul); }
 
     static void _Lock();
     static void _Unlock();

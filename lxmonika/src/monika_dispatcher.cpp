@@ -280,7 +280,7 @@ MapCreateProcess(
         status = ((PS_PICO_CREATE_PROCESS_RS4*)MapOriginalRoutines.CreateProcess)(
             ProcessAttributes, &psTempInfo, &hdlProcess);
 
-        Logger::LogTrace("First call returned, status=", (PVOID)status);
+        Logger::LogTrace("First call returned, status=", LogHex, status);
 
         if (NT_SUCCESS(status))
         {
@@ -315,7 +315,7 @@ MapCreateProcess(
 
             if (!NT_SUCCESS(status))
             {
-                Logger::LogTrace("TH1 variant also failed, status=", (PVOID)status);
+                Logger::LogTrace("TH1 variant also failed, status=", LogHex, status);
                 Logger::LogTrace("Invalidating ABI check results.");
                 MapRanAbiCheck = FALSE;
             }

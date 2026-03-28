@@ -60,7 +60,7 @@ PicoSppLocateProviderRoutines(
     SIZE_T uNtKernelSize = 0;
     status = MdlpFindModuleByName("ntoskrnl.exe", &hdlNtKernel, &uNtKernelSize);
 
-    Logger::LogTrace("Find ntoskrnl: status=", (void*)status, " handle=", hdlNtKernel,
+    Logger::LogTrace("Find ntoskrnl: status=", LogHex, status, " handle=", hdlNtKernel,
         " size=", uNtKernelSize);
 
     if (!NT_SUCCESS(status))
@@ -128,7 +128,7 @@ PicoSppLocateProviderRoutines(
     status = MdlpFindModuleSectionByName(hdlNtKernel, ".data",
         &pNtKernelData, &uNtKernelDataSize);
 
-    Logger::LogTrace("Find ntoskrnl data: status=", (void*)status, " data=", pNtKernelData,
+    Logger::LogTrace("Find ntoskrnl data: status=", LogHex, status, " data=", pNtKernelData,
         " size=", uNtKernelDataSize);
 
     if (!NT_SUCCESS(status))
@@ -140,7 +140,7 @@ PicoSppLocateProviderRoutines(
     SIZE_T uLxCoreSize = 0;
     status = MdlpFindModuleByName("lxcore.sys", &hdlLxCore, &uLxCoreSize);
 
-    Logger::LogTrace("Find lxcore: status=", (void*)status, " handle=", hdlLxCore,
+    Logger::LogTrace("Find lxcore: status=", LogHex, status, " handle=", hdlLxCore,
         " size=", uLxCoreSize);
 
     if (!NT_SUCCESS(status))
@@ -273,7 +273,7 @@ PicoSppLocateRoutines(
     SIZE_T uLxCoreSize = 0;
     status = MdlpFindModuleByName("lxcore.sys", &hdlLxCore, &uLxCoreSize);
 
-    Logger::LogTrace("Find lxcore: status=", (void*)status, " handle=", hdlLxCore,
+    Logger::LogTrace("Find lxcore: status=", LogHex, status, " handle=", hdlLxCore,
         " size=", uLxCoreSize);
 
     if (NT_SUCCESS(status))
@@ -281,7 +281,7 @@ PicoSppLocateRoutines(
         PVOID pLxpRoutines;
         status = MdlpGetProcAddress(hdlLxCore, "LxpRoutines", &pLxpRoutines);
 
-        Logger::LogTrace("Find LxpRoutines: status=", (void*)status, " &LxpRoutines=",
+        Logger::LogTrace("Find LxpRoutines: status=", LogHex, status, " &LxpRoutines=",
             pLxpRoutines);
 
         if (!NT_SUCCESS(status))
@@ -306,7 +306,7 @@ PicoSppLocateRoutines(
     SIZE_T uNtKernelSize;
     status = MdlpFindModuleByName("ntoskrnl.exe", &hdlNtKernel, &uNtKernelSize);
 
-    Logger::LogTrace("Find ntoskrnl: status=", (PVOID)status, " handle=", hdlNtKernel,
+    Logger::LogTrace("Find ntoskrnl: status=", LogHex, status, " handle=", hdlNtKernel,
         " size=", uNtKernelSize);
 
     if (NT_SUCCESS(status))
@@ -571,7 +571,7 @@ PicoSppDetermineAbiStatus(
 
             if (!NT_SUCCESS(status))
             {
-                Logger::LogWarning("Unexpected error code: ", (PVOID)status);
+                Logger::LogWarning("Unexpected error code: ", LogHex, status);
             }
 
             break;
@@ -659,13 +659,13 @@ PicoSppDetermineAbiStatus(
 
                 Logger::LogTrace(
                     "The correct sizes are: ", *pProviderRoutinesSize, ", ", *pPicoRoutinesSize);
-                Logger::LogTrace("The return status is: ", (PVOID)status);
+                Logger::LogTrace("The return status is: ", LogHex, status);
 
                 if (!NT_SUCCESS(status))
                 {
                     if (status != STATUS_TOO_LATE)
                     {
-                        Logger::LogWarning("Got an unexpected error code: ", (PVOID)status);
+                        Logger::LogWarning("Got an unexpected error code: ", LogHex, status);
                     }
                     *pTooLate = TRUE;
 
@@ -700,7 +700,7 @@ PicoSppDetermineAbiStatus(
             pAbiVersion
         ));
 
-        Logger::LogTrace("The system ABI version is: ", (PVOID)*pAbiVersion);
+        Logger::LogTrace("The system ABI version is: ", LogHex, *pAbiVersion);
 
         return STATUS_SUCCESS;
     }

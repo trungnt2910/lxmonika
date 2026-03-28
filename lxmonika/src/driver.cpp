@@ -62,7 +62,7 @@ DriverEntry(
 
         if (!NT_SUCCESS(status))
         {
-            Logger::LogError("Failed to initialize CNG, status=", (PVOID)status);
+            Logger::LogError("Failed to initialize CNG, status=", LogHex, status);
             return status;
         }
     }
@@ -78,7 +78,7 @@ DriverEntry(
     {
         MapCngCleanup();
 
-        Logger::LogError("Failed to initialize lxmonika, status=", (PVOID)status);
+        Logger::LogError("Failed to initialize lxmonika, status=", LogHex, status);
         return status;
     }
 
@@ -87,7 +87,7 @@ DriverEntry(
 
     if (!NT_SUCCESS(status))
     {
-        Logger::LogWarning("Failed to integrate LXSS into lxmonika, status=", (PVOID)status);
+        Logger::LogWarning("Failed to integrate LXSS into lxmonika, status=", LogHex, status);
         Logger::LogWarning("WSL integration features may not work.");
     }
 
@@ -103,7 +103,7 @@ DriverEntry(
 
     if (!NT_SUCCESS(statusUnpatch))
     {
-        Logger::LogWarning("Problem undoing LXSS patches, status=", (PVOID)statusUnpatch);
+        Logger::LogWarning("Problem undoing LXSS patches, status=", LogHex, statusUnpatch);
         Logger::LogWarning("You may encounter issues with PatchGuard.");
     }
 
@@ -115,7 +115,7 @@ DriverEntry(
 
         // The reality device (at least the Win32 one) is required for userland hosts to launch
         // Pico processes.
-        Logger::LogError("Failed to initialize the reality device, status=", (PVOID)status);
+        Logger::LogError("Failed to initialize the reality device, status=", LogHex, status);
         return status;
     }
 

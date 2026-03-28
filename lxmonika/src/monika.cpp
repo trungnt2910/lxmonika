@@ -347,7 +347,7 @@ MaRegisterPicoProviderEx(
             (dwAbiVersion < NTDDI_WINBLUE || dwAbiVersion > 0x0C000000))
         {
             Logger::LogWarning("Provider is reporting an invalid ABI version: ",
-                (PVOID)AdditionalProviderRoutines->AbiVersion);
+                LogHex, AdditionalProviderRoutines->AbiVersion);
 
             return STATUS_INVALID_PARAMETER;
         }
@@ -460,7 +460,7 @@ MaRegisterPicoProviderEx(
     }
 
     Logger::LogTrace("Registered Pico provider #", uProviderIndex, ".");
-    Logger::LogTrace("Identified ABI version is ", (PVOID)(SIZE_T)dwAbiVersion, ".");
+    Logger::LogTrace("Identified ABI version is ", LogHex, dwAbiVersion, ".");
 
     return STATUS_SUCCESS;
 }

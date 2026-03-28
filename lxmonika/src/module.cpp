@@ -653,7 +653,7 @@ MdlpPatchTrampoline(
 
     if (!NT_SUCCESS(statusFlush))
     {
-        Logger::LogWarning("Failed to flush instruction cache, status=", (PVOID)statusFlush);
+        Logger::LogWarning("Failed to flush instruction cache, status=", LogHex, statusFlush);
         Logger::LogWarning("The trampoline may not work.");
     }
 

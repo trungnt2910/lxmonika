@@ -57,7 +57,7 @@ RlpInitializeDevices(
 
     if (!NT_SUCCESS(status))
     {
-        Logger::LogWarning("Failed to initialize lxss device, status=", (PVOID)status);
+        Logger::LogWarning("Failed to initialize lxss device, status=", LogHex, status);
         Logger::LogWarning("WSL integration features will not work.");
         Logger::LogWarning("Make sure WSL1 is enabled and lxcore.sys is loaded.");
 
