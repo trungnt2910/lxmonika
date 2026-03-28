@@ -128,15 +128,30 @@
 
 typedef ULONG64 POOL_FLAGS;
 
+// Using a special value (e.g. -2) made clang complain, so we invented this whole new class.
+//
+// Fortunately, everything is constexpr, so there should be no runtime bloat.
+class CompatPOOL_TYPE {
+    POOL_TYPE Value     = {};
+    bool      Supported = {};
+
+public:
+    constexpr CompatPOOL_TYPE(): Supported(FALSE) { }
+    constexpr CompatPOOL_TYPE(POOL_TYPE type): Value(type), Supported(TRUE) { }
+
+    constexpr bool IsSupported() const { return Supported; }
+    constexpr operator POOL_TYPE() const { return Value; }
+};
+
 consteval
-POOL_TYPE
+CompatPOOL_TYPE
 CompatPoolFlagsToPoolTypeImpl(
     POOL_FLAGS Flags
 )
 {
-    constexpr POOL_TYPE Unsupported = (POOL_TYPE)-2;
+    constexpr CompatPOOL_TYPE Unsupported;
 
-    POOL_TYPE Type = Unsupported;
+    CompatPOOL_TYPE Type = Unsupported;
 
     bool FlagUninitialized = false;
     bool FlagSession = false;
@@ -144,7 +159,6 @@ CompatPoolFlagsToPoolTypeImpl(
 
     if (Flags & POOL_FLAG_UNINITIALIZED)
     {
-        // No effect, but handled by the compat macro.
         FlagUninitialized = true;
         Flags ^= POOL_FLAG_UNINITIALIZED;
     }
@@ -164,7 +178,7 @@ CompatPoolFlagsToPoolTypeImpl(
     if (Flags & POOL_FLAG_NON_PAGED)
     {
         Flags ^= POOL_FLAG_NON_PAGED;
-        constexpr POOL_TYPE Map[2][2] =
+        constexpr CompatPOOL_TYPE Map[2][2] =
         {
             { NonPagedPoolNx, NonPagedPoolNxCacheAligned },
             { NonPagedPoolSessionNx, Unsupported }
@@ -174,7 +188,7 @@ CompatPoolFlagsToPoolTypeImpl(
     else if (Flags & POOL_FLAG_NON_PAGED_EXECUTE)
     {
         Flags ^= POOL_FLAG_NON_PAGED_EXECUTE;
-        constexpr POOL_TYPE Map[2][2] =
+        constexpr CompatPOOL_TYPE Map[2][2] =
         {
             { NonPagedPoolExecute, NonPagedPoolCacheAligned },
             { NonPagedPoolSession, NonPagedPoolCacheAlignedSession }
@@ -184,7 +198,7 @@ CompatPoolFlagsToPoolTypeImpl(
     else if (Flags & POOL_FLAG_PAGED)
     {
         Flags ^= POOL_FLAG_PAGED;
-        constexpr POOL_TYPE Map[2][2] =
+        constexpr CompatPOOL_TYPE Map[2][2] =
         {
             { PagedPool, PagedPoolCacheAligned },
             { PagedPoolSession, PagedPoolCacheAlignedSession }
@@ -197,15 +211,19 @@ CompatPoolFlagsToPoolTypeImpl(
         return Unsupported;
     }
 
+    // No effect in ExAllocatePoolWithTag.
+    // Instead, handled in compat macro below with a memset.
+    UNREFERENCED_PARAMETER(FlagUninitialized);
+
     return Type;
 }
 
 #define ExAllocatePool2(Flags, NumberOfBytes, Tag)                                              \
     ([&]() [[msvc::forceinline]]                                                                \
     {                                                                                           \
-        constexpr POOL_TYPE Type = CompatPoolFlagsToPoolTypeImpl((Flags));                      \
-        static_assert((int)Type >= 0, "Unsupported Pool Flags.");                               \
-        PVOID pReturn = ExAllocatePoolWithTag(Type, (NumberOfBytes), (Tag));                    \
+        constexpr CompatPOOL_TYPE Type = CompatPoolFlagsToPoolTypeImpl((Flags));                \
+        static_assert(Type.IsSupported(), "Unsupported Pool Flags.");                           \
+        PVOID pReturn = ExAllocatePoolWithTag((POOL_TYPE)Type, (NumberOfBytes), (Tag));         \
         if constexpr (!((Flags) & POOL_FLAG_UNINITIALIZED))                                     \
         {                                                                                       \
             if (pReturn != NULL)                                                                \
