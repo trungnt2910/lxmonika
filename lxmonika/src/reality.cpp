@@ -389,7 +389,7 @@ RlpFileIoctl(
             // they please. Sanitize and keep our own copy of these strings before we exit the
             // __try block.
 
-            constexpr auto Copy = [](UNICODE_STRING& dstString, PUNICODE_STRING src)
+            static constexpr auto Copy = [](UNICODE_STRING& dstString, PUNICODE_STRING src)
             {
                 PWSTR dst = (PWSTR)ExAllocatePool2(POOL_FLAG_PAGED,
                     (src->Length + 1) * sizeof(WCHAR), MA_REALITY_TAG);
@@ -413,7 +413,7 @@ RlpFileIoctl(
             MA_RETURN_IF_FAIL(Copy(strCurrentWorkingDirectory,
                 pUserAttributes->CurrentWorkingDirectory));
 
-            constexpr auto CopyList = [](
+            static constexpr auto CopyList = [](
                 _MA_UNICODE_STRING_LIST& dstStringList,
                 PUNICODE_STRING src,
                 SIZE_T srcCount
