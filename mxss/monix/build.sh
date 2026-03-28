@@ -49,7 +49,7 @@ for filename in src/*; do
         -nostdlib -static -s                \
         -Werror -Wall -Wextra -Wpedantic    \
         -Wno-multichar                      \
-        -std=c++23 -O2
+        -std=c++26 -O2
 done
 
 mkdir -p bin/$ARCH

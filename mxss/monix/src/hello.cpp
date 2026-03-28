@@ -11,13 +11,6 @@ MonixSyscall(
 {
     constexpr size_t argsCount = sizeof...(Args);
 
-    // TODO: Use C++26 pack indexing to prevent the overhead of an extra array
-    // when compiled without optimizations. Also avoids hacks like the one below.
-
-    // ISO C++ forbids zero-size array.
-    constexpr size_t argsArrSize = argsCount == 0 ? 1 : argsCount;
-    intptr_t argsArray[argsArrSize] = { (intptr_t)args... };
-
     static_assert(argsCount <= 6, "Too many arguments for a Linux syscall.");
 
 #define SET_REGISTER_IF_PRESENT(index)              \
@@ -25,7 +18,7 @@ MonixSyscall(
     {                                               \
         if constexpr (argsCount > index)            \
         {                                           \
-            reg_r##index = argsArray[index];        \
+            reg_r##index = (intptr_t)args...[index];\
         }                                           \
     }                                               \
     while (0)
