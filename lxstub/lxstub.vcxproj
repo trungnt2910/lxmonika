@@ -82,7 +82,7 @@
     <ClCompile>
       <AdditionalIncludeDirectories>include;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4471;4748;5040;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>MONIKA_BUILD_YEAR=$([System.DateTime]::UtcNow.ToString(yyyy));%(PreprocessorDefinitions)</PreprocessorDefinitions>
