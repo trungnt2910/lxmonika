@@ -231,7 +231,7 @@ constexpr bool CompatPoolNeedsManualZeroing = true;
 #endif
 
 #define ExAllocatePool2(Flags, NumberOfBytes, Tag)                                              \
-    ([&]() [[msvc::forceinline]]                                                                \
+    ([&] [[msvc::forceinline]] ()                                                               \
     {                                                                                           \
         constexpr CompatPOOL_TYPE Type = CompatPoolFlagsToPoolTypeImpl((Flags));                \
         static_assert(Type.IsSupported(), "Unsupported Pool Flags.");                           \
