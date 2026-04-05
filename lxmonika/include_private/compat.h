@@ -111,7 +111,6 @@
 #define POOL_FLAG_PAGED                   0x0000000000000100UI64     // Paged pool
 #define POOL_FLAG_RESERVED2               0x0000000000000200UI64     // Reserved for system use
 #define POOL_FLAG_RESERVED3               0x0000000000000400UI64     // Reserved for system use
-#define POOL_FLAG_LAST_KNOWN_REQUIRED     POOL_FLAG_RESERVED3        // Must be set to the last known required entry.
 #define POOL_FLAG_REQUIRED_END            0x0000000080000000UI64
 
 #define POOL_FLAG_OPTIONAL_START          0x0000000100000000UI64
@@ -119,6 +118,10 @@
 #define POOL_FLAG_OPTIONAL_END            0x8000000000000000UI64
 
 #define POOL_FLAG_REQUIRED_MASK           0x00000000FFFFFFFFUI64
+
+#ifndef POOL_FLAG_LAST_KNOWN_REQUIRED
+#define POOL_FLAG_LAST_KNOWN_REQUIRED     POOL_FLAG_RESERVED3        // Must be set to the last known required entry.
+#endif
 
 //
 // Bits from the "required" flags that are currently not used.
