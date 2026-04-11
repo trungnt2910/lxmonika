@@ -1,0 +1,107 @@
+{
+  "version": 10,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 24,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "Base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/bin/$env{CONFIGURATION}/$env{ARCHITECTURE}",
+      "cacheVariables": {
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/$env{CONFIGURATION}",
+        "CMAKE_BUILD_TYPE": "$env{CONFIGURATION}",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_SYSTEM_NAME": "Windows",
+        "CMAKE_SYSTEM_PROCESSOR": "$env{TOOL_ARCH}"
+      }
+    },
+    {
+      "name": "Debug",
+      "hidden": true,
+      "inherits": "Base",
+      "environment": {
+        "CONFIGURATION": "Debug"
+      }
+    },
+    {
+      "name": "Release",
+      "hidden": true,
+      "inherits": "Base",
+      "environment": {
+        "CONFIGURATION": "Release"
+      }
+    },
+    {
+      "name": "x64",
+      "hidden": true,
+      "inherits": "Base",
+      "environment": {
+        "ARCHITECTURE": "x64",
+        "TOOL_ARCH": "x86_64"
+      }
+    },
+    {
+      "name": "x86",
+      "hidden": true,
+      "inherits": "Base",
+      "environment": {
+        "ARCHITECTURE": "x86",
+        "TOOL_ARCH": "i686"
+      }
+    },
+    {
+      "name": "ARM64",
+      "hidden": true,
+      "inherits": "Base",
+      "environment": {
+        "ARCHITECTURE": "ARM64",
+        "TOOL_ARCH": "aarch64"
+      }
+    },
+    {
+      "name": "ARM",
+      "hidden": true,
+      "inherits": "Base",
+      "environment": {
+        "ARCHITECTURE": "ARM",
+        "TOOL_ARCH": "armv7"
+      }
+    },
+    {
+      "name": "Debug-x64",
+      "inherits": ["Debug", "x64"]
+    },
+    {
+      "name": "Release-x64",
+      "inherits": ["Release", "x64"]
+    },
+    {
+      "name": "Debug-x86",
+      "inherits": ["Debug", "x86"]
+    },
+    {
+      "name": "Release-x86",
+      "inherits": ["Release", "x86"]
+    },
+    {
+      "name": "Debug-ARM64",
+      "inherits": ["Debug", "ARM64"]
+    },
+    {
+      "name": "Release-ARM64",
+      "inherits": ["Release", "ARM64"]
+    },
+    {
+      "name": "Debug-ARM",
+      "inherits": ["Debug", "ARM"]
+    },
+    {
+      "name": "Release-ARM",
+      "inherits": ["Release", "ARM"]
+    }
+  ]
+}

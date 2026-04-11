@@ -1,0 +1,8 @@
+@echo off
+setlocal
+
+set MONIKA_TOOL_PATH=%~dp0..\..\..\c\bin\@MONIKA_INSTALL_ARCH@\monika.exe
+
+"%MONIKA_TOOL_PATH%" %*
+
+endlocal

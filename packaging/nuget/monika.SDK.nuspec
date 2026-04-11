@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata>
+    <id>MONIKA_NUGET_PACKAGE_ID</id>
+    <version>MONIKA_BUILD_VERSION</version>
+    <title>LxMonika SDK</title>
+    <authors>trungnt2910</authors>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>SDK for building Windows Pico process providers.</description>
+    <tags>Windows Pico LxMonika Monika WSL SDK native</tags>
+    <copyright>Copyright (c) MONIKA_BUILD_COPYRIGHT_YEARS MONIKA_BUILD_AUTHOR</copyright>
+    <license type="expression">MIT</license>
+    <readme>README.md</readme>
+    <projectUrl>https://go.trungnt2910.com/monika</projectUrl>
+    <repository type="git" url=MONIKA_QUOTED_BUILD_ORIGIN commit=MONIKA_QUOTED_BUILD_HASH_FULL />
+  </metadata>
+  <files>
+    <file src="..\..\LICENSE.md" />
+
+    <file src="..\..\packaging\nuget\README.SDK.md" target="README.md" />
+
+    <!-- Visual Studio C++ build support. -->
+    <file src="..\..\packaging\nuget\monika.targets" target=MONIKA_NUGET_TARGETS_PATH />
+
+    <file src=".\Include\**" target="c/Include/" />
+    <file src=".\Lib\**" target="c/Lib/" />
+  </files>
+</package>

@@ -1,0 +1,7 @@
+{
+    "cmake.copyCompileCommands": "${workspaceFolder}/out/compile_commands.json",
+    "C_Cpp.intelliSenseEngine": "disabled",
+    "clangd.arguments": [
+        "--compile-commands-dir=${workspaceFolder}/out"
+    ]
+}
