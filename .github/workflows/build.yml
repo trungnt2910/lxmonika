@@ -10,8 +10,12 @@ on:
     branches:
       - "master"
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
-  build:
+  build-msvc:
     strategy:
       matrix:
         platform: [x86, x64, ARM, ARM64]
@@ -79,5 +83,102 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: monika_${{ matrix.configuration }}_${{ matrix.platform }}
+          name: monika_msvc_${{ matrix.configuration }}_${{ matrix.platform }}
           path: out/${{ matrix.configuration }}
+
+  build-clang:
+    strategy:
+      matrix:
+        platform: [x86, x64, ARM, ARM64]
+        configuration: [Debug, Release]
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          # Fetch everything for build metadata to work
+          fetch-depth: 0
+
+      - name: Install Windows SDK/WDK
+        run: |
+          :: Need a dummy log file to prevent winget from failing with a weird error on 22621 SDK.
+          winget install --silent --source winget --exact --id Microsoft.WindowsSDK.10.0.22621 ^
+            --log %TEMP%\sdk-install.log
+          winget install --silent --source winget --exact --id Microsoft.WindowsWDK.10.0.22621
+          winget install --silent --source winget --exact --id Microsoft.WindowsSDK.10.0.26100
+          winget install --silent --source winget --exact --id Microsoft.WindowsWDK.10.0.26100
+        shell: cmd
+
+      - name: Install Code Signing Certificate
+        run: |
+          $pfxBytes = [System.Convert]::FromBase64String("${{ secrets.MONIKA_CERT_PFX }}".Trim())
+          $pfxPath = "${{ github.workspace }}\lxmonika.pfx"
+          [System.IO.File]::WriteAllBytes($pfxPath, $pfxBytes)
+
+          Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My
+
+          Remove-Item $pfxPath
+        shell: powershell
+
+      - name: Build
+        run: |
+          cmake --preset ${{ matrix.configuration }}-${{ matrix.platform }} ^
+            -DMONIKA_CERT_NAME="Project Reality"
+          cmake --build bin/${{ matrix.configuration }}/${{ matrix.platform }} --target install
+        shell: cmd
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: monika_clang_${{ matrix.configuration }}_${{ matrix.platform }}
+          path: out/${{ matrix.configuration }}
+
+  pack-clang:
+    needs: build-clang
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        configuration: [Debug, Release]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: monika_clang_${{ matrix.configuration }}_*
+          path: out/${{ matrix.configuration }}
+          merge-multiple: true
+
+      - name: Setup NuGet
+        uses: nuget/setup-nuget@v3
+
+      - name: NuGet Pack
+        run: |
+          nuget pack out/${{ matrix.configuration }}/monika.nuspec -NonInteractive
+          nuget pack out/${{ matrix.configuration }}/monika.SDK.nuspec -NonInteractive
+        shell: cmd
+
+      - name: Upload NuGet Artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: monika_nupkg_clang_${{ matrix.configuration }}
+          path: ./*.nupkg
+
+      - name: Publish NuGet Packages to GitHub
+        if: ${{ github.ref == 'refs/heads/master' }}
+        run: |
+          nuget sources add                             ^
+            -NonInteractive                             ^
+            -Name "github"                              ^
+            -UserName "${{ github.repository_owner }}"  ^
+            -Password "${{ secrets.GITHUB_TOKEN }}"     ^
+            -Source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
+
+          nuget push *.nupkg                      ^
+            -NonInteractive                       ^
+            -ApiKey "${{ secrets.GITHUB_TOKEN }}" ^
+            -Source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
+        shell: cmd
