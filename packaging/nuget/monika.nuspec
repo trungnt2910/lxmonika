@@ -27,7 +27,7 @@
 
     <!-- Move all SDK files to c\ to avoid conflicts. -->
     <!-- This matches what the Windows C++ SDK NuGet package is doing. -->
-    <file src=".\bin\**" target="c/bin/" />
-    <file src=".\Debug\**" target="c/Debug/" />
+    <file src=MONIKA_NUGET_BIN_SRC_PATH target="c/bin/" />
+    <file src=MONIKA_NUGET_PDB_SRC_PATH target="c/Debug/" />
   </files>
 </package>

@@ -130,8 +130,8 @@ jobs:
           name: monika_clang_${{ matrix.configuration }}_${{ matrix.platform }}
           path: out/${{ matrix.configuration }}
 
-  pack-clang:
-    needs: build-clang
+  pack:
+    needs: [build-msvc, build-clang]
     runs-on: windows-latest
     permissions:
       packages: write  # Pushing to GitHub Packages
@@ -144,11 +144,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Download Build Artifacts
+      - name: Download Build Artifacts (Clang)
         uses: actions/download-artifact@v8
         with:
           pattern: monika_clang_${{ matrix.configuration }}_*
           path: out/${{ matrix.configuration }}
+          merge-multiple: true
+
+      - name: Download Build Artifacts (MSVC)
+        uses: actions/download-artifact@v8
+        with:
+          pattern: monika_clang_${{ matrix.configuration }}_*
+          path: out/${{ matrix.configuration }}/msvc
           merge-multiple: true
 
       - name: Setup NuGet
@@ -158,12 +165,15 @@ jobs:
         run: |
           nuget pack out/${{ matrix.configuration }}/monika.nuspec -NonInteractive
           nuget pack out/${{ matrix.configuration }}/monika.SDK.nuspec -NonInteractive
+
+          nuget pack out/${{ matrix.configuration }}/monika.MSVC.nuspec -NonInteractive
+          nuget pack out/${{ matrix.configuration }}/monika.SDK.MSVC.nuspec -NonInteractive
         shell: cmd
 
       - name: Upload NuGet Artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: monika_nupkg_clang_${{ matrix.configuration }}
+          name: monika_nupkg_${{ matrix.configuration }}
           path: ./*.nupkg
 
       - name: Log In to NuGet

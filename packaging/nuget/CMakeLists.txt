@@ -59,6 +59,18 @@ monika_add_processed_xml(
     "${CMAKE_CURRENT_BINARY_DIR}/monika.nuspec"
     FLAGS
         "-DMONIKA_NUGET_PACKAGE_ID=monika${MONIKA_NUGET_PACKAGE_SUFFIX}"
+        "-DMONIKA_NUGET_BIN_SRC_PATH=\".\\bin\\**\""
+        "-DMONIKA_NUGET_PDB_SRC_PATH=\".\\Debug\\**\""
+)
+
+monika_add_processed_xml(
+    MonikaNuGetMsvcXml
+    "${CMAKE_CURRENT_SOURCE_DIR}/monika.nuspec"
+    "${CMAKE_CURRENT_BINARY_DIR}/monika.MSVC.nuspec"
+    FLAGS
+        "-DMONIKA_NUGET_PACKAGE_ID=monika.MSVC${MONIKA_NUGET_PACKAGE_SUFFIX}"
+        "-DMONIKA_NUGET_BIN_SRC_PATH=\".\\msvc\\bin\\**\""
+        "-DMONIKA_NUGET_PDB_SRC_PATH=\".\\msvc\\Debug\\**\""
 )
 
 set(MONIKA_NUGET_TARGETS_PATH "build/native/monika.SDK${MONIKA_NUGET_PACKAGE_SUFFIX}.targets")
@@ -70,6 +82,19 @@ monika_add_processed_xml(
     FLAGS
         "-DMONIKA_NUGET_PACKAGE_ID=monika.SDK${MONIKA_NUGET_PACKAGE_SUFFIX}"
         "-DMONIKA_NUGET_TARGETS_PATH=\"${MONIKA_NUGET_TARGETS_PATH}\""
+        "-DMONIKA_NUGET_INC_SRC_PATH=\".\\Include\\**\""
+        "-DMONIKA_NUGET_LIB_SRC_PATH=\".\\Lib\\**\""
+)
+
+monika_add_processed_xml(
+    MonikaNuGetSdkMsvcXml
+    "${CMAKE_CURRENT_SOURCE_DIR}/monika.SDK.nuspec"
+    "${CMAKE_CURRENT_BINARY_DIR}/monika.SDK.MSVC.nuspec"
+    FLAGS
+        "-DMONIKA_NUGET_PACKAGE_ID=monika.SDK.MSVC${MONIKA_NUGET_PACKAGE_SUFFIX}"
+        "-DMONIKA_NUGET_TARGETS_PATH=\"${MONIKA_NUGET_TARGETS_PATH}\""
+        "-DMONIKA_NUGET_INC_SRC_PATH=\".\\msvc\\Include\\**\""
+        "-DMONIKA_NUGET_LIB_SRC_PATH=\".\\msvc\\Lib\\**\""
 )
 
 configure_file(
@@ -85,6 +110,12 @@ if(MONIKA_NUGET_SHOULD_INSTALL)
         DESTINATION "${CMAKE_INSTALL_PREFIX}"
     )
     install(FILES "${CMAKE_CURRENT_BINARY_DIR}/monika.SDK.nuspec"
+        DESTINATION "${CMAKE_INSTALL_PREFIX}"
+    )
+    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/monika.MSVC.nuspec"
+        DESTINATION "${CMAKE_INSTALL_PREFIX}"
+    )
+    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/monika.SDK.MSVC.nuspec"
         DESTINATION "${CMAKE_INSTALL_PREFIX}"
     )
     install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/DotnetToolSettings.xml"

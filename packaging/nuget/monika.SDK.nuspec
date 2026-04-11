@@ -22,7 +22,7 @@
     <!-- Visual Studio C++ build support. -->
     <file src="..\..\packaging\nuget\monika.targets" target=MONIKA_NUGET_TARGETS_PATH />
 
-    <file src=".\Include\**" target="c/Include/" />
-    <file src=".\Lib\**" target="c/Lib/" />
+    <file src=MONIKA_NUGET_INC_SRC_PATH target="c/Include/" />
+    <file src=MONIKA_NUGET_LIB_SRC_PATH target="c/Lib/" />
   </files>
 </package>
