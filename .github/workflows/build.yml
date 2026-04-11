@@ -10,10 +10,6 @@ on:
     branches:
       - "master"
 
-permissions:
-  contents: write
-  packages: write
-
 jobs:
   build-msvc:
     strategy:
@@ -137,6 +133,9 @@ jobs:
   pack-clang:
     needs: build-clang
     runs-on: windows-latest
+    permissions:
+      packages: write  # Pushing to GitHub Packages
+      id-token: write  # GitHub OIDC token issuance for NuGet authentication
     strategy:
       matrix:
         configuration: [Debug, Release]
@@ -167,7 +166,14 @@ jobs:
           name: monika_nupkg_clang_${{ matrix.configuration }}
           path: ./*.nupkg
 
-      - name: Publish NuGet Packages to GitHub
+      - name: Log In to NuGet
+        uses: NuGet/login@v1
+        if: ${{ github.ref == 'refs/heads/master' }}
+        id: nuget-login
+        with:
+          user: ${{ github.repository_owner }}
+
+      - name: Publish NuGet Packages
         if: ${{ github.ref == 'refs/heads/master' }}
         run: |
           nuget sources add                             ^
@@ -181,4 +187,9 @@ jobs:
             -NonInteractive                       ^
             -ApiKey "${{ secrets.GITHUB_TOKEN }}" ^
             -Source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
+
+          nuget push *.nupkg                                        ^
+            -NonInteractive                                         ^
+            -ApiKey ${{ steps.nuget-login.outputs.NUGET_API_KEY }}  ^
+            -Source "https://api.nuget.org/v3/index.json"
         shell: cmd
