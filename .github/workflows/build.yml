@@ -154,7 +154,7 @@ jobs:
       - name: Download Build Artifacts (MSVC)
         uses: actions/download-artifact@v8
         with:
-          pattern: monika_clang_${{ matrix.configuration }}_*
+          pattern: monika_msvc_${{ matrix.configuration }}_*
           path: out/${{ matrix.configuration }}/msvc
           merge-multiple: true
 
