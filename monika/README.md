@@ -11,12 +11,11 @@ providers.
 
 ## Building
 
-Build this as a normal Visual Studio project.
+To build and install `monika.exe`, please follow
+[these instructions](/docs/workflow/building/README.md).
 
-## Installation
-
-The build output at `$(SolutionDir)\monika\bin\$(Configuration)\$(Platform)\monika.exe` can be run
-as a standalone executable file. No installation is required.
+`monika.exe` is included with `FeatureCore` in CMake and with the `monika` project in
+Visual Studio/MSBuild.
 
 ## Usage
 

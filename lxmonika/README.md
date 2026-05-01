@@ -90,71 +90,12 @@ ABIs, such as Darwin.
 
 ## Build instructions
 
-### Prerequisites
-
-- Visual Studio 2022.
-- The latest WDK. Download it
-[here](https://learn.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk).
-- WDK version
-[10.0.14393.0](https://download.microsoft.com/download/8/1/6/816FE939-15C7-4185-9767-42ED05524A95/wdk/wdksetup.exe)
-for 32-bit (x86, ARM) and x64 builds.
-- WDK version
-[10.0.17134.0](https://download.microsoft.com/download/B/5/8/B58D625D-17D6-47A8-B3D3-668670B6D1EB/wdk/wdksetup.exe)
-for ARM64 builds.
-- A Windows NT 10.0 machine with Test Signing enabled.
-
-### Instructions
+To build and install `lxmonika`, please follow
+[these instructions](/docs/workflow/building/README.md).
 
 Please use the [`monika.exe`](../monika) CLI to deploy `lxmonika`. This specialized tool
 handles "borrowing" and other quirks specific to `lxmonika.sys`, unlike generic tools like `sc`
 or `pnputil`.
-
-#### For the first time you deploy a driver on a new computer
-
-On an elevated Command Prompt window on the test computer:
-
-- Enable test signing.
-```bat
-bcdedit /set testsigning on
-```
-- Reboot the device.
-```bat
-shutdown /r /t 00
-```
-
-#### Every time you want to test
-
-- Build this driver on Visual Studio 2022 (Right-click the project -> Build).
-- Copy the output folder, located at
-`$(SolutionDir)\lxmonika\bin\$(Configuration)\$(Platform)\lxmonika`, to the test device.
-
-On an elevated Command Prompt window on the test computer:
-
-- Uninstall existing installations of `lxmonika`.
-```bat
-monika uninstall
-```
-- Run the command below. Replace the `path\to` part with the relevant paths.
-```bat
-monika install path\to\lxmonika\lxmonika.sys
-```
-- Reboot the device.
-```bat
-shutdown /r /t 00
-```
-
-#### When you want to uninstall the driver
-
-On an elevated Command Prompt window on the test computer:
-
-- Run the command below.
-```bat
-monika uninstall
-```
-- Reboot the device.
-```bat
-shutdown /r /t 00
-```
 
 ### Notes
 

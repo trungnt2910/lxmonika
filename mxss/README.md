@@ -15,7 +15,11 @@ Like SysX, it is still under development and only supports a few simple function
 
 ### Building the `mxss` driver
 
-`mxss` requires [`lxmonika`](../lxmonika/README.md#build-instructions) to be built and installed.
+`mxss` requires `lxmonika` to be built and installed. Please refer to the
+[build instructions](/docs/workflow/building/README.md) for more details.
+
+For CMake-based builds, you will need to build `FeatureMXSS`. For MSBuild-based builds, you will
+need to build the `mxss` project.
 
 After that, the [`monika.exe`](../monika) CLI can be used to deploy `mxss`.
 ```cmd
@@ -23,6 +27,12 @@ monika.exe install provider path\to\mxss\mxss.sys
 ```
 
 ### Building the Monix distro
+
+#### CMake Cross-Compilation
+
+For CMake-based builds, the Monix distro is included in the `FeatureMXSS` target.
+
+#### On Linux
 
 On a Linux machine (WSL1 should work), run:
 
@@ -40,6 +50,13 @@ After building, a tarball should appear in `/repo/root/mxss/monix/bin/$ARCH`. Co
 to your target machine, and extract it anywhere.
 
 ### Building the Windows Subsystem for Monix host (`mxhost`)
+
+#### CMake
+
+`mxhost.exe` is included in the `FeatureMXSS` target. To install `mxhost.exe`, pass
+`-DMONIKA_INSTALL_MXSS=ON` during CMake configuration.
+
+#### MSBuild
 
 Build the `mxhost` project. This should produce a normal Win32 executable at
 `$(SolutionDir)\mxss\mxhost\bin\$(Configuration)\$(Platform)\mxhost.exe`. Copy it to your target
