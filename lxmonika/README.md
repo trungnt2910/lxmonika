@@ -107,6 +107,23 @@ not provide the required Pico processes infrastructure.
 
 ## Building your own Pico provider
 
+### Dependencies
+
+#### NuGet Package
+
+`lxmonika` exposes an SDK in the [`monika.SDK`](https://nuget.org/packages/monika.SDK) native
+package.
+
+From a Visual Studio C++ driver project, right click the project name, and select
+"Manage NuGet Packages". Search for and install `monika.SDK`.
+
+The NuGet package automatically adds the required headers and libraries from `lxmonika`. For more
+details on native NuGet packages, check out the
+[documentation](https://learn.microsoft.com/en-us/nuget/consume-packages/finding-and-choosing-packages#native-c-packages)
+from Microsoft.
+
+#### Manual Configuration
+
 Your driver will need to add a reference to `lxmonika`. It should also have headers in the
 [`include/`](include) directory included.
 
@@ -120,8 +137,12 @@ Your driver will need to add a reference to `lxmonika`. It should also have head
     </Link>
 ```
 
+### Runtime Initialization
+
 After having the required imports, call `MaRegisterPicoProvider` or `MaRegisterPicoProviderEx` to
 register as a Pico provider.
+
+### Installation
 
 Install your driver using the `monika.exe` CLI.
 ```bat

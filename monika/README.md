@@ -9,6 +9,17 @@ Unified host for `lxmonika`.
 `monika.exe` provides a command line interface to manage `lxmonika` and `lxmonika`-based Pico
 providers.
 
+## Installation
+
+`monika.exe` is packaged as a
+[.NET tool](https://learn.microsoft.com/en-us/dotnet/core/tools/global-tools).
+
+To install, run:
+
+```cmd
+dotnet tool install --global monika
+```
+
 ## Building
 
 To build and install `monika.exe`, please follow
