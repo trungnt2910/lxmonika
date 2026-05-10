@@ -9,6 +9,10 @@ add_compile_options(-Werror)
 add_compile_options(-Wall)
 add_compile_options(-Wextra)
 
+# Third-party dependencies.
+# Must be included before lxmonika-specific target hooks (BuldProps.cmake).
+include(${CMAKE_SOURCE_DIR}/cmake/ThirdParty.cmake)
+
 # Build system hacks.
 include(${CMAKE_SOURCE_DIR}/cmake/Hacks.cmake)
 
@@ -33,11 +37,15 @@ include(${CMAKE_SOURCE_DIR}/cmake/BuildProps.cmake)
 # Support for building kernel-mode drivers
 include(${CMAKE_SOURCE_DIR}/cmake/KernelModeDriver.cmake)
 
+# Support for testing.
+include(${CMAKE_SOURCE_DIR}/cmake/Testing.cmake)
+
 add_subdirectory(lxstub)
 add_subdirectory(lxmonika)
 add_subdirectory(monika)
 add_subdirectory(mxss)
 add_subdirectory(packaging)
+add_subdirectory(testing)
 
 # Add targets such as FeatureCore and FeatureMXSS.
 # Must always be at the very end of this file.

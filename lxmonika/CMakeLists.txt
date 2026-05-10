@@ -33,3 +33,5 @@ monika_should_install_target(lxmonika SHOULD_INSTALL_LXMONIKA)
 if(SHOULD_INSTALL_LXMONIKA)
     install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include/" DESTINATION "Include/lxmonika")
 endif()
+
+add_subdirectory(tests)
