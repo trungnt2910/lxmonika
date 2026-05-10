@@ -62,6 +62,13 @@ jobs:
         with:
           msbuild-architecture: x64
 
+      - name: Setup NuGet
+        uses: nuget/setup-nuget@v4
+
+      - name: Restore NuGet packages
+        run: nuget restore ${{ github.workspace }}\lxmonika.sln
+        shell: cmd
+
       - name: Build
         run: |
             msbuild ${{ github.workspace }}\lxmonika.sln ^
