@@ -13,7 +13,7 @@ Before filing an issue, please search if a similar
 
 If you want to improve `lxmonika`, please open a pull request (PR).
 
-We only accept high-quality pull requests that improves the codebase.
+We only accept high-quality pull requests that improve the codebase.
 
 Before filing a large PR, you are encouraged to discuss by
 [opening an issue](https://github.com/trungnt2910/lxmonika/issues/new) or chatting with us on
